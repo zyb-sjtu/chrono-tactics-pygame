@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import pygame
 
 from .geometry import BoardGeometry
-from .assets import Clip, SpriteBody
+from .assets import Clip, Sprite, SpriteBody
 from .view_models import AttackPresentation
 
 DAMAGE_DURATION = 0.9
@@ -84,39 +84,48 @@ class CombatEffects:
         return ()
 
     def body_views(self):
-        return tuple(SpriteBody(effect.uid, effect.cell, effect.clip.frame_at(effect.age))
-                     for effect in self.sprites)
+        bodies = tuple(SpriteBody(effect.uid, effect.cell, effect.clip.frame_at(effect.age))
+                       for effect in self.sprites)
+        if hasattr(self.geometry, "depth_at"):
+            # Geometric defeat bodies share the renderer's foot-Y/UID ordering with PNG clips.
+            bodies += tuple(SpriteBody(effect.uid, effect.cell, Sprite(self._death_layer(effect), (.5, 1)))
+                            for effect in self.deaths)
+        return bodies
+
+    def _death_layer(self, effect):
+        body_rect = self.geometry.body_rect(effect.cell)
+        cell_size = body_rect[2]
+        scale = self.geometry.cell_scale(effect.cell)
+        progress = effect.age / DEATH_DURATION
+        layer = pygame.Surface((cell_size, cell_size), pygame.SRCALPHA)
+        size = max(1, round(max(4, 42 * (1 - progress * 0.6)) * scale))
+        color = (69, 156, 239) if effect.team == "ally" else (231, 88, 94)
+        if int(effect.age * 20) % 2 == 0:
+            color = (255, 224, 192)
+        center = (cell_size // 2, cell_size // 2)
+        if effect.team == "ally":
+            pygame.draw.circle(layer, color, center, size // 2)
+        else:
+            rect = pygame.Rect(0, 0, size, size)
+            rect.center = center
+            pygame.draw.rect(layer, color, rect, border_radius=3)
+        label = self.label_font.render(effect.uid, True, "white")
+        layer.blit(label, label.get_rect(center=center))
+        for index in range(6):
+            angle = index * math.tau / 6
+            radius = (8 + 23 * progress) * scale
+            point = (round(center[0] + math.cos(angle) * radius),
+                     round(center[1] + math.sin(angle) * radius))
+            pygame.draw.circle(layer, (255, 192, 132), point, max(1, round(3 * (1 - progress) * scale)))
+        layer.set_alpha(round(255 * (1 - progress)))
+        return layer
 
     def draw(self, surface):
         old_clip = surface.get_clip()
         surface.set_clip(old_clip.clip(pygame.Rect(self.geometry.bounds)))
-        for effect in self.deaths:
-            body_rect = self.geometry.body_rect(effect.cell)
-            cell_size = body_rect[2]
-            scale = self.geometry.cell_scale(effect.cell)
-            progress = effect.age / DEATH_DURATION
-            layer = pygame.Surface((cell_size, cell_size), pygame.SRCALPHA)
-            size = max(1, round(max(4, 42 * (1 - progress * 0.6)) * scale))
-            color = (69, 156, 239) if effect.team == "ally" else (231, 88, 94)
-            if int(effect.age * 20) % 2 == 0:
-                color = (255, 224, 192)
-            center = (cell_size // 2, cell_size // 2)
-            if effect.team == "ally":
-                pygame.draw.circle(layer, color, center, size // 2)
-            else:
-                rect = pygame.Rect(0, 0, size, size)
-                rect.center = center
-                pygame.draw.rect(layer, color, rect, border_radius=3)
-            label = self.label_font.render(effect.uid, True, "white")
-            layer.blit(label, label.get_rect(center=center))
-            for index in range(6):
-                angle = index * math.tau / 6
-                radius = (8 + 23 * progress) * scale
-                point = (round(center[0] + math.cos(angle) * radius),
-                         round(center[1] + math.sin(angle) * radius))
-                pygame.draw.circle(layer, (255, 192, 132), point, max(1, round(3 * (1 - progress) * scale)))
-            layer.set_alpha(round(255 * (1 - progress)))
-            surface.blit(layer, body_rect[:2])
+        if not hasattr(self.geometry, "depth_at"):
+            for effect in self.deaths:
+                surface.blit(self._death_layer(effect), self.geometry.body_rect(effect.cell)[:2])
 
         for effect in self.damage_texts:
             progress = effect.age / DAMAGE_DURATION

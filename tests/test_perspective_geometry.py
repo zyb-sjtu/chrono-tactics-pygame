@@ -27,7 +27,9 @@ class PerspectiveGeometryChecks(unittest.TestCase):
                     self.assertEqual(self.geometry.cell_at(self.geometry.project((col+dx,row+dy))), cell)
                 self.assertEqual(self.geometry.cell_at(self.geometry.cell_anchor(cell)), cell)
                 x,y,w,h = self.geometry.body_rect(cell)
-                self.assertEqual(self.geometry.cell_at((x+w/2,y+h/2)),cell)
+                ax,ay = self.geometry.cell_anchor(cell)
+                self.assertLessEqual(abs(x+w/2-ax),1)
+                self.assertLessEqual(abs(y+h-ay),1)
                 self.assertEqual(self.geometry.depth_at(cell), self.geometry.cell_anchor(cell)[1])
 
     def test_polygons_share_exact_edges_and_consistent_winding(self):
@@ -76,3 +78,18 @@ class PerspectiveGeometryChecks(unittest.TestCase):
         geometry = PerspectiveBoardGeometry(8,8,((0,0),(800,0),(800,800),(0,800)),(800,800),(800,800))
         self.assertEqual(geometry.cell_center((2,5)),(250.0,550.0))
         self.assertEqual(geometry.cell_at((350,250)),(3,2))
+
+    def test_irregular_mask_reference_rectangle_and_shared_edge_ownership(self):
+        geometry = PerspectiveBoardGeometry(8,8,((100,100),(400,100),(400,400),(100,400)),
+            (800,800),(800,800),(1,2,3,3),((1,2),(2,2),(2,3)))
+        self.assertEqual(geometry.cell_center((2,3)),(250,250))
+        self.assertIsNone(geometry.cell_at(geometry.project((1.5,3.5))))
+        self.assertEqual(geometry.cell_at(geometry.project((2,2.5))),(2,2))
+        self.assertIsNone(geometry.cell_at(geometry.project((3,2.5))))
+        self.assertEqual(geometry.cell_at(geometry.project((2.5,3))),(2,3))
+        for cell in geometry.cells:
+            self.assertEqual(geometry.cell_at(geometry.cell_center(cell)),cell)
+        with self.assertRaises(ValueError): geometry.cell_anchor((1,3))
+        for changes in ({'cells':[]},{'cells':[(1,2),(1,2)]},{'cells':[(True,2)]},
+                        {'reference_region':[]},{'reference_region':[1,2,8,8]}):
+            with self.subTest(changes=changes),self.assertRaises(ValueError): replace(geometry,**changes)

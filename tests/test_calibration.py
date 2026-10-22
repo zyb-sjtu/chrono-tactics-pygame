@@ -9,6 +9,7 @@ import unittest
 from scripts.calibrate_board import DEFAULT, inspect_extent, load_observations, measure
 from tactics.data_files import DataError
 from tactics.perspective_geometry import PerspectiveBoardGeometry
+from scripts.fit_board import load_map, measure_map, check_presentation
 
 
 class CalibrationChecks(unittest.TestCase):
@@ -71,3 +72,43 @@ class CalibrationChecks(unittest.TestCase):
                              (0,sample['node'][1]-1))
             native=self.geometry.fit.to_image(self.geometry.fit.to_screen(sample['image']))
             for a,b in zip(native,sample['image']): self.assertAlmostEqual(a,b)
+
+    def test_irregular_map_holdouts_meet_target_and_runtime_matches_fit(self):
+        data,geometry=load_map()
+        report=measure_map(data,geometry)
+        self.assertTrue(report['threshold_met'])
+        self.assertFalse(report['full_rectangular_8x8'])
+        self.assertEqual(report['playable_cells'],28)
+        self.assertEqual(report['independent_validation']['count'],20)
+        self.assertAlmostEqual(report['independent_validation']['mean_px'],5.567315763585733)
+        self.assertAlmostEqual(report['independent_validation']['max_px'],11.41999211967498)
+        self.assertEqual(report['independent_interior']['count'],9)
+        self.assertGreater(report['four_observed_corners_baseline']['max_px'],12)
+        # These four reference corners are held out, not falsely reported as zero-error fits.
+        for node in ((1,3),(7,3),(7,7),(1,7)):
+            self.assertEqual(next(p['role'] for p in data['observations'] if tuple(p['node'])==node),'validation')
+        check_presentation(data,geometry)
+
+    def test_map_validation_points_cannot_influence_homography(self):
+        from scripts.fit_board import fit_corners
+        data,geometry=load_map()
+        changed=deepcopy(data)
+        for item in changed['observations']:
+            if item['role']=='validation': item['image'][0]+=30
+        self.assertEqual(fit_corners(changed),fit_corners(data))
+        self.assertFalse(measure_map(changed,geometry)['threshold_met'])
+
+    def test_map_missing_duplicate_and_unusable_observations_rejected(self):
+        data,_=load_map()
+        variations=[]
+        changed=deepcopy(data); changed['observations'].pop(); variations.append(changed)
+        changed=deepcopy(data); changed['observations'].append(changed['observations'][0]); variations.append(changed)
+        changed=deepcopy(data); changed['sha256']='0'*64; variations.append(changed)
+        changed=deepcopy(data)
+        for item in changed['observations']: item['role']='calibration'
+        variations.append(changed)
+        with tempfile.TemporaryDirectory() as temp:
+            path=Path(temp)/'map.json'
+            for changed in variations:
+                path.write_text(json.dumps(changed),encoding='utf-8')
+                with self.subTest(changed=changed),self.assertRaises(DataError): load_map(path)

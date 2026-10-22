@@ -1,0 +1,620 @@
+{
+  "schema_version": 1,
+  "image": "assets/skins/war_torn/backgrounds/battlefield.png",
+  "sha256": "f3ae6033599a5cc9047a8509c3d3f2269e3604513aa29cb0ec7e4db1051f5d2a",
+  "image_size": [
+    1672,
+    941
+  ],
+  "viewport_size": [
+    1280,
+    720
+  ],
+  "logical_size": [
+    8,
+    8
+  ],
+  "reference_region": [
+    1,
+    3,
+    6,
+    4
+  ],
+  "cells": [
+    [
+      3,
+      2
+    ],
+    [
+      4,
+      2
+    ],
+    [
+      5,
+      2
+    ],
+    [
+      6,
+      2
+    ],
+    [
+      1,
+      3
+    ],
+    [
+      2,
+      3
+    ],
+    [
+      3,
+      3
+    ],
+    [
+      4,
+      3
+    ],
+    [
+      5,
+      3
+    ],
+    [
+      6,
+      3
+    ],
+    [
+      1,
+      4
+    ],
+    [
+      2,
+      4
+    ],
+    [
+      3,
+      4
+    ],
+    [
+      4,
+      4
+    ],
+    [
+      5,
+      4
+    ],
+    [
+      6,
+      4
+    ],
+    [
+      1,
+      5
+    ],
+    [
+      2,
+      5
+    ],
+    [
+      3,
+      5
+    ],
+    [
+      4,
+      5
+    ],
+    [
+      5,
+      5
+    ],
+    [
+      6,
+      5
+    ],
+    [
+      1,
+      6
+    ],
+    [
+      2,
+      6
+    ],
+    [
+      3,
+      6
+    ],
+    [
+      4,
+      6
+    ],
+    [
+      5,
+      6
+    ],
+    [
+      6,
+      6
+    ]
+  ],
+  "observations": [
+    {
+      "node": [
+        3,
+        2
+      ],
+      "image": [
+        1084,
+        316
+      ],
+      "role": "calibration",
+      "band": "far"
+    },
+    {
+      "node": [
+        4,
+        2
+      ],
+      "image": [
+        1195,
+        350
+      ],
+      "role": "validation",
+      "band": "far"
+    },
+    {
+      "node": [
+        5,
+        2
+      ],
+      "image": [
+        1311,
+        385
+      ],
+      "role": "calibration",
+      "band": "far"
+    },
+    {
+      "node": [
+        6,
+        2
+      ],
+      "image": [
+        1437,
+        424
+      ],
+      "role": "validation",
+      "band": "far"
+    },
+    {
+      "node": [
+        7,
+        2
+      ],
+      "image": [
+        1576,
+        469
+      ],
+      "role": "calibration",
+      "band": "far"
+    },
+    {
+      "node": [
+        1,
+        3
+      ],
+      "image": [
+        771,
+        288
+      ],
+      "role": "validation",
+      "band": "far"
+    },
+    {
+      "node": [
+        2,
+        3
+      ],
+      "image": [
+        874,
+        321
+      ],
+      "role": "calibration",
+      "band": "far"
+    },
+    {
+      "node": [
+        3,
+        3
+      ],
+      "image": [
+        990,
+        356
+      ],
+      "role": "validation",
+      "band": "far"
+    },
+    {
+      "node": [
+        4,
+        3
+      ],
+      "image": [
+        1103,
+        395
+      ],
+      "role": "calibration",
+      "band": "far"
+    },
+    {
+      "node": [
+        5,
+        3
+      ],
+      "image": [
+        1223,
+        434
+      ],
+      "role": "validation",
+      "band": "far"
+    },
+    {
+      "node": [
+        6,
+        3
+      ],
+      "image": [
+        1352,
+        479
+      ],
+      "role": "calibration",
+      "band": "far"
+    },
+    {
+      "node": [
+        7,
+        3
+      ],
+      "image": [
+        1491,
+        527
+      ],
+      "role": "validation",
+      "band": "far"
+    },
+    {
+      "node": [
+        1,
+        4
+      ],
+      "image": [
+        685,
+        333
+      ],
+      "role": "calibration",
+      "band": "middle"
+    },
+    {
+      "node": [
+        2,
+        4
+      ],
+      "image": [
+        771,
+        359
+      ],
+      "role": "validation",
+      "band": "middle"
+    },
+    {
+      "node": [
+        3,
+        4
+      ],
+      "image": [
+        883,
+        401
+      ],
+      "role": "calibration",
+      "band": "middle"
+    },
+    {
+      "node": [
+        4,
+        4
+      ],
+      "image": [
+        1002,
+        445
+      ],
+      "role": "validation",
+      "band": "middle"
+    },
+    {
+      "node": [
+        5,
+        4
+      ],
+      "image": [
+        1123,
+        490
+      ],
+      "role": "calibration",
+      "band": "middle"
+    },
+    {
+      "node": [
+        6,
+        4
+      ],
+      "image": [
+        1255,
+        541
+      ],
+      "role": "validation",
+      "band": "middle"
+    },
+    {
+      "node": [
+        7,
+        4
+      ],
+      "image": [
+        1393,
+        596
+      ],
+      "role": "calibration",
+      "band": "middle"
+    },
+    {
+      "node": [
+        1,
+        5
+      ],
+      "image": [
+        567,
+        369
+      ],
+      "role": "validation",
+      "band": "middle"
+    },
+    {
+      "node": [
+        2,
+        5
+      ],
+      "image": [
+        655,
+        406
+      ],
+      "role": "calibration",
+      "band": "middle"
+    },
+    {
+      "node": [
+        3,
+        5
+      ],
+      "image": [
+        769,
+        454
+      ],
+      "role": "validation",
+      "band": "middle"
+    },
+    {
+      "node": [
+        4,
+        5
+      ],
+      "image": [
+        889,
+        501
+      ],
+      "role": "calibration",
+      "band": "middle"
+    },
+    {
+      "node": [
+        5,
+        5
+      ],
+      "image": [
+        1012,
+        552
+      ],
+      "role": "validation",
+      "band": "middle"
+    },
+    {
+      "node": [
+        6,
+        5
+      ],
+      "image": [
+        1140,
+        609
+      ],
+      "role": "calibration",
+      "band": "middle"
+    },
+    {
+      "node": [
+        7,
+        5
+      ],
+      "image": [
+        1288,
+        673
+      ],
+      "role": "validation",
+      "band": "middle"
+    },
+    {
+      "node": [
+        1,
+        6
+      ],
+      "image": [
+        429,
+        411
+      ],
+      "role": "calibration",
+      "band": "near"
+    },
+    {
+      "node": [
+        2,
+        6
+      ],
+      "image": [
+        529,
+        457
+      ],
+      "role": "validation",
+      "band": "near"
+    },
+    {
+      "node": [
+        3,
+        6
+      ],
+      "image": [
+        646,
+        508
+      ],
+      "role": "calibration",
+      "band": "near"
+    },
+    {
+      "node": [
+        4,
+        6
+      ],
+      "image": [
+        765,
+        561
+      ],
+      "role": "validation",
+      "band": "near"
+    },
+    {
+      "node": [
+        5,
+        6
+      ],
+      "image": [
+        889,
+        620
+      ],
+      "role": "calibration",
+      "band": "near"
+    },
+    {
+      "node": [
+        6,
+        6
+      ],
+      "image": [
+        1023,
+        685
+      ],
+      "role": "validation",
+      "band": "near"
+    },
+    {
+      "node": [
+        7,
+        6
+      ],
+      "image": [
+        1165,
+        755
+      ],
+      "role": "calibration",
+      "band": "near"
+    },
+    {
+      "node": [
+        1,
+        7
+      ],
+      "image": [
+        308,
+        458
+      ],
+      "role": "validation",
+      "band": "near"
+    },
+    {
+      "node": [
+        2,
+        7
+      ],
+      "image": [
+        398,
+        510
+      ],
+      "role": "calibration",
+      "band": "near"
+    },
+    {
+      "node": [
+        3,
+        7
+      ],
+      "image": [
+        515,
+        568
+      ],
+      "role": "validation",
+      "band": "near"
+    },
+    {
+      "node": [
+        4,
+        7
+      ],
+      "image": [
+        628,
+        628
+      ],
+      "role": "calibration",
+      "band": "near"
+    },
+    {
+      "node": [
+        5,
+        7
+      ],
+      "image": [
+        759,
+        694
+      ],
+      "role": "validation",
+      "band": "near"
+    },
+    {
+      "node": [
+        6,
+        7
+      ],
+      "image": [
+        889,
+        766
+      ],
+      "role": "calibration",
+      "band": "near"
+    },
+    {
+      "node": [
+        7,
+        7
+      ],
+      "image": [
+        1029,
+        845
+      ],
+      "role": "validation",
+      "band": "near"
+    }
+  ],
+  "annotation": "Native PNG seam-center observations inspected in magnified source crops. Estimated manual uncertainty 3-6 native pixels, larger at worn joints. Alternating parity split keeps all four reference rectangle corners in independent validation. Model-generated corner estimates are stored separately from these observations; no projected vertices are labelled as measured. Irregular 28-tile mask retains all six original logical unit cells."
+}

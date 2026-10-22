@@ -2,9 +2,9 @@
 
 仓库名称：`chrono-tactics-pygame`，阶段版本：`0.2.0`；M0–M5 已实施。发布状态以仓库 tag / Release 为准。
 
-当前开发代码另已接入用户原图的 **8×8 逻辑透视战场**：完整背景、透视点击/高亮、深度排序、独立叠加 HUD 与调试网格。该扩展尚未单独发布；角色暂用几何回退，完整逐砖校准未完成，见 [实施记录](docs/PERSPECTIVE_BATTLEFIELD.md)。
+当前开发代码另有原图逐砖透视战场：**8×8 逻辑包围盒内的 28 块不规则有效地块**，完整背景、透视点击/高亮、脚底深度排序、独立 HUD 和 F3 网格。该扩展尚未单独发布，角色仍为几何回退。
 
-**逐砖对齐尚未修复**：已确认旧四角未按真实8×8整砖边界标定，不只是局部纹理偏差。实际网格、原图交点与误差见 [校准诊断](docs/WAR_TORN_CALIBRATION.md)；局部2×6样带达到阈值不能当作8×8通过。工具可运行 `python scripts/calibrate_board.py --pick` 标点、撤销、预览并保存草稿；不会改正式配置或单位位置。
+按用户允许不规则地图的补充要求完成校准：保留单应性，20 个独立验证交点平均 **5.57 px**、最大 **11.42 px**；其中 9 个内部交点为 **3.86/6.00 px**（1280×720）。六个单位初始坐标/属性不变，void 通过原有场景障碍数据阻挡。实测点与拟合四角分开记录；近处边界仍有残差，详见 [校准报告、截图与限制](docs/WAR_TORN_CALIBRATION.md)。
 
 项目仓库：[zyb-sjtu/chrono-tactics-pygame](https://github.com/zyb-sjtu/chrono-tactics-pygame)。这是私有仓库，需要登录有权限的 GitHub 账号访问。
 
@@ -29,7 +29,7 @@
 | [扩展演练](docs/EXTENSION_EXERCISE.md) | 渡口试玩与仅通过 JSON/PNG 扩展的具体步骤 |
 | [功能模板](docs/templates/FEATURE_TEMPLATE.md) | 可复制的规则、数据、回溯、表现与验收模板 |
 | [源码发布](docs/RELEASE.md) | 提交树打包、SHA256 与解压验收 |
-| [透视战场](docs/PERSPECTIVE_BATTLEFIELD.md) | 原图、配置、四角/边界、独立 HUD、152 项检查与校准限制 |
+| [透视战场基线](docs/PERSPECTIVE_BATTLEFIELD.md) / [逐砖校准](docs/WAR_TORN_CALIBRATION.md) | 原图、28 格不规则地图、独立误差、实际截图、输入与脚底 |
 
 架构整改 M0–M5 已落实，后续按实际功能需求继续开发；新增状态必须能回溯，新增美术通过资源与渲染入口接入。约束同时写入 [AGENTS.md](AGENTS.md)，实现进度见 [TASKS.md](TASKS.md)。
 
@@ -57,6 +57,8 @@ cd E:\gamedesign
 默认内容/资源路径相对项目位置解析，与工作目录无关。--scenario 相对 content 根；显式传入 --content-root 或 --assets 时，目录相对当前工作目录或使用绝对路径。更换单位、地砖和动画只改 JSON/PNG，步骤见 [M4 记录](docs/M4_IMPLEMENTATION.md) 和 [资源来源](assets/README.md)。
 
 透视入口固定 1280×720，F3 切换调试网格。`--presentation` 的路径相对项目根；它与 `--scenario`、`--assets`、`--content-root`、`--geometry` 互斥，冲突会报错退出，不隐含覆盖。`--debug-grid` 需要透视入口。快速体验：移动 A2 到内部坐标 `(4,3)`，再攻击 D1 `(5,3)`，击杀后退格恢复；坐标可用调试网格查看。
+
+逐砖校准复核：`python -S scripts/fit_board.py --check`；原图标点、误差分区、配置再生成和真实窗口截图见 [校准报告](docs/WAR_TORN_CALIBRATION.md)。
 
 在新机器安装（Python 3.9 或以上、可用的桌面环境）：
 
@@ -132,6 +134,8 @@ E:\gamedesign\
 │   ├── EXTENSION_EXERCISE.md # 第二场景与外观演练
 │   ├── RELEASE.md          # 提交树打包与解压验收
 │   ├── PERSPECTIVE_BATTLEFIELD.md # 透视模式与校准记录
+│   ├── WAR_TORN_CALIBRATION.md # 不规则地图、实测误差与运行截图
+│   ├── calibration/         # 历史样带、正式40交点及独立误差报告
 │   ├── templates/FEATURE_TEMPLATE.md # 可复制开发模板
 │   ├── ROADMAP.md           # 阶段、前置与验收
 │   ├── ASSET_GUIDE.md       # 美术资源与动画规范
@@ -167,9 +171,10 @@ E:\gamedesign\
 │   ├── test_assets.py       # 16 项 PNG、缓存、渲染和动画检查
 │   ├── test_milestone.py    # 6 项跨场景/外观集成验收
 │   ├── test_release.py      # 4 项发布包损坏/来源/路径检查
-│   ├── test_perspective_geometry.py # 7 项纯透视几何检查
-│   ├── test_presentation_layout.py # 5 项纯配置/背景检查
-│   ├── test_perspective_rendering.py # 7 项显示/输入/战斗集成
+│   ├── test_perspective_geometry.py # 8 项纯透视/遮罩几何检查
+│   ├── test_presentation_layout.py # 6 项纯配置/背景检查
+│   ├── test_perspective_rendering.py # 9 项显示/输入/战斗集成
+│   ├── test_calibration.py  # 9 项观测、误差及标定/验证分离检查
 │   ├── test_content.py      # 13 项无第三方包的内容/清单检查
 │   ├── test_core.py         # 12 项无第三方包的 M1 核心检查
 │   ├── test_controller.py   # 16 项无第三方包的协调与数据边界检查
@@ -177,12 +182,14 @@ E:\gamedesign\
 │   ├── test_rendering.py    # 6 项只读视图、渲染、按钮和场景注入检查
 │   └── test_rewind.py       # 12 项回溯、击杀及行动顺序检查
 ├── content/                 # units.json、训练场/渡口/war_torn 三个场景
-├── presentations/war_torn_8x8.json # 透视角点、视口、HUD、调试
+├── presentations/war_torn_8x8.json # 参照角点、28格遮罩、视口、HUD、调试
 ├── assets/                  # 默认/dusk 共 26 张 PNG；war_torn 原始背景与独立清单
 ├── scripts/generate_demo_assets.py # 重建演示 PNG，不下载外部资源
 ├── scripts/generate_dusk_assets.py # 重建第二套演示 PNG
 ├── scripts/build_release.py # 从确切提交构建源码 ZIP 与 SHA256
 ├── scripts/verify_release.py # 校验并在解压目录验收
+├── scripts/calibrate_board.py # 四角/内部点的可撤销草稿标点
+├── scripts/fit_board.py     # 单应性多点标定、独立误差、配置一致性与真实截图
 ├── VERSION.txt             # 阶段版本 0.2.0
 ├── artifacts\               # 实际运行截图，不是游戏资源
 │   ├── m4_assets.png        # 当前默认地砖/斥候素材
@@ -224,7 +231,7 @@ $releaseCommit = git rev-parse HEAD
 
 ## 验证记录
 
-校准诊断新增7项检查，总计 **159项，本机158通过、1项符号链接权限跳过**；七组纯检查75项。运行检查通过不等于画面逐砖对齐通过，完整8×8校准仍未完成，详见诊断记录。
+当前总计 **165 项，本机 164 通过、1 项符号链接权限跳过**，dummy 与实际 Windows 显示分别验证。七组纯检查 80 项，另 4 项包完整性检查；逐砖误差另由真实原图交点独立测量，不以测试数量代替对齐证据。
 
 透视功能实现时的基线为 **152 项：本机 151 通过、1 项符号链接权限跳过**，dummy 与 windows 实际窗口分别执行；当时六组纯检查 69 项，另 4 项包完整性检查可用 `-S`。矩形/透视完整战斗状态一致；旧几何 13 帧逐像素不变。这是功能/兼容性基线，不是接缝对齐验收，见 [透视实施记录](docs/PERSPECTIVE_BATTLEFIELD.md)。
 

@@ -1,0 +1,782 @@
+{
+  "image_sha256": "f3ae6033599a5cc9047a8509c3d3f2269e3604513aa29cb0ec7e4db1051f5d2a",
+  "viewport_size": [
+    1280,
+    720
+  ],
+  "scale": 0.7651434643995749,
+  "offset": [
+    0.34006376195532084,
+    0.0
+  ],
+  "playable_cells": 28,
+  "method": "One homography refined offline; runtime PerspectiveBoardGeometry formula unchanged.",
+  "reference_region": [
+    1,
+    3,
+    6,
+    4
+  ],
+  "fitted_corners_image": {
+    "p00": [
+      785.8062519854639,
+      286.44325233527604
+    ],
+    "p10": [
+      1493.02283721993,
+      531.1572489530942
+    ],
+    "p11": [
+      1042.6596392405297,
+      844.3669334366049
+    ],
+    "p01": [
+      298.78755614375797,
+      467.71591609752414
+    ]
+  },
+  "observed_reference_corners_image": {
+    "p00": [
+      771,
+      288
+    ],
+    "p10": [
+      1491,
+      527
+    ],
+    "p11": [
+      1029,
+      845
+    ],
+    "p01": [
+      308,
+      458
+    ]
+  },
+  "four_observed_corners_baseline": {
+    "count": 36,
+    "mean_px": 13.605057700552218,
+    "max_px": 27.442274938900766
+  },
+  "calibration": {
+    "count": 20,
+    "mean_px": 4.807673228910535,
+    "max_px": 10.442477862768744
+  },
+  "independent_validation": {
+    "count": 20,
+    "mean_px": 5.567315763585733,
+    "max_px": 11.41999211967498
+  },
+  "all_vertices": {
+    "count": 40,
+    "mean_px": 5.187494496248133,
+    "max_px": 11.41999211967498
+  },
+  "independent_interior": {
+    "count": 9,
+    "mean_px": 3.855241185859837,
+    "max_px": 6.002101554331281
+  },
+  "bands": {
+    "far": {
+      "count": 6,
+      "mean_px": 4.807837170217445,
+      "max_px": 11.391353551582771
+    },
+    "middle": {
+      "count": 7,
+      "mean_px": 3.4757789343163403,
+      "max_px": 7.207970336328134
+    },
+    "near": {
+      "count": 7,
+      "mean_px": 8.309834244313658,
+      "max_px": 11.41999211967498
+    }
+  },
+  "threshold_met": true,
+  "full_rectangular_8x8": false,
+  "points": [
+    {
+      "node": [
+        3,
+        2
+      ],
+      "image": [
+        1084,
+        316
+      ],
+      "role": "calibration",
+      "band": "far",
+      "predicted_image": [
+        1080.0697921993747,
+        314.3087438919754
+      ],
+      "error_px": 3.27378419167604
+    },
+    {
+      "node": [
+        4,
+        2
+      ],
+      "image": [
+        1195,
+        350
+      ],
+      "role": "validation",
+      "band": "far",
+      "predicted_image": [
+        1190.2088694929646,
+        349.6706252904999
+      ],
+      "error_px": 3.6745547252828534
+    },
+    {
+      "node": [
+        5,
+        2
+      ],
+      "image": [
+        1311,
+        385
+      ],
+      "role": "calibration",
+      "band": "far",
+      "predicted_image": [
+        1308.851522367961,
+        387.7627132475154
+      ],
+      "error_px": 2.6778426017199477
+    },
+    {
+      "node": [
+        6,
+        2
+      ],
+      "image": [
+        1437,
+        424
+      ],
+      "role": "validation",
+      "band": "far",
+      "predicted_image": [
+        1437.0221060327408,
+        428.91389309853264
+      ],
+      "error_px": 3.759871234889329
+    },
+    {
+      "node": [
+        7,
+        2
+      ],
+      "image": [
+        1576,
+        469
+      ],
+      "role": "calibration",
+      "band": "far",
+      "predicted_image": [
+        1575.9163859173018,
+        473.5080841241113
+      ],
+      "error_px": 3.449924360854747
+    },
+    {
+      "node": [
+        1,
+        3
+      ],
+      "image": [
+        771,
+        288
+      ],
+      "role": "validation",
+      "band": "far",
+      "predicted_image": [
+        785.8062519854639,
+        286.44325233527604
+      ],
+      "error_px": 11.391353551582771
+    },
+    {
+      "node": [
+        2,
+        3
+      ],
+      "image": [
+        874,
+        321
+      ],
+      "role": "calibration",
+      "band": "far",
+      "predicted_image": [
+        882.3558752377736,
+        319.8517507660421
+      ],
+      "error_px": 6.453527121674999
+    },
+    {
+      "node": [
+        3,
+        3
+      ],
+      "image": [
+        990,
+        356
+      ],
+      "role": "validation",
+      "band": "far",
+      "predicted_image": [
+        986.1531051602166,
+        355.76809591758916
+      ],
+      "error_px": 2.948769938827149
+    },
+    {
+      "node": [
+        4,
+        3
+      ],
+      "image": [
+        1103,
+        395
+      ],
+      "role": "calibration",
+      "band": "far",
+      "predicted_image": [
+        1098.0458406869918,
+        394.4856812725476
+      ],
+      "error_px": 3.811015016273398
+    },
+    {
+      "node": [
+        5,
+        3
+      ],
+      "image": [
+        1223,
+        434
+      ],
+      "role": "validation",
+      "band": "far",
+      "predicted_image": [
+        1219.0196089539077,
+        436.34552299090893
+      ],
+      "error_px": 3.5350117429595445
+    },
+    {
+      "node": [
+        6,
+        3
+      ],
+      "image": [
+        1352,
+        479
+      ],
+      "role": "calibration",
+      "band": "far",
+      "predicted_image": [
+        1350.2266705701336,
+        481.7463310360737
+      ],
+      "error_px": 2.5013324440445417
+    },
+    {
+      "node": [
+        7,
+        3
+      ],
+      "image": [
+        1491,
+        527
+      ],
+      "role": "validation",
+      "band": "far",
+      "predicted_image": [
+        1493.0228372199304,
+        531.1572489530942
+      ],
+      "error_px": 3.5374618277630256
+    },
+    {
+      "node": [
+        1,
+        4
+      ],
+      "image": [
+        685,
+        333
+      ],
+      "role": "calibration",
+      "band": "middle",
+      "predicted_image": [
+        680.8727503568576,
+        325.5004292373722
+      ],
+      "error_px": 6.549813583854788
+    },
+    {
+      "node": [
+        2,
+        4
+      ],
+      "image": [
+        771,
+        359
+      ],
+      "role": "validation",
+      "band": "middle",
+      "predicted_image": [
+        778.0597800622454,
+        361.9862144874186
+      ],
+      "error_px": 5.865111463716077
+    },
+    {
+      "node": [
+        3,
+        4
+      ],
+      "image": [
+        883,
+        401
+      ],
+      "role": "calibration",
+      "band": "middle",
+      "predicted_image": [
+        882.9047079962697,
+        401.34691453920067
+      ],
+      "error_px": 0.27527120921527526
+    },
+    {
+      "node": [
+        4,
+        4
+      ],
+      "image": [
+        1002,
+        445
+      ],
+      "role": "validation",
+      "band": "middle",
+      "predicted_image": [
+        996.3497676256354,
+        443.93626103803996
+      ],
+      "error_px": 4.399186773408743
+    },
+    {
+      "node": [
+        5,
+        4
+      ],
+      "image": [
+        1123,
+        490
+      ],
+      "role": "calibration",
+      "band": "middle",
+      "predicted_image": [
+        1119.498380800686,
+        490.1684986912177
+      ],
+      "error_px": 2.682341217503711
+    },
+    {
+      "node": [
+        6,
+        4
+      ],
+      "image": [
+        1255,
+        541
+      ],
+      "role": "validation",
+      "band": "middle",
+      "predicted_image": [
+        1253.651165970423,
+        540.5319034092786
+      ],
+      "error_px": 1.092432936890221
+    },
+    {
+      "node": [
+        7,
+        4
+      ],
+      "image": [
+        1393,
+        596
+      ],
+      "role": "calibration",
+      "band": "middle",
+      "predicted_image": [
+        1400.3520505782699,
+        595.6060937412525
+      ],
+      "error_px": 5.633441690118532
+    },
+    {
+      "node": [
+        1,
+        5
+      ],
+      "image": [
+        567,
+        369
+      ],
+      "role": "validation",
+      "band": "middle",
+      "predicted_image": [
+        565.8078626684804,
+        368.3285975908011
+      ],
+      "error_px": 1.0468696717041603
+    },
+    {
+      "node": [
+        2,
+        5
+      ],
+      "image": [
+        655,
+        406
+      ],
+      "role": "calibration",
+      "band": "middle",
+      "predicted_image": [
+        663.2929897128848,
+        408.35072272960804
+      ],
+      "error_px": 6.595322549495995
+    },
+    {
+      "node": [
+        3,
+        5
+      ],
+      "image": [
+        769,
+        454
+      ],
+      "role": "validation",
+      "band": "middle",
+      "predicted_image": [
+        768.8610712603954,
+        451.69127219038603
+      ],
+      "error_px": 1.7697034422975442
+    },
+    {
+      "node": [
+        4,
+        5
+      ],
+      "image": [
+        889,
+        501
+      ],
+      "role": "calibration",
+      "band": "middle",
+      "predicted_image": [
+        883.560880881674,
+        498.7808157262852
+      ],
+      "error_px": 4.494773111995415
+    },
+    {
+      "node": [
+        5,
+        5
+      ],
+      "image": [
+        1012,
+        552
+      ],
+      "role": "validation",
+      "band": "middle",
+      "predicted_image": [
+        1008.6308338264325,
+        550.1277797157743
+      ],
+      "error_px": 2.949177915869502
+    },
+    {
+      "node": [
+        6,
+        5
+      ],
+      "image": [
+        1140,
+        609
+      ],
+      "role": "calibration",
+      "band": "middle",
+      "predicted_image": [
+        1145.5438807845032,
+        606.3368781149106
+      ],
+      "error_px": 4.705901798516729
+    },
+    {
+      "node": [
+        7,
+        5
+      ],
+      "image": [
+        1288,
+        673
+      ],
+      "role": "validation",
+      "band": "middle",
+      "predicted_image": [
+        1296.0657886753477,
+        668.1330394000606
+      ],
+      "error_px": 7.207970336328134
+    },
+    {
+      "node": [
+        1,
+        6
+      ],
+      "image": [
+        429,
+        411
+      ],
+      "role": "calibration",
+      "band": "near",
+      "predicted_image": [
+        439.0698761562441,
+        415.5015965148594
+      ],
+      "error_px": 8.439736251045368
+    },
+    {
+      "node": [
+        2,
+        6
+      ],
+      "image": [
+        529,
+        457
+      ],
+      "role": "validation",
+      "band": "near",
+      "predicted_image": [
+        536.3953795677992,
+        459.61594739587196
+      ],
+      "error_px": 6.002101554331281
+    },
+    {
+      "node": [
+        3,
+        6
+      ],
+      "image": [
+        646,
+        508
+      ],
+      "role": "calibration",
+      "band": "near",
+      "predicted_image": [
+        642.2357421434587,
+        507.5897952401758
+      ],
+      "error_px": 2.897248352754742
+    },
+    {
+      "node": [
+        4,
+        6
+      ],
+      "image": [
+        765,
+        561
+      ],
+      "role": "validation",
+      "band": "near",
+      "predicted_image": [
+        757.7595089642778,
+        559.9528019135618
+      ],
+      "error_px": 5.597657716528402
+    },
+    {
+      "node": [
+        5,
+        6
+      ],
+      "image": [
+        889,
+        620
+      ],
+      "role": "calibration",
+      "band": "near",
+      "predicted_image": [
+        884.3592972791572,
+        617.3361935983505
+      ],
+      "error_px": 4.0941958308460125
+    },
+    {
+      "node": [
+        6,
+        6
+      ],
+      "image": [
+        1023,
+        685
+      ],
+      "role": "validation",
+      "band": "near",
+      "predicted_image": [
+        1023.7082089948733,
+        680.4983306624625
+      ],
+      "error_px": 3.4867871267372244
+    },
+    {
+      "node": [
+        7,
+        6
+      ],
+      "image": [
+        1165,
+        755
+      ],
+      "role": "calibration",
+      "band": "near",
+      "predicted_image": [
+        1177.8341897273367,
+        750.3584120962137
+      ],
+      "error_px": 10.442477862768744
+    },
+    {
+      "node": [
+        1,
+        7
+      ],
+      "image": [
+        308,
+        458
+      ],
+      "role": "validation",
+      "band": "near",
+      "predicted_image": [
+        298.787556143758,
+        467.71591609752414
+      ],
+      "error_px": 10.2445866054385
+    },
+    {
+      "node": [
+        2,
+        7
+      ],
+      "image": [
+        398,
+        510
+      ],
+      "role": "calibration",
+      "band": "near",
+      "predicted_image": [
+        395.3362929558614,
+        516.6022512207514
+      ],
+      "error_px": 5.447319393156913
+    },
+    {
+      "node": [
+        3,
+        7
+      ],
+      "image": [
+        515,
+        568
+      ],
+      "role": "validation",
+      "band": "near",
+      "predicted_image": [
+        500.82507957448723,
+        570.0152770629938
+      ],
+      "error_px": 10.954912278057362
+    },
+    {
+      "node": [
+        4,
+        7
+      ],
+      "image": [
+        628,
+        628
+      ],
+      "role": "calibration",
+      "band": "near",
+      "predicted_image": [
+        616.5559187463,
+        628.6142476415122
+      ],
+      "error_px": 8.768967922047146
+    },
+    {
+      "node": [
+        5,
+        7
+      ],
+      "image": [
+        759,
+        694
+      ],
+      "role": "validation",
+      "band": "near",
+      "predicted_image": [
+        744.0965395928538,
+        693.1929644471313
+      ],
+      "error_px": 11.41999211967498
+    },
+    {
+      "node": [
+        6,
+        7
+      ],
+      "image": [
+        889,
+        766
+      ],
+      "role": "calibration",
+      "band": "near",
+      "predicted_image": [
+        885.351832697661,
+        764.7159467735619
+      ],
+      "error_px": 2.959228068647654
+    },
+    {
+      "node": [
+        7,
+        7
+      ],
+      "image": [
+        1029,
+        845
+      ],
+      "role": "validation",
+      "band": "near",
+      "predicted_image": [
+        1042.65963924053,
+        844.366933436605
+      ],
+      "error_px": 10.46280230942786
+    }
+  ]
+}

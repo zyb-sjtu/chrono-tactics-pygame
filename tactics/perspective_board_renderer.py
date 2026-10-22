@@ -6,6 +6,7 @@ import pygame
 class PerspectiveBoardRenderer:
     def __init__(self, geometry, assets, debug=()):
         self.geometry = geometry
+        self.cells = frozenset(geometry.cells)
         self.assets = assets
         self.elapsed = 0
         self.debug = dict(debug)
@@ -18,24 +19,26 @@ class PerspectiveBoardRenderer:
 
     def _build_debug_layer(self):
         layer = pygame.Surface(tuple(map(int, self.geometry.viewport_size)), pygame.SRCALPHA)
-        for row in range(self.geometry.rows):
-            for col in range(self.geometry.cols):
-                cell = (col,row)
-                polygon = self.geometry.cell_polygon(cell)
-                center = self.geometry.cell_center(cell)
-                if self.debug.get("show_grid"):
-                    pygame.draw.polygon(layer,(130,210,236,180),polygon,1)
-                if self.debug.get("show_cell_centers"):
-                    pygame.draw.circle(layer,(255,210,90),center,2)
-                if self.debug.get("show_coordinates"):
-                    label = self.debug_font.render("{},{}".format(col,row),True,(255,248,199))
-                    layer.blit(label,label.get_rect(center=center))
+        for col,row in self.geometry.cells:
+            cell = (col,row)
+            polygon = self.geometry.cell_polygon(cell)
+            center = self.geometry.cell_center(cell)
+            if self.debug.get("show_grid"):
+                pygame.draw.polygon(layer,(130,210,236,180),polygon,1)
+            if self.debug.get("show_cell_centers"):
+                pygame.draw.circle(layer,(255,210,90),center,2)
+            if self.debug.get("show_coordinates"):
+                label = self.debug_font.render("{},{}".format(col,row),True,(255,248,199))
+                layer.blit(label,label.get_rect(center=center))
         if self.debug.get("show_grid"):
-            for name, point in zip(("p00","p10","p11","p01"),self.geometry.corners):
+            ox,oy,w,h = self.geometry.reference_region
+            nodes = ((ox,oy),(ox+w,oy),(ox+w,oy+h),(ox,oy+h))
+            for name, point, node in zip(("p00","p10","p11","p01"),self.geometry.corners,nodes):
                 screen = self.geometry.fit.to_screen(point)
                 pygame.draw.circle(layer,(255,160,100),screen,5)
-                label = self.debug_font.render(name,True,(255,238,200))
-                layer.blit(label,(screen[0]+6,screen[1]-18))
+                label = self.debug_font.render("REF {} {}".format(name,node),True,(255,238,200))
+                label_x = screen[0]-label.get_width()-8 if name == "p01" else screen[0]+6
+                layer.blit(label,(label_x,screen[1]-18))
         return layer
 
     def update(self, elapsed):
@@ -45,6 +48,27 @@ class PerspectiveBoardRenderer:
         enabled = not any(self.debug.values())
         self.debug = dict.fromkeys(("show_grid","show_cell_centers","show_coordinates"),enabled)
         self._debug_layer = self._build_debug_layer()
+
+    def cell_at(self, position, view):
+        """Visible bodies use the same foot pivots as drawing, then fall back to floor picking."""
+        for unit in sorted(view.units, key=lambda u: (self.geometry.depth_at(u.cell),u.uid), reverse=True):
+            anchor = self.geometry.cell_anchor(unit.cell)
+            clip = self.assets.visual(unit.definition_id,"idle",self.geometry.cell_scale(unit.cell))
+            if clip:
+                sprite = clip.frame_at(self.elapsed)
+                width,height = sprite.surface.get_size()
+                rect = pygame.Rect(round(anchor[0]-width*sprite.pivot[0]),
+                                   round(anchor[1]-height*sprite.pivot[1]),width,height)
+                if rect.collidepoint(position):
+                    x,y = round(position[0]-rect.x),round(position[1]-rect.y)
+                    if 0 <= x < width and 0 <= y < height and sprite.surface.get_at((x,y)).a:
+                        return unit.cell
+            else:
+                rect = pygame.Rect(self.geometry.body_rect(unit.cell))
+                if rect.collidepoint(position):
+                    if unit.team != "ally" or ((position[0]-rect.centerx)**2+(position[1]-rect.centery)**2 <= (rect.width/2)**2):
+                        return unit.cell
+        return self.geometry.cell_at(position)
 
     def draw(self, surface, view, bodies=()):
         if (view.cols,view.rows) != (self.geometry.cols,self.geometry.rows):
@@ -61,7 +85,8 @@ class PerspectiveBoardRenderer:
         surface.blit(layer,(0,0))
 
         overrides = {body.uid:body for body in bodies}
-        drawables = [(self.geometry.depth_at(c),"obstacle:{}:{}".format(*c),"obstacle",c) for c in view.obstacles]
+        drawables = [(self.geometry.depth_at(c),"obstacle:{}:{}".format(*c),"obstacle",c)
+                     for c in view.obstacles if c in self.cells]
         drawables += [(self.geometry.depth_at(u.cell),u.uid,"unit",u) for u in view.units if u.uid not in overrides]
         drawables += [(self.geometry.depth_at(b.cell),b.uid,"sprite",b) for b in bodies]
         # Shadows precede all bodies. Cached sprites are never modified in-place.
@@ -84,6 +109,7 @@ class PerspectiveBoardRenderer:
                     sprite.blit(surface,anchor)
                 else:
                     rock = rect.inflate(-rect.width*.3,-rect.height*.3)
+                    rock.midbottom = tuple(round(v) for v in anchor)
                     pygame.draw.rect(surface,(92,89,84),rock,border_radius=6)
                     pygame.draw.line(surface,(172,159,133),rock.topleft,rock.bottomright,2)
                 continue
@@ -91,10 +117,10 @@ class PerspectiveBoardRenderer:
             if clip:
                 clip.frame_at(self.elapsed).blit(surface,anchor)
             elif item.team == "ally":
-                pygame.draw.circle(surface,(61,131,177),rect.center,round(19*scale))
-                pygame.draw.circle(surface,(163,215,227),rect.center,round(19*scale),2)
+                pygame.draw.circle(surface,(61,131,177),rect.center,rect.width//2)
+                pygame.draw.circle(surface,(163,215,227),rect.center,rect.width//2,2)
             else:
-                block = rect.inflate(-rect.width*.4,-rect.height*.4)
+                block = rect
                 pygame.draw.rect(surface,(170,72,64),block,border_radius=3)
                 pygame.draw.rect(surface,(235,162,128),block,2,border_radius=3)
         # Every mark and health bar remains above all large neighboring bodies.
@@ -103,10 +129,10 @@ class PerspectiveBoardRenderer:
             if unit.uid == view.active_uid:
                 pygame.draw.polygon(surface,(239,204,113),self.geometry.cell_polygon(unit.cell),2)
             if unit.uid == view.selected_uid:
-                pygame.draw.ellipse(surface,(235,238,219),rect.inflate(8,8),2)
+                pygame.draw.polygon(surface,(235,238,219),self.geometry.cell_polygon(unit.cell),3)
             label = self.label_font.render(unit.uid,True,(255,249,225))
             surface.blit(label,label.get_rect(center=rect.center))
-            bar = pygame.Rect(rect.x+6,rect.bottom-3,max(12,rect.width-12),4)
+            bar = pygame.Rect(rect.x,rect.top-7,rect.width,4)
             pygame.draw.rect(surface,(33,30,28),bar)
             fill = bar.copy()
             fill.width = round(bar.width*min(1,unit.health/max(1,unit.max_health)))

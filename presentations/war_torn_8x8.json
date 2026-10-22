@@ -4,11 +4,166 @@
   "mode": "perspective",
   "scenario_file": "scenarios/war_torn.json",
   "asset_root": "assets/skins/war_torn",
-  "viewport": {"reference_size":[1280,720],"background_fit":"contain"},
-  "board": {
-    "cols":8,"rows":8,"reference_image_size":[1672,941],
-    "corners":{"p00":[1060,270],"p10":[1530,452],"p11":[892,898],"p01":[340,568]}
+  "viewport": {
+    "reference_size": [
+      1280,
+      720
+    ],
+    "background_fit": "contain"
   },
-  "hud": {"layout":"overlay","safe_margin":24},
-  "debug": {"show_grid":false,"show_cell_centers":false,"show_coordinates":false}
+  "board": {
+    "cols": 8,
+    "rows": 8,
+    "reference_image_size": [
+      1672,
+      941
+    ],
+    "corners": {
+      "p00": [
+        785.8062519854639,
+        286.44325233527604
+      ],
+      "p10": [
+        1493.02283721993,
+        531.1572489530942
+      ],
+      "p11": [
+        1042.6596392405297,
+        844.3669334366049
+      ],
+      "p01": [
+        298.78755614375797,
+        467.71591609752414
+      ]
+    },
+    "reference_region": [
+      1,
+      3,
+      6,
+      4
+    ],
+    "cells": [
+      [
+        3,
+        2
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        6
+      ]
+    ]
+  },
+  "hud": {
+    "layout": "overlay",
+    "safe_margin": 24
+  },
+  "debug": {
+    "show_grid": false,
+    "show_cell_centers": false,
+    "show_coordinates": false
+  }
 }

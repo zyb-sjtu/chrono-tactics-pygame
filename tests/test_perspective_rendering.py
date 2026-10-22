@@ -121,7 +121,7 @@ class PerspectiveRenderingChecks(unittest.TestCase):
         initial=game.controller.get_view_state()
         for unit in initial.units:
             rect=pygame.Rect(game.geometry.body_rect(unit.cell))
-            self.assertEqual(game.geometry.cell_at(rect.center),unit.cell)
+            self.assertEqual(game.renderer.cell_at(rect.center,initial.board),unit.cell)
         for position in ((30,30),(40,180),(410,60)):
             self.assertTrue(game.panel.contains(position))
             game.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN,button=1,pos=position))
@@ -155,6 +155,48 @@ class PerspectiveRenderingChecks(unittest.TestCase):
         center=tuple(round(v) for v in game.geometry.cell_center((2,4)))
         pixel=game.screen.get_at(center)
         self.assertNotEqual(pixel[:3],(76,139,137))  # Range fill preserves image texture via alpha.
+
+    def test_irregular_voids_body_picking_ranges_and_foot_anchored_obstacle(self):
+        original=load_content(scenario_file='scenarios/war_torn.json').scenario
+        scenario=replace(original,obstacles=frozenset(original.obstacles)|{(3,6)})
+        game=Game(scenario,presentation_file=PRESENTATION,debug_grid=True)
+        initial=game.controller.get_view_state()
+        cells=frozenset(game.geometry.cells)
+        self.assertTrue(initial.board.move_cells<=cells)
+        self.assertEqual(tuple((u.uid,u.cell) for u in initial.units),tuple((u.uid,u.cell) for u in original.units))
+        for uid in ('D2','D1','A1','A2'):
+            unit=next(u for u in initial.units if u.uid==uid)
+            body=pygame.Rect(game.geometry.body_rect(unit.cell))
+            game.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN,button=1,pos=body.center))
+            self.assertEqual(game.controller.get_view_state().selected.uid,uid)
+        # Ground hits are tested independently of body-selection priority, across all 28 tiles.
+        for cell in cells:
+            self.assertEqual(game.geometry.cell_at(game.geometry.cell_center(cell)),cell)
+        for cell in original.obstacles:
+            self.assertIsNone(game.geometry.cell_at(game.geometry.project((cell[0]+.5,cell[1]+.5))))
+        rectangles=[]
+        draw_rect=pygame.draw.rect
+        def record(surface,color,rect,*args,**kwargs):
+            if color==(92,89,84): rectangles.append(pygame.Rect(rect))
+            return draw_rect(surface,color,rect,*args,**kwargs)
+        with patch('pygame.draw.rect',side_effect=record): game.draw()
+        self.assertEqual(len(rectangles),1)
+        anchor=game.geometry.cell_anchor((3,6))
+        self.assertEqual(rectangles[0].midbottom,tuple(round(v) for v in anchor))
+        self.assertTrue(game.controller.move_to((4,3)))
+        self.assertTrue(game.controller.attack('D1'))
+        game.update(.2)
+        death=next(body for body in game.effects.body_views() if body.uid=='D1')
+        self.assertEqual(death.sprite.pivot,(.5,1))
+        anchors=[]
+        blit=Sprite.blit
+        def record_body(sprite,surface,position):
+            if sprite is not game.renderer.background: anchors.append(position)
+            return blit(sprite,surface,position)
+        with patch.object(Sprite,'blit',record_body): game.draw()
+        self.assertEqual(anchors,[game.geometry.cell_anchor(death.cell)])  # One depth-sorted defeat body.
+        broken=replace(original,obstacles=frozenset())
+        with self.assertRaisesRegex(DataError,'void'): Game(broken,presentation_file=PRESENTATION)
 
     def test_missing_corrupt_and_wrong_sized_background_fail_cleanly(self):
         layout=load_presentation(PRESENTATION)
