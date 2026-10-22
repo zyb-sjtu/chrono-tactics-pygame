@@ -1,6 +1,6 @@
 # 演示资源来源与替换
 
-这 9 张 PNG 是 `scripts/generate_demo_assets.py` 使用 Pygame 几何图形生成的项目演示素材，没有下载或引用第三方美术。它们用于验证资源链路，不代表最终美术风格。资源无第三方素材许可要求；项目整体授权仍由仓库所有者决定，本文件不另设开源许可证。
+默认 9 张 PNG 由 `scripts/generate_demo_assets.py` 使用 Pygame 几何图形生成；M5 增加 [dusk 外观](skins/dusk/README.md) 的 17 张 PNG，由 `scripts/generate_dusk_assets.py` 生成。没有下载或引用第三方美术，不代表最终风格。资源无第三方素材许可要求；项目整体授权仍由仓库所有者决定，本文件不另设开源许可证。
 
 | 文件 | 原始 / 基准显示尺寸 | 锚点 | 用途 |
 | --- | --- | --- | --- |

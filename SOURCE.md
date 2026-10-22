@@ -1,6 +1,6 @@
 # 完整项目源码
 
-本文件由 `python scripts/export_source.py` 生成。包含项目全部文本源码、配置和文档；不包含自身、二进制 PNG、截图、虚拟环境、缓存及压缩包。演示 PNG 可由 scripts/generate_demo_assets.py 重建。
+本文件由 `python scripts/export_source.py` 生成。包含项目全部文本源码、配置和文档；不包含自身、二进制 PNG、截图、虚拟环境、缓存及压缩包。演示 PNG 可由 scripts/generate_demo_assets.py 与 scripts/generate_dusk_assets.py 重建。
 
 ## .gitattributes
 
@@ -18,6 +18,7 @@ name: Tests
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -58,6 +59,10 @@ jobs:
         run: python scripts/export_source.py --check
       - name: Run regression tests
         run: python -m unittest discover -s tests -v
+      - name: Build committed source release
+        run: python scripts/build_release.py
+      - name: Verify extracted release offline
+        run: python scripts/verify_release.py --expected-commit ${{ github.sha }}
 ```
 
 ## .gitignore
@@ -88,7 +93,7 @@ htmlcov/
 
 ## 先确认实际状态
 
-- 最近发布版本是 v0.1.0，开发代码已完成 M1–M4：规则/表现分离、纯数据回溯与结算确认，以及 JSON 内容、资源缓存和图片/动画链路。M5 尚未实施；以 `TASKS.md` 区分现有能力和规划。
+- 阶段版本是 v0.2.0，M1–M5 已实施：规则/表现分离、纯数据回溯与结算确认、JSON/PNG 链路、第二场景/外观与开发模板。发布状态以 tag/Release 为准；以 `TASKS.md` 区分现有能力和规划。
 - 修改玩法、结构或资源入口前，阅读 [整体架构](docs/ARCHITECTURE.md)、[实施路线](docs/ROADMAP.md) 与 [功能开发规范](docs/FEATURE_DEVELOPMENT.md)。接入美术时同时遵守 [资源规范](docs/ASSET_GUIDE.md)。用户提供的原始报告是评审材料，当前开发决策以这些评审后文档为准。
 
 ## 开发边界
@@ -120,6 +125,7 @@ htmlcov/
 - 修改内容或清单后，另运行 `python -S -m unittest discover -s tests -p test_content.py -v`，CI 安装依赖前合计 57 项；原图/缩放缓存和实际资源链路由 `test_assets.py` 及真实窗口检查。Windows 无创建符号链接权限时该项可明确跳过，路径越界等其他检查仍须通过。
 - 保留原有行为覆盖；接口迁移时可调整测试夹具，不为保留旧字段访问而保留架构漏洞。新增架构边界在相应阶段就加入检查，不推迟到最终验收。
 - 使用 `python scripts/export_source.py` 更新 `SOURCE.md`，再用 `python scripts/export_source.py --check` 检查一致性。
+- 后续需求参考 `docs/templates/FEATURE_TEMPLATE.md`；换场景/外观参考 `docs/EXTENSION_EXERCISE.md`。新增内容要补真实集成，不能只验证文件存在。阶段发布按 `docs/RELEASE.md` 从确切提交打包并验证解压产物。
 - 不提交虚拟环境、缓存、安装器、凭据或 `dist/`、`.delivery/` 中的生成文件。`artifacts/*.png` 是随文档交付的运行截图。
 ````
 
@@ -128,7 +134,15 @@ htmlcov/
 ````markdown
 # 更新记录
 
-## 未发布
+## 0.2.0 - 2026-10-22
+
+### M5 · 扩展演练与阶段交付
+
+- 新增 6×5 渡口场景，复用单位定义；新增自包含 dusk 清单与 17 张项目生成 PNG，含地砖、障碍、斥候和木桩动画。既有运行代码、单位定义和默认场景不变。
+- 增加可复制功能开发模板和演练手册，明确新状态、指令、回溯、独立视图、资源与 token 取消的责任和验收。
+- 新增 6 项两场景 × 三模式集成与 4 项包完整性检查，共 133 项；本机 132 通过、1 项符号链接权限跳过。Windows 实际窗口与 dummy 分别验收，新增 4 张运行截图。
+- 增加 VERSION、从提交树构建源码 ZIP/SHA256、校验并解压运行验收的标准库工具。CI 四平台组合同时执行完整回归和产物检查，新增 v* tag 触发；不构建 EXE。
+- 同步 TASKS、README、架构/路线/资源文档和 SOURCE。最终发布对应 tag、Release 和 ZIP comment 中的同一提交。
 
 ### M4 · 内容与资源接入
 
@@ -203,15 +217,15 @@ htmlcov/
 ````markdown
 # Chrono Tactics · 离线回溯战棋
 
-仓库名称：`chrono-tactics-pygame`，最近发布版本：`0.1.0`；当前开发代码已完成 M1–M4（未发布）。
+仓库名称：`chrono-tactics-pygame`，阶段版本：`0.2.0`；M0–M5 已实施。发布状态以仓库 tag / Release 为准。
 
 项目仓库：[zyb-sjtu/chrono-tactics-pygame](https://github.com/zyb-sjtu/chrono-tactics-pygame)。这是私有仓库，需要登录有权限的 GitHub 账号访问。
 
-使用 Python 和 Pygame 绘制，运行时不访问网络，不需要另行下载美术。默认显示随项目提供的演示地砖与斥候 PNG，也可用 --geometry 回到几何模式。棋盘保持 8×8，每格 64×64，侧栏 384 像素，窗口 896×512。
+使用 Python 和 Pygame 绘制，运行时不访问网络，不需要另行下载美术。默认显示随项目提供的演示地砖与斥候 PNG，也可用 --geometry 回到几何模式。默认棋盘 8×8，每格 64×64，侧栏 384 像素，窗口 896×512；渡口场景为 6×5，窗口 768×512。
 
 ## 整体规划与后续开发
 
-已完成评审和 M1–M4：规则与表现分离、纯数据回溯、结算确认、JSON 内容/资源清单、PNG 缓存和实际素材动画。回溯按 UID 重建单位，重复或过期动画通知不会推进回合。当前是程序生成的演示美术，最终风格与 M5 扩展/发布验收尚未交付。
+已完成评审和 M1–M5：规则与表现分离、纯数据回溯、结算确认、JSON 内容/资源清单、PNG 缓存和实际素材动画。M5 增加 6×5 渡口场景及 `dusk` 外观，复用全部游戏代码；三种显示模式的相同操作产生一致战斗状态。当前美术仍为程序生成的演示素材。
 
 | 文档 | 内容 |
 | --- | --- |
@@ -224,8 +238,12 @@ htmlcov/
 | [M2 实施与验收](docs/M2_IMPLEMENTATION.md) | Controller 接口、完整视图、75 项检查与 13 帧像素对照 |
 | [M3 实施与验收](docs/M3_IMPLEMENTATION.md) | 纯数据快照、结算与代次协议、94 项检查及 13 帧像素对照 |
 | [M4 实施与验收](docs/M4_IMPLEMENTATION.md) | JSON 格式、资源替换、缓存、动画、123 项检查与实际窗口 |
+| [M5 实施与验收](docs/M5_IMPLEMENTATION.md) | 第二场景/外观、133 项回归、实际窗口、发布对应关系 |
+| [扩展演练](docs/EXTENSION_EXERCISE.md) | 渡口试玩与仅通过 JSON/PNG 扩展的具体步骤 |
+| [功能模板](docs/templates/FEATURE_TEMPLATE.md) | 可复制的规则、数据、回溯、表现与验收模板 |
+| [源码发布](docs/RELEASE.md) | 提交树打包、SHA256 与解压验收 |
 
-下一任务是 **ARCH-05 / M5**。后续功能需要先具备对应的最小架构边界；新增状态必须能回溯，新增美术通过资源与渲染入口接入。约束同时写入 [AGENTS.md](AGENTS.md)，实现进度见 [TASKS.md](TASKS.md)。
+架构整改 M0–M5 已落实，后续按实际功能需求继续开发；新增状态必须能回溯，新增美术通过资源与渲染入口接入。约束同时写入 [AGENTS.md](AGENTS.md)，实现进度见 [TASKS.md](TASKS.md)。
 
 ## 运行
 
@@ -243,6 +261,7 @@ cd E:\gamedesign
 ```powershell
 .\.venv\Scripts\python.exe main.py --geometry
 .\.venv\Scripts\python.exe main.py --scenario scenarios/training_ground.json --assets assets
+.\.venv\Scripts\python.exe main.py --scenario scenarios/river_crossing.json --assets assets/skins/dusk
 ```
 
 默认内容/资源路径相对项目位置解析，与工作目录无关。--scenario 相对 content 根；显式传入 --content-root 或 --assets 时，目录相对当前工作目录或使用绝对路径。更换单位、地砖和动画只改 JSON/PNG，步骤见 [M4 记录](docs/M4_IMPLEMENTATION.md) 和 [资源来源](assets/README.md)。
@@ -272,7 +291,7 @@ $env:PATH = 'D:\Miniconda3;D:\Miniconda3\Library\bin;' + $env:PATH
 - 移动目的地可以是移动力步数内的任意可达空格，按实际通路步数计算。障碍、友方和敌方单位均不能穿过或重叠。即使没有用满步数，也消耗本次移动机会，不能分段多次移动。
 - 攻击仅能锁定距离 1 格的敌方单位，不能攻击自己、同阵营、斜向或更远的单位。必须先完成或跳过移动，才能攻击。
 - 伤害为**攻击属性的 100%**，当前防御属性不减伤。例如攻击 10 对生命 100/100 的目标造成 10 点伤害，生命变为 90/100。伤害跳字显示攻击结算值，持续约 0.9 秒并向上浮动淡出；过量伤害下生命最低为 0。
-- 生命归零即被击杀：播放约 0.65 秒的闪烁、缩小、碎点扩散和淡出动画，然后在棋盘消失。被击杀单位不再阻挡路径、不能被选为目标，也不会再次行动。
+- 生命归零即被击杀：几何模式播放约 0.65 秒闪烁/缩小/碎点淡出，图片模式按外观 death 帧播放（演示约 0.6 秒），然后消失。被击杀单位不再阻挡路径、不能被选为目标，也不会再次行动。
 - 攻击动画期间锁定移动、攻击、结束行动和回溯，窗口仍能正常关闭；动画使用逐帧更新时间，没有阻塞式等待。
 - 一方全灭后显示胜方，停止继续行动，仍可回溯最后一次行动并恢复被击杀单位。
 - **双方均由玩家手动操作，没有 AI。** 红色木桩同样参与回合，可手动移动和攻击；不操作时不会自行行动。
@@ -312,11 +331,15 @@ E:\gamedesign\
 ├── scripts/export_source.py # 源码汇总生成与一致性检查
 ├── docs/
 │   ├── ARCHITECTURE_REVIEW.md # 对原整改报告的源码核对与评审
-│   ├── ARCHITECTURE.md      # M1–M4 已实施，M5 待验收
+│   ├── ARCHITECTURE.md      # M1–M5 扩展边界
 │   ├── M1_IMPLEMENTATION.md # M1 接口与验证记录
 │   ├── M2_IMPLEMENTATION.md # M2 指令、视图与验证记录
 │   ├── M3_IMPLEMENTATION.md # M3 快照、结算确认与验证记录
 │   ├── M4_IMPLEMENTATION.md # M4 内容、资源与验证记录
+│   ├── M5_IMPLEMENTATION.md # M5 扩展与阶段交付记录
+│   ├── EXTENSION_EXERCISE.md # 第二场景与外观演练
+│   ├── RELEASE.md          # 提交树打包与解压验收
+│   ├── templates/FEATURE_TEMPLATE.md # 可复制开发模板
 │   ├── ROADMAP.md           # 阶段、前置与验收
 │   ├── ASSET_GUIDE.md       # 美术资源与动画规范
 │   ├── FEATURE_DEVELOPMENT.md # 后续开发约束
@@ -345,15 +368,21 @@ E:\gamedesign\
 │   ├── test_game.py         # 11 项窗口交互、绘制与字体检查
 │   ├── test_effects.py      # 10 项几何动画、通知、清理和交互检查
 │   ├── test_assets.py       # 16 项 PNG、缓存、渲染和动画检查
+│   ├── test_milestone.py    # 6 项跨场景/外观集成验收
+│   ├── test_release.py      # 4 项发布包损坏/来源/路径检查
 │   ├── test_content.py      # 13 项无第三方包的内容/清单检查
 │   ├── test_core.py         # 12 项无第三方包的 M1 核心检查
 │   ├── test_controller.py   # 16 项无第三方包的协调与数据边界检查
 │   ├── test_resolution.py   # 16 项无第三方包的快照和结算协议检查
 │   ├── test_rendering.py    # 6 项只读视图、渲染、按钮和场景注入检查
 │   └── test_rewind.py       # 12 项回溯、击杀及行动顺序检查
-├── content/                 # units.json、scenarios/training_ground.json
-├── assets/                  # manifest.json、README、tiles/units 下的 9 张 PNG
+├── content/                 # units.json、训练场与渡口两个场景
+├── assets/                  # 默认 9 张 PNG；skins/dusk 自包含清单与 17 张 PNG
 ├── scripts/generate_demo_assets.py # 重建演示 PNG，不下载外部资源
+├── scripts/generate_dusk_assets.py # 重建第二套演示 PNG
+├── scripts/build_release.py # 从确切提交构建源码 ZIP 与 SHA256
+├── scripts/verify_release.py # 校验并在解压目录验收
+├── VERSION.txt             # 阶段版本 0.2.0
 ├── artifacts\               # 实际运行截图，不是游戏资源
 │   ├── m4_assets.png        # 当前默认地砖/斥候素材
 │   ├── m4_attack.png        # 素材攻击与跳字
@@ -385,21 +414,23 @@ python scripts/export_source.py --check
 可在 GitHub 仓库中通过 Code → Download ZIP 下载源码，也可在本地 Git 仓库生成：
 
 ```powershell
-New-Item -ItemType Directory -Force dist
-git archive --format=zip --prefix=chrono-tactics-pygame/ --output=dist/chrono-tactics-pygame-dev.zip HEAD
+.\.venv\Scripts\python.exe scripts/build_release.py --ref HEAD
+$releaseCommit = git rev-parse HEAD
+.\.venv\Scripts\python.exe scripts/verify_release.py --expected-commit $releaseCommit
 ```
 
-源码包包含运行代码、测试、文档、配置和截图，不包含 `.venv`、缓存或凭据；解压后按上面的新机器安装步骤创建环境。这是 Python 源码包，未构建独立 EXE。
+源码包包含运行代码、两场景/外观、测试、文档、配置和截图，不包含 `.venv`、缓存或凭据；解压后按新机器安装步骤创建环境。输出 `dist/chrono-tactics-pygame-0.2.0-source.zip` 和 `.zip.sha256`，ZIP comment 记录确切提交，详见 [发布说明](docs/RELEASE.md)。这是 Python 源码包，未构建独立 EXE。
 
 ## 验证记录
 
-M4 共 **123 项测试**，本机 **122 通过、1 项跳过**（Windows 无创建符号链接权限；其他路径越界检查通过）。其中 **57 项无需第三方包**，含该跳过项。完整检查在 dummy 与 Windows 实际窗口完成；几何模式 13 帧与 M3 逐像素一致，素材模式验证了透明度、锚点、图层、缓存、攻击/死亡与回溯，并通过其他工作目录下的实际入口验证。详情见 [M4 记录](docs/M4_IMPLEMENTATION.md)。
+M5 共 **133 项测试**，本机 **132 通过、1 项跳过**（Windows 无创建符号链接权限，其他路径检查通过）。四组核心/内容检查共 **57 项无需第三方包**，另 4 项发布完整性检查也可用 `-S`。dummy 与 Windows 实际窗口分别回归；两场景 × 三模式的完整状态一致，覆盖击杀、跨轮、战斗结束、连续回溯、旧通知、字体异常及异地 CLI/QUIT。真实窗口使用自动投递事件，非人工逐次点击。详见 [M5 记录](docs/M5_IMPLEMENTATION.md)。M4 的 123 项基线及 13 帧几何像素对照记录保留。
 
 ```powershell
 .\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_core.py -v
 .\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_controller.py -v
 .\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_resolution.py -v
 .\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_content.py -v
+.\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_release.py -v
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
@@ -427,7 +458,7 @@ v0.1.0 基线记录：2026-10-22，本机 Python 3.9.1 / Pygame 2.6.1 / SDL 2.28
 ````markdown
 # 项目进度
 
-最近发布版本：`0.1.0`。开发代码已完成 M1–M4（未发布）；已实现能力与后续规划分开记录。
+阶段版本：`0.2.0`，M0–M5 已实施；发布状态以仓库 tag / Release 为准。已实现能力与后续规划分开记录。
 
 ## 已实现能力
 
@@ -440,9 +471,11 @@ v0.1.0 基线记录：2026-10-22，本机 Python 3.9.1 / Pygame 2.6.1 / SDL 2.28
 | COMBAT-02 | 已完成 | 击杀动画、消失、死亡单位退出队列、一方全灭结束战斗 |
 | REWIND-01 | 已完成 | 回溯上一单位行动开始前、连续回溯、恢复死亡单位和战斗状态 |
 | FIX-01 | 已完成 | Windows 系统字体扫描异常回退，保留英文降级界面 |
-| QA-01 | 已完成 | 123 项测试，本机 122 通过、1 项符号链接权限跳过；57 项无需第三方包；几何模式 13 帧与 M3 一致，素材真实窗口实测 |
+| QA-01 | 已完成 | 133 项测试，本机 132 通过、1 项符号链接权限跳过；核心/内容 57 项与发布完整性 4 项无需第三方包；两场景 × 三模式状态一致，真实窗口实测 |
 | ASSET-01 | 已完成 | JSON 单位/场景、清单验证、PNG 与缩放缓存、可选缺失回退、必需缺失拒绝、静态和循环/非循环素材接入 |
 | DELIVERY-01 | 已完成 | 运行文档、源码汇总生成脚本、忽略规则和自动测试配置 |
+| EXTENSION-01 | 已完成 | 6×5 渡口场景、17 PNG 的 dusk 外观；复用现有运行代码；可复制功能开发模板 |
+| RELEASE-01 | 已完成 | VERSION、提交树源码 ZIP、SHA256、解压验收脚本；四组 CI 包含产物检查，发布见 tag/Release |
 
 CI 配置覆盖 Windows / Linux 与 Python 3.9 / 3.12。远程执行结果以 GitHub Actions 为准，配置存在不代表运行已通过。
 
@@ -459,21 +492,27 @@ CI 配置覆盖 Windows / Linux 与 Python 3.9 / 3.12。远程执行结果以 Gi
 | ARCH-02 | M2 | 已完成 | Controller 统一操作与动画交接、完整只读 View、UIAction 命中；Game/表现不持有可变战斗对象，75 项检查及 13 帧一致性验收 |
 | ARCH-03 | M3 | 已完成 | ID 化 AttackResult、纯数据快照/UID 重建、结算编号与表现代次确认；拒绝重复/过期通知，94 项检查及 13 帧一致性验收 |
 | ARCH-04 | M4 | 已完成 | 内容/资源清单、路径/引用验证、缓存和真实默认渲染链路；123 项测试、几何像素对照及素材窗口验收 |
-| ARCH-05 | M5 | 未开始 | 场景与外观扩展演练、完整回归、真实窗口与跨平台验收 |
+| ARCH-05 | M5 | 已完成 | 第二场景/外观、开发模板、133 项回归、真实窗口、四组 CI 与 0.2.0 提交树源码交付链路 |
 
-实现与验证见 [M1](docs/M1_IMPLEMENTATION.md)、[M2](docs/M2_IMPLEMENTATION.md)、[M3](docs/M3_IMPLEMENTATION.md) 和 [M4 实施记录](docs/M4_IMPLEMENTATION.md)。下一实施任务为 **ARCH-05 / M5**：正式扩展演练、开发模板与阶段发布验收。当前演示素材不是最终美术，尚无图集切帧、音频、热重载或磁盘存档。
+实现与验证见 [M1](docs/M1_IMPLEMENTATION.md)、[M2](docs/M2_IMPLEMENTATION.md)、[M3](docs/M3_IMPLEMENTATION.md)、[M4](docs/M4_IMPLEMENTATION.md) 和 [M5 实施记录](docs/M5_IMPLEMENTATION.md)。架构整改阶段已落实；后续按真实功能需求与开发模板推进。当前演示素材不是最终美术，尚无图集切帧、音频、热重载或磁盘存档。
 
 阶段依赖、提交拆分和完成条件见 [ROADMAP](docs/ROADMAP.md)，技术边界见 [ARCHITECTURE](docs/ARCHITECTURE.md)。每个阶段同步增加所需边界测试，不等全部迁移后才测试。
 
 后续技能、AI、美术、地图、存档等需求，须先明确扩展点与最小必要前置，按 [FEATURE_DEVELOPMENT](docs/FEATURE_DEVELOPMENT.md) 实施。此表不是新增玩法承诺。
 ````
 
+## VERSION.txt
+
+```text
+0.2.0
+```
+
 ## assets/README.md
 
 ````markdown
 # 演示资源来源与替换
 
-这 9 张 PNG 是 `scripts/generate_demo_assets.py` 使用 Pygame 几何图形生成的项目演示素材，没有下载或引用第三方美术。它们用于验证资源链路，不代表最终美术风格。资源无第三方素材许可要求；项目整体授权仍由仓库所有者决定，本文件不另设开源许可证。
+默认 9 张 PNG 由 `scripts/generate_demo_assets.py` 使用 Pygame 几何图形生成；M5 增加 [dusk 外观](skins/dusk/README.md) 的 17 张 PNG，由 `scripts/generate_dusk_assets.py` 生成。没有下载或引用第三方美术，不代表最终风格。资源无第三方素材许可要求；项目整体授权仍由仓库所有者决定，本文件不另设开源许可证。
 
 | 文件 | 原始 / 基准显示尺寸 | 锚点 | 用途 |
 | --- | --- | --- | --- |
@@ -528,6 +567,91 @@ CI 配置覆盖 Windows / Linux 与 Python 3.9 / 3.12。远程执行结果以 Gi
 }
 ```
 
+## assets/skins/dusk/README.md
+
+````markdown
+# dusk 演示外观
+
+17 张 PNG 由项目的 `scripts/generate_dusk_assets.py` 使用 Pygame 几何图形生成，没有引用第三方美术，不代表最终风格。项目授权仍由仓库所有者决定。
+
+| 内容 | 数量 | 原始/显示尺寸 | pivot |
+| --- | --- | --- | --- |
+| 地砖 | 1 | 64×64 | (0.5,0.5) |
+| 障碍 | 1 | 64×80 | (0.5,1) |
+| 斥候 idle / attack / death | 2 / 3 / 3 | 64×96 | (0.5,1) |
+| 木桩 idle / attack / death | 1 / 3 / 3 | 64×96 | (0.5,1) |
+
+斥候 idle 2fps 循环，木桩 idle 单张；双方 attack 8fps、death 5fps 非循环。所有图片 optional=true；先锋与卫士明确使用几何回退。大精灵按脚底排序，规则占格和点击仍是一格。
+
+在项目根重建（只覆盖上述 17 个指定文件，不改 manifest）：
+
+```powershell
+.\.venv\Scripts\python.exe scripts/generate_dusk_assets.py
+.\.venv\Scripts\python.exe main.py --scenario scenarios/river_crossing.json --assets assets/skins/dusk
+```
+
+资源根自包含，没有引用根外 PNG。缓存 Surface 只读，来源、锚点、回退和替换约束同 [资源规范](../../../docs/ASSET_GUIDE.md)。
+````
+
+## assets/skins/dusk/manifest.json
+
+```text
+{
+  "schema_version": 1,
+  "images": {
+    "tile.floor": {"path":"tiles/floor.png","display_size":[64,64],"pivot":[0.5,0.5],"optional":true},
+    "tile.obstacle": {"path":"tiles/obstacle.png","display_size":[64,80],"pivot":[0.5,1],"optional":true},
+    "scout.idle.0": {"path":"units/scout_idle_0.png","display_size":[64,96],"pivot":[0.5,1],"optional":true},
+    "scout.idle.1": {"path":"units/scout_idle_1.png","display_size":[64,96],"pivot":[0.5,1],"optional":true},
+    "scout.attack.0": {"path":"units/scout_attack_0.png","display_size":[64,96],"pivot":[0.5,1],"optional":true},
+    "scout.attack.1": {"path":"units/scout_attack_1.png","display_size":[64,96],"pivot":[0.5,1],"optional":true},
+    "scout.attack.2": {"path":"units/scout_attack_2.png","display_size":[64,96],"pivot":[0.5,1],"optional":true},
+    "scout.death.0": {"path":"units/scout_death_0.png","display_size":[64,96],"pivot":[0.5,1],"optional":true},
+    "scout.death.1": {"path":"units/scout_death_1.png","display_size":[64,96],"pivot":[0.5,1],"optional":true},
+    "scout.death.2": {"path":"units/scout_death_2.png","display_size":[64,96],"pivot":[0.5,1],"optional":true},
+    "dummy.idle": {"path":"units/dummy_idle_0.png","display_size":[64,96],"pivot":[0.5,1],"optional":true},
+    "dummy.attack.0": {"path":"units/dummy_attack_0.png","display_size":[64,96],"pivot":[0.5,1],"optional":true},
+    "dummy.attack.1": {"path":"units/dummy_attack_1.png","display_size":[64,96],"pivot":[0.5,1],"optional":true},
+    "dummy.attack.2": {"path":"units/dummy_attack_2.png","display_size":[64,96],"pivot":[0.5,1],"optional":true},
+    "dummy.death.0": {"path":"units/dummy_death_0.png","display_size":[64,96],"pivot":[0.5,1],"optional":true},
+    "dummy.death.1": {"path":"units/dummy_death_1.png","display_size":[64,96],"pivot":[0.5,1],"optional":true},
+    "dummy.death.2": {"path":"units/dummy_death_2.png","display_size":[64,96],"pivot":[0.5,1],"optional":true}
+  },
+  "animations": {
+    "scout.idle": {"frames":["scout.idle.0","scout.idle.1"],"fps":2,"loop":true},
+    "scout.attack": {"frames":["scout.attack.0","scout.attack.1","scout.attack.2"],"fps":8,"loop":false},
+    "scout.death": {"frames":["scout.death.0","scout.death.1","scout.death.2"],"fps":5,"loop":false},
+    "dummy.attack": {"frames":["dummy.attack.0","dummy.attack.1","dummy.attack.2"],"fps":8,"loop":false},
+    "dummy.death": {"frames":["dummy.death.0","dummy.death.1","dummy.death.2"],"fps":5,"loop":false}
+  },
+  "visuals": {
+    "unit.scout": {"idle":"scout.idle","attack":"scout.attack","death":"scout.death"},
+    "unit.dummy": {"idle":"dummy.idle","attack":"dummy.attack","death":"dummy.death"},
+    "unit.vanguard": {},
+    "unit.guard": {}
+  },
+  "board": {"floor":"tile.floor","obstacle":"tile.obstacle"}
+}
+```
+
+## content/scenarios/river_crossing.json
+
+```text
+{
+  "schema_version": 1,
+  "id": "river_crossing",
+  "cols": 6,
+  "rows": 5,
+  "obstacles": [[2,0],[2,1],[3,3],[0,4]],
+  "spawns": [
+    {"uid":"A2","definition_id":"scout","team":"ally","cell":[1,2],"overrides":{"health":80}},
+    {"uid":"A1","definition_id":"guard","team":"ally","cell":[0,3]},
+    {"uid":"R1","definition_id":"dummy","team":"enemy","cell":[4,2],"overrides":{"name":"桥头木桩","health":5}},
+    {"uid":"R2","definition_id":"dummy","team":"enemy","cell":[5,4],"overrides":{"name":"后卫木桩","health":10,"speed":8}}
+  ]
+}
+```
+
 ## content/scenarios/training_ground.json
 
 ```text
@@ -567,7 +691,7 @@ CI 配置覆盖 Windows / Linux 与 Python 3.9 / 3.12。远程执行结果以 Gi
 ````markdown
 # 整体架构与扩展边界
 
-状态：M1–M4 已实施，M5 待验收。规则与 Controller 不依赖 Pygame；内容/清单用纯加载器验证，图片由资源层缓存，界面、动画和快照保持职责分离。进度见 [TASKS](../TASKS.md)，当前接口见 [M4 验收记录](M4_IMPLEMENTATION.md)，早期决策见 M1–M3 记录。
+状态：M1–M5 已实施。规则与 Controller 不依赖 Pygame；内容/清单用纯加载器验证，图片由资源层缓存，界面、动画和快照保持职责分离。M5 在不修改运行代码的情况下交付第二场景/外观并验证一致性，见 [M5 验收记录](M5_IMPLEMENTATION.md)。当前接口见 [M4 记录](M4_IMPLEMENTATION.md)，进度见 [TASKS](../TASKS.md)。
 
 最简单的划分：规则决定“能做什么、结果是什么”；协调层决定“接收哪次操作、何时继续”；表现层负责“输入来自哪里、画面怎样显示”。替换图片不应影响伤害，增加技能不应要求改写主循环。
 
@@ -740,7 +864,7 @@ AttackResult 包含结算编号、双方 UID、目标位置/阵营、伤害/生�
 
 原报告的主要判断准确，适合作为渐进重构的起点。建议采纳“规则、应用协调、表现与资源分离”的方向，并补齐数据身份、回溯与动画协议、资源制作规范、功能开发准入和逐阶段验收。当前原型无需推翻，也不需要先建设通用游戏引擎。
 
-M0 交付的是整体规划和后续开发约束，当时不包括运行代码重构。后续已完成 M1–M3 的边界与纯数据迁移，M4 的内容和图片/动画链路也已接入；M5 系统扩展与阶段发布仍待验收。
+M0 交付的是整体规划和后续开发约束，当时不包括运行代码重构。后续已完成 M1–M5：边界与纯数据迁移、内容/图片动画链路，以及第二场景/外观扩展和阶段交付链路；实际结果见各阶段实施记录和 TASKS。
 
 ## 对照源码的判断
 
@@ -920,12 +1044,68 @@ AssetManager 集中解析清单、加载原图、生成缩放/切帧结果。初
 - 自动化负责路径、缓存和状态；真实窗口另查透明度、缩放、图层和动画观感，不以单个像素哈希代替跨平台视觉检查。
 ````
 
+## docs/EXTENSION_EXERCISE.md
+
+````markdown
+# M5 扩展演练：渡口与 dusk 外观
+
+这次只添加数据、素材、工具、文档与验收测试。`main.py`、`tactics/*.py`、原单位定义和原场景不变；不复制 Board/Battle，不在 Game 按场景名分支。
+
+## 第二场景
+
+[river_crossing.json](../content/scenarios/river_crossing.json) 使用已有 schema_version=1：6×5，四处障碍，斥候/卫士与两只木桩，共用 [units.json](../content/units.json)。生命、速度和名字的实例覆盖使用既有 overrides。默认训练场仍为 8×8、双方各三人。
+
+```powershell
+.\.venv\Scripts\python.exe main.py --scenario scenarios/river_crossing.json
+.\.venv\Scripts\python.exe main.py --scenario scenarios/river_crossing.json --geometry
+.\.venv\Scripts\python.exe main.py --scenario scenarios/river_crossing.json --assets assets/skins/dusk
+```
+
+开局 A2 在 `(1,2)`，生命 80/100；移动到 `(3,2)`，攻击右侧 R1（生命 5），实际伤害 10。R1 动画后消失并跳过行动，轮到 A1。回车结束 A1、再回车结束 R2，进入第二轮 A2。移动到 `(5,3)` 攻击下方 R2（生命 10），蓝方胜利。此时连续四次退格，依次回到第二轮 A2、第一轮 R2、第一轮 A1、最初 A2，木桩复活、位置和血量恢复。内部坐标从 0 开始；侧栏坐标从 1 开始。
+
+这是一条便于检查击杀和回溯的演练路线，数值不代表平衡设计；红方仍由玩家手动操作。
+
+## 第二套外观
+
+[dusk/manifest.json](../assets/skins/dusk/manifest.json) 自包含地砖、障碍、斥候和木桩的 17 张 PNG。切换资源根，不修改 definition_id 或 visual_id。未配置图片的卫士/先锋继续几何回退；缺少可选图片按既有规则回退。
+
+同一 dusk 外观也可用于原训练场：
+
+```powershell
+.\.venv\Scripts\python.exe main.py --assets assets/skins/dusk
+```
+
+人物显示 64×96、脚底锚点 `(0.5,1)`，占格始终一格。斥候待机循环不阻塞；攻击与死亡仍经 M3 token 确认，不把图片或动画时钟写入规则快照。来源与重建见 [dusk 说明](../assets/skins/dusk/README.md)。
+
+## 可以直接复用的流程
+
+新增关卡时复制一个 JSON，保留已支持的字段，用现有定义与 overrides，运行纯内容检查和实际入口。新增美术时复制自包含资源根，修改 manifest 的图片、尺寸、pivot、帧与 visual 状态，检查加载和真实窗口，再比较相同指令的 BattleView。
+
+需要新增玩法字段时，先填写 [功能模板](templates/FEATURE_TEMPLATE.md)，明确规则、初始化、回溯、只读结果与表现边界；不能仅在 JSON 增加解析器不认识的字段。现有解析器会拒绝未知字段。
+
+## 自动验收
+
+[test_milestone.py](../tests/test_milestone.py) 对两张地图 × 三种模式执行相同输入，比较每个观察点的完整不可变 BattleView，包含移动范围、单位属性、血量、队列、日志、阶段、轮数、胜负、代次与结算 token。另检查伤害字、死亡表现、输入锁定、表现清理、旧通知、字体扫描异常及其他工作目录下的真实 CLI 入口和 QUIT。
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests -p test_milestone.py -v
+```
+
+![dusk 渡口开局](../artifacts/m5_dusk_initial.png)
+
+![dusk 击杀与跳字](../artifacts/m5_dusk_death.png)
+
+![连续回溯后复活](../artifacts/m5_dusk_revived.png)
+````
+
 ## docs/FEATURE_DEVELOPMENT.md
 
 ````markdown
 # 后续功能开发规范
 
 本规范与 [AGENTS.md](../AGENTS.md) 一起约束后续开发。目标是让每次新增功能都继续积累可维护性，而不是让主循环和 Unit 对象不断堆叠特殊分支。
+
+可直接复制 [功能变更模板](templates/FEATURE_TEMPLATE.md)。仅新增关卡或美术时，参考已经交付的 [M5 扩展演练](EXTENSION_EXERCISE.md)，优先使用现有 JSON/PNG 入口。
 
 当前基础能力仍以 [TASKS.md](../TASKS.md) 的实现状态为准。遇到尚未就绪的边界，先补齐需求所需的最小前置并一并交付，不把规划中的模块当成现成 API，也不为形式要求所有阶段一次完成。
 
@@ -1440,12 +1620,97 @@ Renderer 单独推进循环待机，不影响 Controller/Battle。Effects 在合
 M5 将正式交付第二场景和第二套外观、开发模板及阶段发布验收。当前临时测试数据和颜色替换证明 M4 链路可用，不提前把系统扩展演练或最终美术标记完成。
 ````
 
+## docs/M5_IMPLEMENTATION.md
+
+````markdown
+# M5 扩展、验收与阶段交付
+
+M5 交付第二场景 `river_crossing`、第二套 `dusk` 外观、可复制功能模板，以及可重建/校验的 0.2.0 源码发布链路。具体演练步骤见 [EXTENSION_EXERCISE](EXTENSION_EXERCISE.md)，后续开发从 [模板](templates/FEATURE_TEMPLATE.md) 和 [规范](FEATURE_DEVELOPMENT.md) 开始。
+
+## 扩展成本
+
+- 场景仅增加一个 JSON：尺寸 6×5、四单位、四障碍，共用既有单位定义和实例覆盖字段。
+- 外观仅增加独立 manifest 与 17 张项目脚本生成的 PNG；已有 9 张经典素材保留。
+- `main.py`、`tactics/*.py`、`content/units.json` 和默认场景相对 M4 完全未改。没有新增规则分支、运行状态、快照字段、兼容层或未使用框架。
+- 新增 6 项扩展集成与 4 项包完整性测试。打包/校验为离线 Python 标准库脚本；PNG 重建使用已有 Pygame。
+
+## 本机实际验证
+
+环境：Windows、Python 3.9.1、Pygame 2.6.1 / SDL 2.28.4。
+
+| 验收 | 结果/边界 |
+| --- | --- |
+| 完整回归 | 133 项，本机 132 通过、1 项符号链接创建权限跳过；不放宽路径校验 |
+| 无第三方包 | 既有四组 57 项（56 通过、同一权限项跳过）；发布完整性另 4 项可用 `-S` 执行 |
+| 场景 × 外观 | 两场景 × geometry/classic/dusk，逐观察点比较完整 BattleView，一致 |
+| 实际窗口 | windows SDL 驱动；六条操作链、击杀、跨轮、胜利、连续回溯、形体清理、QUIT 释放通过 |
+| 字体与 CLI | 强制模拟字体扫描 TypeError，英文回退仍可绘制；其他工作目录实际 main.py 参数与关闭通过 |
+| 截图检查 | 观察开局、死亡/跳字、连续回溯复活；锚点、透明度、图层与侧栏显示正常 |
+| 发布包 | CI 构建提交树并检查解压后的 SOURCE/CLI/六项集成；最终包记录合并提交与 SHA256 |
+
+实际窗口由事件与公开指令自动驱动，不是人工逐次点击。截图是实际绘制的 Surface；dummy 测试不能替代真实窗口检查。保留 M4 的几何 13 帧对照证据，本阶段没有改绘制或规则代码，不重复宣称新做了逐像素对照。
+
+## CI 与版本对应
+
+`.github/workflows/ci.yml` 覆盖 Windows 2022 / Ubuntu 24.04 × Python 3.9 / 3.12，依赖安装前跑四组纯检查，之后跑完整回归、SOURCE 校验、提交树打包和解压验收。平台字体或符号链接能力不同，跳过原因必须在日志中可见。
+
+工作流在 PR、main 和 `v*` tag 触发。远程成功状态以该提交的 Actions 为准，文档存在不构成 CI 成功证据。最终发布以仓库 `v0.2.0` tag 和同名 Release 为准；包内 ZIP comment、SHA256 和 Release 说明标识实际提交。构建与验证命令见 [RELEASE](RELEASE.md)。
+
+## 后续边界
+
+M0–M5 架构规划已落实；后续按真实功能需求继续开发。技能/Buff 要同步规则、指令、快照和只读结果；AI 共用 Controller；新美术走清单、缓存与表现 token。当前仍无 AI、联网、存档、音频、图集切帧、热重载和独立 EXE，数值和美术是演示内容。
+
+![经典外观渡口](../artifacts/m5_classic_initial.png)
+
+![dusk 外观渡口](../artifacts/m5_dusk_initial.png)
+````
+
+## docs/RELEASE.md
+
+````markdown
+# 阶段源码发布
+
+版本值在 `VERSION.txt`，本阶段为 0.2.0。交付是 Python 源码 ZIP，运行需要 Python 和 requirements.txt；不含虚拟环境或独立 EXE。首次安装 Pygame 需要联网，之后可离线运行。
+
+## 构建并验证
+
+先提交所有交付内容，再构建指定提交。脚本只读取已提交 Git 树，不会把工作区尚未提交的修改打进包：
+
+```powershell
+.\.venv\Scripts\python.exe scripts/build_release.py --ref HEAD
+$releaseCommit = git rev-parse HEAD
+.\.venv\Scripts\python.exe scripts/verify_release.py --expected-commit $releaseCommit
+Get-FileHash dist/chrono-tactics-pygame-0.2.0-source.zip -Algorithm SHA256
+```
+
+产物：`dist/chrono-tactics-pygame-0.2.0-source.zip` 和 `.zip.sha256`。构建使用 git archive；ZIP comment 保存格式、版本、完整提交 SHA，不把生成元数据混入 SOURCE 扫描。相同提交重复构建字节一致；未提交文件、`.git`、`.venv`、缓存、`.delivery` 和旧包不进入交付。
+
+校验器检查 SHA256、ZIP CRC、路径、版本与指定提交，然后在临时目录解压，使用调用者已有 Python/Pygame 离线执行 SOURCE 一致性、`main.py --help` 和六项 M5 集成验收。通过不代表安装了独立运行时，也不代表人工点击验收；完整回归在打包前执行。
+
+显式校验其他位置的文件：
+
+```powershell
+.\.venv\Scripts\python.exe scripts/verify_release.py C:\Downloads\chrono-tactics-pygame-0.2.0-source.zip --expected-commit <完整提交SHA>
+```
+
+SHA256 用于检出损坏，ZIP 内的提交声明不是数字签名。确认来源时，以有权限访问的 GitHub tag/Release 及该提交的 Actions 记录为准。
+
+## 发布门槛
+
+1. 更新 TASKS/CHANGELOG/README/SOURCE，审查实际改动；本地完整回归、纯逻辑检查和实际窗口通过。
+2. PR 在 Windows/Linux × Python 3.9/3.12 通过；四组均包含从当前提交构建和解压验收。
+3. 合并后基于同一提交构建最终 ZIP、校验并确认工作区干净。tag `v0.2.0` 指向该提交；tag 的四组 CI 也通过后发布 Release。
+4. Release 附带该 ZIP 与 SHA256，发布说明写明实际验收与限制。流水线不自动发布，避免未经验收的 tag 直接生成公开结果。
+
+源码包中的文档不硬编码自身最终提交 SHA（否则修改文档会改变 SHA）；实际提交以 tag、Release 和 ZIP comment 为准。测试/记录数量与本机权限差异见 [M5 验收](M5_IMPLEMENTATION.md)。
+````
+
 ## docs/ROADMAP.md
 
 ````markdown
 # 架构实施路线与验收
 
-状态：M0–M4 已完成；M5 未开始。最近发布仍为 `v0.1.0`，M1–M4 属于未发布的开发变更；资源加载和演示素材已接入，磁盘存档未实现。
+状态：M0–M5 已实施，阶段版本 `0.2.0`（发布状态以 tag/Release 为准）。第二场景与第二套演示外观已通过同一运行链路接入，磁盘存档未实现。
 
 本路线以当前 41 项行为检查为迁移基线。测试数量可增加，导入和夹具可随接口迁移，关键行为不能丢失。每个阶段在专用分支完成小批次提交，先验证、再审查差异并合并；不在一次提交中同时迁移架构和改动玩法。
 
@@ -1458,7 +1723,7 @@ M5 将正式交付第二场景和第二套外观、开发模板及阶段发布�
 | M2 / ARCH-02（已完成） | M1 | Controller 操作入口、完整只读 View、UIAction 命中接口；Game 缩减为组装与循环 | 75 项检查通过，28 项无第三方包；13 帧与 M1 一致；完整交互与输入锁定通过，详见 M2 实施记录 |
 | M3 / ARCH-03（已完成） | M2 | ID 化结算结果、纯数据快照/UID 重建、结算编号与表现代次；回溯清除旧表现 | 94 项检查通过，44 项无第三方包；错误/重复/过期通知无效；死亡及跨轮恢复一致；13 帧与 M2 一致，详见 M3 实施记录 |
 | M4 / ARCH-04（已完成） | M3 | JSON 内容/资源清单、验证、图片/缩放缓存；默认地砖与斥候静态/动画素材链路、几何回退 | 123 项测试，本机 122 通过/1 项权限跳过；57 项无需第三方包；13 帧几何模式一致；替换、缓存、回退与素材窗口验收，详见 M4 记录 |
-| M5 / ARCH-05 | M1–M4 | 扩展演练、开发模板、完整 CI 与真实窗口验收、阶段版本交付 | 新场景与第二套外观分别通过数据接入；现有流程、动画、击杀和回溯全部通过；发布文件和文档对应同一提交 |
+| M5 / ARCH-05（已完成） | M1–M4 | 渡口场景、dusk 外观、开发模板、四组 CI/产物检查、真实窗口与 0.2.0 交付链路 | 133 项测试，本机 132 通过/1 项权限跳过；两场景 × 三模式状态一致；提交树打包与解压验收，见 M5 记录 |
 
 M1–M4 可以继续细分为下列小提交，不以“文件已经创建”作为完成条件。
 
@@ -1534,9 +1799,9 @@ M1–M4 可以继续细分为下列小提交，不以“文件已经创建”作
 
 ## 当前下一步
 
-M1–M4 已完成规则/表现边界、纯数据回溯、结算确认和首条真实资源链路，见 [M4 实施与验收](M4_IMPLEMENTATION.md) 及各阶段记录。几何模式保持原画面，默认素材模式只改变表现。
+M1–M5 已完成，见 [M5 实施与验收](M5_IMPLEMENTATION.md) 及各阶段记录。几何模式保持原画面，两套素材只改变表现。
 
-下一个任务是 **ARCH-05 / M5**：用正式交付的第二场景与第二套外观完成扩展演练、补齐开发模板、核对几何/素材两种模式及完整 CI，再作阶段发布。M4 的临时测试场景和颜色替换检查不替代这项系统验收。
+后续按用户实际需求推进，使用 [开发模板](templates/FEATURE_TEMPLATE.md) 记录最小必要设计与验收。扩展演练见 [EXTENSION_EXERCISE](EXTENSION_EXERCISE.md)，阶段发布见 [RELEASE](RELEASE.md)。不自动进入技能、AI 或存档开发。
 ````
 
 ## docs/references/architecture_proposal.md
@@ -1811,6 +2076,53 @@ Chrono Tactics 当前已经具备可继续迭代的基础结构，没有必要�
 **实施状态：** 本报告为整改方案。实际代码修改、自动化测试和合并均须在具备仓库写入权限的环境中完成并验证。
 ````
 
+## docs/templates/FEATURE_TEMPLATE.md
+
+````markdown
+# 功能变更模板
+
+复制本模板到任务说明或 PR；小功能可以压缩成几句话。未涉及的项目注明原因，不要求新增空模块。规范见 [功能开发规范](../FEATURE_DEVELOPMENT.md)。
+
+## 玩家行为与范围
+
+- 触发条件、当前行为、预期行为：
+- 具体示例（输入 → 结果）：
+- 明确不涉及的玩法：
+- 所需前置能力及当前实现位置：
+
+## 数据与指令
+
+| 数据/状态 | 唯一归属与初始化 | 修改入口与合法性 | 死亡/结束行为 | 快照/恢复 |
+| --- | --- | --- | --- | --- |
+| 填写实际字段；纯外观不加规则状态 | content / Scenario / Battle / Controller / presentation | Controller 指令 → 规则验证 | 明确保留、移除或重置 | 新 Unit 字段同步 UnitSnapshot 与恢复；资源不入快照 |
+
+- UI 和未来 AI 共用哪个指令？失败是否无状态、副作用和行动消耗？
+- 外部拿到的是哪些独立只读视图/结果？实例用 UID、定义用 definition_id，避免保留跨回溯实体引用。
+- 有延迟表现时：阻塞还是非阻塞？匹配哪个结算 token？回溯/重开怎样清理，旧通知怎样拒绝？
+- 只有真实需要才新增模块/抽象；写明当前调用方。
+
+## 内容和美术
+
+- 新定义、场景和 schema 变化：
+- 素材来源/授权、PNG 路径、尺寸、脚底 pivot、状态与帧速率：
+- 必需/可选资源与失败回退：
+- 清单预载/缓存、图层、点击占格是否仍符合规范：
+- 数据格式若不兼容，说明迁移、回退与错误提示；没有格式变化则省略。
+
+## 验收证据
+
+- [ ] 正常操作；敌我/范围/资源不足等非法操作无副作用。
+- [ ] 新状态经过连续回溯、跨轮、死亡、结束后恢复；快照字段覆盖检查通过。
+- [ ] 异步效果锁定、完成一次、重复/旧 token、回溯后取消表现通过。
+- [ ] 同一指令在几何/两套素材下规则状态一致；资源缺失行为符合清单约定。
+- [ ] 按改动运行相关纯测试与完整回归，记录实际通过/跳过/失败及原因。
+- [ ] 需要观察时，记录实际窗口驱动和截图；自动投递事件与人工操作分开说明。
+- [ ] 更新 TASKS、CHANGELOG、README、资源来源和相关接口说明，重新导出 SOURCE。
+- [ ] 在专用分支审查差异；发布时包、tag、Release 对应同一提交并验证解压产物。
+
+填写实际命令、结果、截图位置和仍未验证的限制：
+````
+
 ## main.py
 
 ```python
@@ -1842,6 +2154,54 @@ if __name__ == "__main__":
 pygame==2.6.1
 ```
 
+## scripts/build_release.py
+
+```python
+"""Build a reproducible source ZIP from an exact committed Git tree."""
+
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import re
+import subprocess
+import zipfile
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def git(*args):
+    return subprocess.check_output(["git", *args], cwd=ROOT)
+
+
+def build(ref="HEAD", output_dir=None):
+    commit = git("rev-parse", "--verify", "--end-of-options", ref + "^{commit}").decode().strip()
+    version = git("show", commit + ":VERSION.txt").decode().strip()
+    if not re.fullmatch(r"\d+\.\d+\.\d+", version):
+        raise ValueError("VERSION.txt must contain a numeric semantic version")
+    folder = Path(output_dir) if output_dir else ROOT / "dist"
+    folder.mkdir(parents=True, exist_ok=True)
+    name = "chrono-tactics-pygame-{}".format(version)
+    archive = folder / (name + "-source.zip")
+    git("archive", "--format=zip", "--prefix=" + name + "/", "--output=" + str(archive.resolve()), commit)
+    with zipfile.ZipFile(archive, "a") as package:
+        package.comment = json.dumps({"format": "chrono-tactics-source-v1", "version": version,
+                                      "commit": commit}, sort_keys=True).encode("ascii")
+    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+    checksum = archive.with_suffix(archive.suffix + ".sha256")
+    checksum.write_text(digest + "  " + archive.name + "\n", encoding="ascii")
+    return {"archive": str(archive.resolve()), "checksum": str(checksum.resolve()),
+            "version": version, "commit": commit, "sha256": digest}
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--ref", default="HEAD")
+    parser.add_argument("--output-dir", type=Path)
+    args = parser.parse_args()
+    print(json.dumps(build(args.ref, args.output_dir), indent=2))
+```
+
 ## scripts/export_source.py
 
 ```python
@@ -1866,7 +2226,7 @@ def source_files():
 
 
 def render():
-    parts = ["# 完整项目源码\n\n本文件由 `python scripts/export_source.py` 生成。包含项目全部文本源码、配置和文档；不包含自身、二进制 PNG、截图、虚拟环境、缓存及压缩包。演示 PNG 可由 scripts/generate_demo_assets.py 重建。\n"]
+    parts = ["# 完整项目源码\n\n本文件由 `python scripts/export_source.py` 生成。包含项目全部文本源码、配置和文档；不包含自身、二进制 PNG、截图、虚拟环境、缓存及压缩包。演示 PNG 可由 scripts/generate_demo_assets.py 与 scripts/generate_dusk_assets.py 重建。\n"]
     for path in source_files():
         name = path.relative_to(ROOT).as_posix()
         language = {".py": "python", ".md": "markdown", ".yml": "yaml", ".yaml": "yaml"}.get(path.suffix, "text")
@@ -1946,6 +2306,144 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=ROOT / "assets")
     generate(parser.parse_args().output)
+```
+
+## scripts/generate_dusk_assets.py
+
+```python
+"""Generate the second self-contained programmer-art skin, without external art."""
+
+import argparse
+from pathlib import Path
+import pygame
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def generate(root):
+    root = Path(root)
+    for folder in ("tiles", "units"):
+        (root / folder).mkdir(parents=True, exist_ok=True)
+    floor = pygame.Surface((64, 64), pygame.SRCALPHA)
+    floor.fill((34, 39, 61))
+    for y in (2, 34):
+        pygame.draw.rect(floor, (49, 56, 81), (2, y, 60, 28), border_radius=4)
+        pygame.draw.line(floor, (72, 85, 115), (6, y+2), (58, y+2), 2)
+    pygame.draw.circle(floor, (83, 108, 129), (12, 18), 2)
+    pygame.image.save(floor, str(root / "tiles/floor.png"))
+    obstacle = pygame.Surface((64, 80), pygame.SRCALPHA)
+    pygame.draw.polygon(obstacle, (79, 91, 115), ((8, 70), (12, 27), (31, 10), (54, 24), (57, 70)))
+    pygame.draw.polygon(obstacle, (116, 132, 156), ((12, 27), (31, 10), (36, 44), (8, 70)))
+    pygame.draw.line(obstacle, (168, 191, 209), (31, 16), (36, 57), 2)
+    pygame.image.save(obstacle, str(root / "tiles/obstacle.png"))
+    for role in ("scout", "dummy"):
+        for state, count in (("idle", 2 if role == "scout" else 1), ("attack", 3), ("death", 3)):
+            for index in range(count):
+                body = pygame.Surface((64, 96), pygame.SRCALPHA)
+                pygame.draw.ellipse(body, (9, 12, 25, 110), (9, 85, 46, 9))
+                if role == "scout":
+                    dy = -index if state == "idle" else 0
+                    pygame.draw.polygon(body, (31, 73, 121), ((13, 84), (19, 47+dy), (45, 47+dy), (54, 84)))
+                    pygame.draw.circle(body, (58, 126, 214), (32, 64+dy), 20)
+                    pygame.draw.circle(body, (140, 214, 249), (32, 64+dy), 20, 2)
+                    pygame.draw.polygon(body, (65, 142, 211), ((19, 42+dy), (20, 27+dy), (32, 18+dy), (44, 27+dy), (45, 42+dy)))
+                    pygame.draw.rect(body, (203, 223, 242), (25, 35+dy, 14, 6), border_radius=2)
+                    pygame.draw.polygon(body, (164, 209, 245), ((13, 53), (27, 53), (27, 70), (20, 77), (13, 70)))
+                else:
+                    pygame.draw.rect(body, (76, 36, 39), (27, 28, 10, 63))
+                    pygame.draw.rect(body, (175, 60, 70), (10, 43, 44, 38), border_radius=6)
+                    pygame.draw.rect(body, (244, 142, 139), (10, 43, 44, 38), 2, border_radius=6)
+                    pygame.draw.line(body, (108, 45, 48), (20, 46), (20, 77), 3)
+                    pygame.draw.line(body, (108, 45, 48), (43, 46), (43, 77), 3)
+                    pygame.draw.circle(body, (255, 186, 139), (32, 62), 10, 2)
+                if state == "attack":
+                    pygame.draw.arc(body, (237, 207, 151), (25-index*3, 27, 36, 52), -.9, 1.3, 3+index)
+                image = pygame.Surface((64, 96), pygame.SRCALPHA)
+                if state == "death":
+                    size = (64-index*10, 96-index*17)
+                    body = pygame.transform.smoothscale(body, size)
+                    body.set_alpha(210-index*80)
+                    image.blit(body, ((64-size[0])//2, 96-size[1]))
+                else:
+                    image.blit(body, (0, 0))
+                pygame.image.save(image, str(root / "units" / "{}_{}_{}.png".format(role, state, index)))
+    print("Generated 17 dusk PNGs in " + str(root.resolve()))
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output", type=Path, default=ROOT / "assets/skins/dusk")
+    generate(parser.parse_args().output)
+```
+
+## scripts/verify_release.py
+
+```python
+"""Verify source archive integrity and exercise the extracted game offline."""
+
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path, PurePosixPath
+import re
+import subprocess
+import sys
+import tempfile
+import zipfile
+
+
+def verify(archive, expected_commit=None):
+    archive = Path(archive).resolve()
+    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+    sidecar = archive.with_suffix(archive.suffix + ".sha256").read_text(encoding="ascii").strip()
+    if sidecar != digest + "  " + archive.name:
+        raise ValueError("SHA256 or checksum filename mismatch")
+    with zipfile.ZipFile(archive) as package, tempfile.TemporaryDirectory(prefix="chrono-release-") as temp:
+        info = json.loads(package.comment)
+        if info.get("format") != "chrono-tactics-source-v1":
+            raise ValueError("Unknown package format")
+        if not re.fullmatch(r"[0-9a-f]{40}", info["commit"]):
+            raise ValueError("Invalid commit provenance")
+        if expected_commit and info["commit"] != expected_commit:
+            raise ValueError("Unexpected source commit")
+        if not re.fullmatch(r"\d+\.\d+\.\d+", info["version"]):
+            raise ValueError("Invalid package version")
+        prefix = "chrono-tactics-pygame-" + info["version"]
+        names = package.namelist()
+        if not names or len(names) != len(set(names)) or package.testzip():
+            raise ValueError("Empty, duplicate or corrupt ZIP entries")
+        for entry in package.infolist():
+            path = PurePosixPath(entry.filename)
+            if (path.is_absolute() or ".." in path.parts or "\\" in entry.filename
+                    or ":" in entry.filename or path.parts[0] != prefix
+                    or any(p in {".git", ".venv", ".delivery", "dist", "__pycache__"} for p in path.parts)
+                    or (entry.external_attr >> 16) & 0o170000 == 0o120000):
+                raise ValueError("Unsafe or unwanted archive entry: " + entry.filename)
+        package.extractall(temp)
+        root = Path(temp) / prefix
+        if (root / "VERSION.txt").read_text(encoding="utf-8").strip() != info["version"]:
+            raise ValueError("Source version differs from archive metadata")
+        env = dict(os.environ, PYTHONPATH=str(root), PYGAME_HIDE_SUPPORT_PROMPT="1",
+                   SDL_VIDEODRIVER="dummy", SDL_AUDIODRIVER="dummy")
+        for args in (("scripts/export_source.py", "--check"), ("main.py", "--help"),
+                     ("-m", "unittest", "discover", "-s", "tests", "-p", "test_milestone.py", "-v")):
+            subprocess.run([sys.executable, *args], cwd=root, env=env, check=True, timeout=180)
+    print("Verified version={} commit={} sha256={}".format(info["version"], info["commit"], digest))
+    return info
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    default_version = (Path(__file__).resolve().parents[1] / "VERSION.txt").read_text(encoding="utf-8").strip()
+    parser.add_argument("archive", type=Path, nargs="?",
+                        default=Path("dist/chrono-tactics-pygame-{}-source.zip".format(default_version)))
+    parser.add_argument("--expected-commit")
+    args = parser.parse_args()
+    try:
+        verify(args.archive, args.expected_commit)
+    except (ValueError, OSError, KeyError, zipfile.BadZipFile, subprocess.SubprocessError) as error:
+        parser.exit(1, "Release verification failed: {}\n".format(error))
 ```
 
 ## tactics/__init__.py
@@ -5052,6 +5550,273 @@ class FontChecks(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+```
+
+## tests/test_milestone.py
+
+```python
+"""M5 extension acceptance using shipped content and public application operations."""
+
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import unittest
+from unittest.mock import patch
+
+import pygame
+
+from tactics.content import load_content
+from tactics.game import Game
+
+ROOT = Path(__file__).resolve().parents[1]
+MODES = ("geometry", "classic", "dusk")
+
+
+def make_game(scene, mode):
+    return Game(scenario_file="scenarios/{}.json".format(scene),
+                geometric=mode == "geometry",
+                asset_root=ROOT / "assets/skins/dusk" if mode == "dusk" else None)
+
+
+def exercise(check, game, scene, capture=None):
+    """Same inputs and observations for every skin; also used for window captures."""
+    trace = []
+
+    def observe(name):
+        game.draw()
+        trace.append(game.controller.get_view_state())
+        if capture:
+            capture(name, game)
+        return trace[-1]
+
+    def click(cell):
+        game.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1,
+                                           pos=game.geometry.cell_center(cell)))
+
+    def key(value):
+        game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=value))
+
+    def unit(uid):
+        return next(u for u in game.controller.get_view_state().units if u.uid == uid)
+
+    initial = observe("initial")
+    check.assertEqual(initial.active.uid, "A2")
+    check.assertEqual((initial.active.health, initial.active.max_health), (80, 100))
+    river = scene == "river_crossing"
+    target = "R1" if river else "D2"
+    click((3, 2) if river else (4, 4))
+    observe("moved")
+    click(unit(target).cell)
+    resolving = observe("attack")
+    token = resolving.pending_resolution
+    check.assertTrue(resolving.input_locked)
+    check.assertEqual(unit(target).health, 0 if river else 90)
+    check.assertEqual(game.effects.damage_texts[0].amount, 10)
+    if river:
+        check.assertNotIn(target, [u.uid for u in resolving.board.units])
+        check.assertTrue(game.effects.deaths or game.effects.body_views())
+    for value in (pygame.K_RETURN, pygame.K_SPACE, pygame.K_BACKSPACE):
+        key(value)
+    click(initial.active.cell)
+    check.assertEqual(game.controller.get_view_state(), resolving)
+    game.update(0.2)
+    observe("death" if river else "damage")
+    game.update(2.0)
+    after = observe("handoff")
+    check.assertEqual(after.active.uid, "A1")
+    check.assertFalse(game.effects.busy)
+    check.assertFalse(game.effects.body_views())
+    check.assertFalse(game.controller.complete_presentation(token))
+    check.assertEqual(game.controller.get_view_state(), after)
+
+    if river:
+        key(pygame.K_RETURN)
+        check.assertEqual(observe("enemy").active.uid, "R2")
+        key(pygame.K_RETURN)
+        round_two = observe("round_two")
+        check.assertEqual((round_two.round_number, round_two.active.uid), (2, "A2"))
+        click((5, 3))
+        check.assertEqual(game.controller.get_view_state().active.cell, (5, 3))
+        click(unit("R2").cell)
+        second_token = observe("final_attack").pending_resolution
+        game.update(2.0)
+        finished = observe("finished")
+        check.assertEqual((finished.phase, finished.winner), ("finished", "ally"))
+        for name in ("undo_win", "undo_round", "undo_enemy", "revived"):
+            key(pygame.K_BACKSPACE)
+            observe(name)
+        check.assertEqual(unit("R1").health, 5)
+        check.assertEqual(unit("R2").health, 10)
+        check.assertEqual(game.controller.get_view_state().round_number, 1)
+        check.assertFalse(game.controller.complete_presentation(second_token))
+    else:
+        key(pygame.K_RETURN)
+        check.assertEqual(observe("enemy").active.uid, "D1")
+        key(pygame.K_BACKSPACE)
+        observe("undo_enemy")
+        key(pygame.K_BACKSPACE)
+        observe("revived")
+        check.assertEqual(unit(target).health, 100)
+
+    restored = game.controller.get_view_state()
+    check.assertEqual(restored.active, initial.active)
+    check.assertEqual(restored.units, initial.units)
+    check.assertEqual(restored.board, initial.board)
+    check.assertFalse(game.effects.busy)
+    check.assertFalse(game.controller.complete_presentation(token))
+    check.assertEqual(game.controller.get_view_state(), restored)
+    return tuple(trace)
+
+
+class ExtensionAcceptance(unittest.TestCase):
+    def tearDown(self):
+        pygame.quit()
+
+    def test_second_scene_reuses_definitions_with_different_layout(self):
+        original = load_content()
+        river = load_content(scenario_file="scenarios/river_crossing.json")
+        self.assertEqual(original.definitions, river.definitions)
+        self.assertEqual((river.scenario.cols, river.scenario.rows), (6, 5))
+        self.assertNotEqual(original.scenario.obstacles, river.scenario.obstacles)
+        self.assertEqual(len(river.scenario.units), 4)
+
+    def test_both_shipped_skins_load_without_fallback_issues(self):
+        frames = []
+        for mode in ("classic", "dusk"):
+            game = make_game("river_crossing", mode)
+            self.assertFalse(game.assets.issues)
+            game.draw()
+            frames.append(pygame.image.tostring(game.screen, "RGB"))
+            pygame.quit()
+        self.assertNotEqual(*frames)
+
+    def compare_modes(self, scene):
+        traces = []
+        for mode in MODES:
+            with self.subTest(mode=mode):
+                game = make_game(scene, mode)
+                traces.append(exercise(self, game, scene))
+                pygame.quit()
+        self.assertEqual(traces[0], traces[1])
+        self.assertEqual(traces[0], traces[2])
+
+    def test_default_scene_identical_rules_in_three_modes(self):
+        self.compare_modes("training_ground")
+
+    def test_river_kills_rounds_and_rewinds_identical_in_three_modes(self):
+        self.compare_modes("river_crossing")
+
+    def test_font_registry_fallback_and_quit_while_resolving(self):
+        for mode in MODES:
+            with self.subTest(mode=mode), \
+                 patch("tactics.panel.Path.is_file", return_value=False), \
+                 patch("tactics.panel.pygame.font.match_font", side_effect=TypeError("bad registry")):
+                game = make_game("river_crossing", mode)
+                self.assertFalse(game.panel.chinese)
+                self.assertTrue(game.controller.move_to((3, 2)))
+                self.assertTrue(game.controller.attack("R1"))
+                game.draw()
+                pygame.event.post(pygame.event.Event(pygame.QUIT))
+                game.run()
+                self.assertFalse(game.running)
+                self.assertFalse(pygame.display.get_init())
+                self.assertFalse(pygame.font.get_init())
+
+    def test_real_cli_from_foreign_directory_with_dusk(self):
+        # Execute the actual argparse/main entry, then inject a close event into its loop.
+        script = """
+import runpy, sys
+from pathlib import Path
+import pygame
+from tactics.game import Game
+original_run = Game.run
+def run(self):
+    assert self.screen.get_size() == (768, 512)
+    assert self.controller.get_view_state().active.uid == 'A2'
+    assert not self.assets.issues
+    self.draw()
+    pygame.event.post(pygame.event.Event(pygame.QUIT))
+    original_run(self)
+    assert not pygame.display.get_init()
+    print('CLI_WINDOW_QUIT_OK')
+Game.run = run
+root = Path(sys.argv[1])
+sys.argv = [str(root / 'main.py'), '--scenario', 'scenarios/river_crossing.json',
+            '--assets', str(root / 'assets/skins/dusk')]
+runpy.run_path(sys.argv[0], run_name='__main__')
+"""
+        env = dict(os.environ, PYTHONPATH=str(ROOT), PYGAME_HIDE_SUPPORT_PROMPT="1")
+        with tempfile.TemporaryDirectory() as folder:
+            result = subprocess.run([sys.executable, "-c", script, str(ROOT)], cwd=folder,
+                                    env=env, capture_output=True, text=True, timeout=45)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("CLI_WINDOW_QUIT_OK", result.stdout)
+```
+
+## tests/test_release.py
+
+```python
+"""Reject unusable delivery artifacts before executing extracted source."""
+
+import hashlib
+import json
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import patch
+import zipfile
+
+from scripts.verify_release import verify
+
+
+class ReleaseIntegrityChecks(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.archive = Path(self.temp.name) / "release.zip"
+        self.commit = "a" * 40
+
+    def write_archive(self, version="0.2.0", extra=None):
+        with zipfile.ZipFile(self.archive, "w") as package:
+            package.comment = json.dumps({"format": "chrono-tactics-source-v1", "version": "0.2.0",
+                                          "commit": self.commit}).encode("ascii")
+            package.writestr("chrono-tactics-pygame-0.2.0/VERSION.txt", version)
+            if extra:
+                package.writestr(extra, "unwanted")
+        digest = hashlib.sha256(self.archive.read_bytes()).hexdigest()
+        self.archive.with_suffix(".zip.sha256").write_text(digest + "  release.zip\n", encoding="ascii")
+
+    def reject(self, message, expected=None):
+        with patch("scripts.verify_release.subprocess.run") as execute:
+            with self.assertRaisesRegex(ValueError, message):
+                verify(self.archive, expected)
+            execute.assert_not_called()
+
+    def test_changed_archive_fails_checksum_before_execution(self):
+        self.write_archive()
+        with self.archive.open("ab") as output:
+            output.write(b"tampered")
+        self.reject("SHA256")
+
+    def test_wrong_source_commit_is_rejected(self):
+        self.write_archive()
+        self.reject("Unexpected source commit", "b" * 40)
+
+    def test_version_file_must_match_metadata(self):
+        self.write_archive(version="9.9.9")
+        self.reject("Source version")
+
+    def test_unsafe_paths_and_workspace_artifacts_are_rejected(self):
+        for extra in ("chrono-tactics-pygame-0.2.0/../../escape", "/absolute",
+                      "chrono-tactics-pygame-0.2.0/.venv/python.exe",
+                      "chrono-tactics-pygame-0.2.0/.git/config",
+                      "chrono-tactics-pygame-0.2.0/dist/old.zip",
+                      "chrono-tactics-pygame-0.2.0/C:/escape"):
+            with self.subTest(extra=extra):
+                self.write_archive(extra=extra)
+                self.reject("Unsafe or unwanted")
 ```
 
 ## tests/test_rendering.py

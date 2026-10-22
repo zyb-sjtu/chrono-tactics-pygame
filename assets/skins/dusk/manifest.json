@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "images": {
+    "tile.floor": {"path":"tiles/floor.png","display_size":[64,64],"pivot":[0.5,0.5],"optional":true},
+    "tile.obstacle": {"path":"tiles/obstacle.png","display_size":[64,80],"pivot":[0.5,1],"optional":true},
+    "scout.idle.0": {"path":"units/scout_idle_0.png","display_size":[64,96],"pivot":[0.5,1],"optional":true},
+    "scout.idle.1": {"path":"units/scout_idle_1.png","display_size":[64,96],"pivot":[0.5,1],"optional":true},
+    "scout.attack.0": {"path":"units/scout_attack_0.png","display_size":[64,96],"pivot":[0.5,1],"optional":true},
+    "scout.attack.1": {"path":"units/scout_attack_1.png","display_size":[64,96],"pivot":[0.5,1],"optional":true},
+    "scout.attack.2": {"path":"units/scout_attack_2.png","display_size":[64,96],"pivot":[0.5,1],"optional":true},
+    "scout.death.0": {"path":"units/scout_death_0.png","display_size":[64,96],"pivot":[0.5,1],"optional":true},
+    "scout.death.1": {"path":"units/scout_death_1.png","display_size":[64,96],"pivot":[0.5,1],"optional":true},
+    "scout.death.2": {"path":"units/scout_death_2.png","display_size":[64,96],"pivot":[0.5,1],"optional":true},
+    "dummy.idle": {"path":"units/dummy_idle_0.png","display_size":[64,96],"pivot":[0.5,1],"optional":true},
+    "dummy.attack.0": {"path":"units/dummy_attack_0.png","display_size":[64,96],"pivot":[0.5,1],"optional":true},
+    "dummy.attack.1": {"path":"units/dummy_attack_1.png","display_size":[64,96],"pivot":[0.5,1],"optional":true},
+    "dummy.attack.2": {"path":"units/dummy_attack_2.png","display_size":[64,96],"pivot":[0.5,1],"optional":true},
+    "dummy.death.0": {"path":"units/dummy_death_0.png","display_size":[64,96],"pivot":[0.5,1],"optional":true},
+    "dummy.death.1": {"path":"units/dummy_death_1.png","display_size":[64,96],"pivot":[0.5,1],"optional":true},
+    "dummy.death.2": {"path":"units/dummy_death_2.png","display_size":[64,96],"pivot":[0.5,1],"optional":true}
+  },
+  "animations": {
+    "scout.idle": {"frames":["scout.idle.0","scout.idle.1"],"fps":2,"loop":true},
+    "scout.attack": {"frames":["scout.attack.0","scout.attack.1","scout.attack.2"],"fps":8,"loop":false},
+    "scout.death": {"frames":["scout.death.0","scout.death.1","scout.death.2"],"fps":5,"loop":false},
+    "dummy.attack": {"frames":["dummy.attack.0","dummy.attack.1","dummy.attack.2"],"fps":8,"loop":false},
+    "dummy.death": {"frames":["dummy.death.0","dummy.death.1","dummy.death.2"],"fps":5,"loop":false}
+  },
+  "visuals": {
+    "unit.scout": {"idle":"scout.idle","attack":"scout.attack","death":"scout.death"},
+    "unit.dummy": {"idle":"dummy.idle","attack":"dummy.attack","death":"dummy.death"},
+    "unit.vanguard": {},
+    "unit.guard": {}
+  },
+  "board": {"floor":"tile.floor","obstacle":"tile.obstacle"}
+}

@@ -1,14 +1,14 @@
 # Chrono Tactics · 离线回溯战棋
 
-仓库名称：`chrono-tactics-pygame`，最近发布版本：`0.1.0`；当前开发代码已完成 M1–M4（未发布）。
+仓库名称：`chrono-tactics-pygame`，阶段版本：`0.2.0`；M0–M5 已实施。发布状态以仓库 tag / Release 为准。
 
 项目仓库：[zyb-sjtu/chrono-tactics-pygame](https://github.com/zyb-sjtu/chrono-tactics-pygame)。这是私有仓库，需要登录有权限的 GitHub 账号访问。
 
-使用 Python 和 Pygame 绘制，运行时不访问网络，不需要另行下载美术。默认显示随项目提供的演示地砖与斥候 PNG，也可用 --geometry 回到几何模式。棋盘保持 8×8，每格 64×64，侧栏 384 像素，窗口 896×512。
+使用 Python 和 Pygame 绘制，运行时不访问网络，不需要另行下载美术。默认显示随项目提供的演示地砖与斥候 PNG，也可用 --geometry 回到几何模式。默认棋盘 8×8，每格 64×64，侧栏 384 像素，窗口 896×512；渡口场景为 6×5，窗口 768×512。
 
 ## 整体规划与后续开发
 
-已完成评审和 M1–M4：规则与表现分离、纯数据回溯、结算确认、JSON 内容/资源清单、PNG 缓存和实际素材动画。回溯按 UID 重建单位，重复或过期动画通知不会推进回合。当前是程序生成的演示美术，最终风格与 M5 扩展/发布验收尚未交付。
+已完成评审和 M1–M5：规则与表现分离、纯数据回溯、结算确认、JSON 内容/资源清单、PNG 缓存和实际素材动画。M5 增加 6×5 渡口场景及 `dusk` 外观，复用全部游戏代码；三种显示模式的相同操作产生一致战斗状态。当前美术仍为程序生成的演示素材。
 
 | 文档 | 内容 |
 | --- | --- |
@@ -21,8 +21,12 @@
 | [M2 实施与验收](docs/M2_IMPLEMENTATION.md) | Controller 接口、完整视图、75 项检查与 13 帧像素对照 |
 | [M3 实施与验收](docs/M3_IMPLEMENTATION.md) | 纯数据快照、结算与代次协议、94 项检查及 13 帧像素对照 |
 | [M4 实施与验收](docs/M4_IMPLEMENTATION.md) | JSON 格式、资源替换、缓存、动画、123 项检查与实际窗口 |
+| [M5 实施与验收](docs/M5_IMPLEMENTATION.md) | 第二场景/外观、133 项回归、实际窗口、发布对应关系 |
+| [扩展演练](docs/EXTENSION_EXERCISE.md) | 渡口试玩与仅通过 JSON/PNG 扩展的具体步骤 |
+| [功能模板](docs/templates/FEATURE_TEMPLATE.md) | 可复制的规则、数据、回溯、表现与验收模板 |
+| [源码发布](docs/RELEASE.md) | 提交树打包、SHA256 与解压验收 |
 
-下一任务是 **ARCH-05 / M5**。后续功能需要先具备对应的最小架构边界；新增状态必须能回溯，新增美术通过资源与渲染入口接入。约束同时写入 [AGENTS.md](AGENTS.md)，实现进度见 [TASKS.md](TASKS.md)。
+架构整改 M0–M5 已落实，后续按实际功能需求继续开发；新增状态必须能回溯，新增美术通过资源与渲染入口接入。约束同时写入 [AGENTS.md](AGENTS.md)，实现进度见 [TASKS.md](TASKS.md)。
 
 ## 运行
 
@@ -40,6 +44,7 @@ cd E:\gamedesign
 ```powershell
 .\.venv\Scripts\python.exe main.py --geometry
 .\.venv\Scripts\python.exe main.py --scenario scenarios/training_ground.json --assets assets
+.\.venv\Scripts\python.exe main.py --scenario scenarios/river_crossing.json --assets assets/skins/dusk
 ```
 
 默认内容/资源路径相对项目位置解析，与工作目录无关。--scenario 相对 content 根；显式传入 --content-root 或 --assets 时，目录相对当前工作目录或使用绝对路径。更换单位、地砖和动画只改 JSON/PNG，步骤见 [M4 记录](docs/M4_IMPLEMENTATION.md) 和 [资源来源](assets/README.md)。
@@ -69,7 +74,7 @@ $env:PATH = 'D:\Miniconda3;D:\Miniconda3\Library\bin;' + $env:PATH
 - 移动目的地可以是移动力步数内的任意可达空格，按实际通路步数计算。障碍、友方和敌方单位均不能穿过或重叠。即使没有用满步数，也消耗本次移动机会，不能分段多次移动。
 - 攻击仅能锁定距离 1 格的敌方单位，不能攻击自己、同阵营、斜向或更远的单位。必须先完成或跳过移动，才能攻击。
 - 伤害为**攻击属性的 100%**，当前防御属性不减伤。例如攻击 10 对生命 100/100 的目标造成 10 点伤害，生命变为 90/100。伤害跳字显示攻击结算值，持续约 0.9 秒并向上浮动淡出；过量伤害下生命最低为 0。
-- 生命归零即被击杀：播放约 0.65 秒的闪烁、缩小、碎点扩散和淡出动画，然后在棋盘消失。被击杀单位不再阻挡路径、不能被选为目标，也不会再次行动。
+- 生命归零即被击杀：几何模式播放约 0.65 秒闪烁/缩小/碎点淡出，图片模式按外观 death 帧播放（演示约 0.6 秒），然后消失。被击杀单位不再阻挡路径、不能被选为目标，也不会再次行动。
 - 攻击动画期间锁定移动、攻击、结束行动和回溯，窗口仍能正常关闭；动画使用逐帧更新时间，没有阻塞式等待。
 - 一方全灭后显示胜方，停止继续行动，仍可回溯最后一次行动并恢复被击杀单位。
 - **双方均由玩家手动操作，没有 AI。** 红色木桩同样参与回合，可手动移动和攻击；不操作时不会自行行动。
@@ -109,11 +114,15 @@ E:\gamedesign\
 ├── scripts/export_source.py # 源码汇总生成与一致性检查
 ├── docs/
 │   ├── ARCHITECTURE_REVIEW.md # 对原整改报告的源码核对与评审
-│   ├── ARCHITECTURE.md      # M1–M4 已实施，M5 待验收
+│   ├── ARCHITECTURE.md      # M1–M5 扩展边界
 │   ├── M1_IMPLEMENTATION.md # M1 接口与验证记录
 │   ├── M2_IMPLEMENTATION.md # M2 指令、视图与验证记录
 │   ├── M3_IMPLEMENTATION.md # M3 快照、结算确认与验证记录
 │   ├── M4_IMPLEMENTATION.md # M4 内容、资源与验证记录
+│   ├── M5_IMPLEMENTATION.md # M5 扩展与阶段交付记录
+│   ├── EXTENSION_EXERCISE.md # 第二场景与外观演练
+│   ├── RELEASE.md          # 提交树打包与解压验收
+│   ├── templates/FEATURE_TEMPLATE.md # 可复制开发模板
 │   ├── ROADMAP.md           # 阶段、前置与验收
 │   ├── ASSET_GUIDE.md       # 美术资源与动画规范
 │   ├── FEATURE_DEVELOPMENT.md # 后续开发约束
@@ -142,15 +151,21 @@ E:\gamedesign\
 │   ├── test_game.py         # 11 项窗口交互、绘制与字体检查
 │   ├── test_effects.py      # 10 项几何动画、通知、清理和交互检查
 │   ├── test_assets.py       # 16 项 PNG、缓存、渲染和动画检查
+│   ├── test_milestone.py    # 6 项跨场景/外观集成验收
+│   ├── test_release.py      # 4 项发布包损坏/来源/路径检查
 │   ├── test_content.py      # 13 项无第三方包的内容/清单检查
 │   ├── test_core.py         # 12 项无第三方包的 M1 核心检查
 │   ├── test_controller.py   # 16 项无第三方包的协调与数据边界检查
 │   ├── test_resolution.py   # 16 项无第三方包的快照和结算协议检查
 │   ├── test_rendering.py    # 6 项只读视图、渲染、按钮和场景注入检查
 │   └── test_rewind.py       # 12 项回溯、击杀及行动顺序检查
-├── content/                 # units.json、scenarios/training_ground.json
-├── assets/                  # manifest.json、README、tiles/units 下的 9 张 PNG
+├── content/                 # units.json、训练场与渡口两个场景
+├── assets/                  # 默认 9 张 PNG；skins/dusk 自包含清单与 17 张 PNG
 ├── scripts/generate_demo_assets.py # 重建演示 PNG，不下载外部资源
+├── scripts/generate_dusk_assets.py # 重建第二套演示 PNG
+├── scripts/build_release.py # 从确切提交构建源码 ZIP 与 SHA256
+├── scripts/verify_release.py # 校验并在解压目录验收
+├── VERSION.txt             # 阶段版本 0.2.0
 ├── artifacts\               # 实际运行截图，不是游戏资源
 │   ├── m4_assets.png        # 当前默认地砖/斥候素材
 │   ├── m4_attack.png        # 素材攻击与跳字
@@ -182,21 +197,23 @@ python scripts/export_source.py --check
 可在 GitHub 仓库中通过 Code → Download ZIP 下载源码，也可在本地 Git 仓库生成：
 
 ```powershell
-New-Item -ItemType Directory -Force dist
-git archive --format=zip --prefix=chrono-tactics-pygame/ --output=dist/chrono-tactics-pygame-dev.zip HEAD
+.\.venv\Scripts\python.exe scripts/build_release.py --ref HEAD
+$releaseCommit = git rev-parse HEAD
+.\.venv\Scripts\python.exe scripts/verify_release.py --expected-commit $releaseCommit
 ```
 
-源码包包含运行代码、测试、文档、配置和截图，不包含 `.venv`、缓存或凭据；解压后按上面的新机器安装步骤创建环境。这是 Python 源码包，未构建独立 EXE。
+源码包包含运行代码、两场景/外观、测试、文档、配置和截图，不包含 `.venv`、缓存或凭据；解压后按新机器安装步骤创建环境。输出 `dist/chrono-tactics-pygame-0.2.0-source.zip` 和 `.zip.sha256`，ZIP comment 记录确切提交，详见 [发布说明](docs/RELEASE.md)。这是 Python 源码包，未构建独立 EXE。
 
 ## 验证记录
 
-M4 共 **123 项测试**，本机 **122 通过、1 项跳过**（Windows 无创建符号链接权限；其他路径越界检查通过）。其中 **57 项无需第三方包**，含该跳过项。完整检查在 dummy 与 Windows 实际窗口完成；几何模式 13 帧与 M3 逐像素一致，素材模式验证了透明度、锚点、图层、缓存、攻击/死亡与回溯，并通过其他工作目录下的实际入口验证。详情见 [M4 记录](docs/M4_IMPLEMENTATION.md)。
+M5 共 **133 项测试**，本机 **132 通过、1 项跳过**（Windows 无创建符号链接权限，其他路径检查通过）。四组核心/内容检查共 **57 项无需第三方包**，另 4 项发布完整性检查也可用 `-S`。dummy 与 Windows 实际窗口分别回归；两场景 × 三模式的完整状态一致，覆盖击杀、跨轮、战斗结束、连续回溯、旧通知、字体异常及异地 CLI/QUIT。真实窗口使用自动投递事件，非人工逐次点击。详见 [M5 记录](docs/M5_IMPLEMENTATION.md)。M4 的 123 项基线及 13 帧几何像素对照记录保留。
 
 ```powershell
 .\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_core.py -v
 .\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_controller.py -v
 .\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_resolution.py -v
 .\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_content.py -v
+.\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_release.py -v
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
