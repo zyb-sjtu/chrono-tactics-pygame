@@ -1,6 +1,6 @@
 # Chrono Tactics · 离线回溯战棋
 
-仓库名称：`chrono-tactics-pygame`，当前版本：`0.1.0`。
+仓库名称：`chrono-tactics-pygame`，最近发布版本：`0.1.0`；当前开发代码已完成 M1（未发布）。
 
 项目仓库：[zyb-sjtu/chrono-tactics-pygame](https://github.com/zyb-sjtu/chrono-tactics-pygame)。这是私有仓库，需要登录有权限的 GitHub 账号访问。
 
@@ -8,7 +8,7 @@
 
 ## 整体规划与后续开发
 
-已对用户的架构整改意见进行源码核对，并建立后续开发约束。当前只完成评审与规划，运行架构仍为 v0.1.0；场景、控制器、只读视图和资源管理等拆分按下表文档逐步实施，不宣称已经具备。
+已完成评审与 M1：默认场景提取、纯逻辑 Board、纯数值 Geometry、独立 BoardRenderer 和最小只读棋盘视图。完整控制器、侧栏视图、ID 快照与资源管理仍属于 M2–M4，未提前标记完成。
 
 | 文档 | 内容 |
 | --- | --- |
@@ -17,8 +17,9 @@
 | [实施路线](docs/ROADMAP.md) | M0–M5、前置能力、小批次提交与验收标准 |
 | [美术资源规范](docs/ASSET_GUIDE.md) | 路径、清单、缓存、透明图片、锚点、图层和动画 |
 | [功能开发规范](docs/FEATURE_DEVELOPMENT.md) | 新功能的数据归属、回溯方案、扩展边界与完成条件 |
+| [M1 实施与验收](docs/M1_IMPLEMENTATION.md) | 当前模块接口、场景示例、57 项检查与 8 帧像素对照 |
 
-开发从 **ARCH-01 / M1** 开始。后续功能需要先具备对应的最小架构边界；新增状态必须能回溯，新增美术通过资源与渲染入口接入。约束同时写入 [AGENTS.md](AGENTS.md)，实现进度见 [TASKS.md](TASKS.md)。
+下一任务是 **ARCH-02 / M2**。后续功能需要先具备对应的最小架构边界；新增状态必须能回溯，新增美术通过资源与渲染入口接入。约束同时写入 [AGENTS.md](AGENTS.md)，实现进度见 [TASKS.md](TASKS.md)。
 
 ## 运行
 
@@ -49,7 +50,7 @@ $env:PATH = 'D:\Miniconda3;D:\Miniconda3\Library\bin;' + $env:PATH
 
 ## 战斗规则
 
-- 3 个蓝色圆形友方与 3 个红色方形木桩均为单位，具有当前生命、最大生命、攻击、防御、速度、移动力。侧栏显示 `生命: 80/100` 这样的当前值/上限格式，棋盘单位下方显示血条。数值在 `tactics/models.py` 中配置，暂为功能演示占位值。
+- 3 个蓝色圆形友方与 3 个红色方形木桩均为单位，具有当前生命、最大生命、攻击、防御、速度、移动力。侧栏显示 `生命: 80/100` 这样的当前值/上限格式，棋盘单位下方显示血条。默认阵容和数值在 `tactics/scenario.py` 中配置，暂为功能演示占位值。
 - 入场时将双方单位按速度从高到低排序，同速按入场顺序排列。每轮各行动一次，全部行动后进入下一轮，按相同顺序继续。
 - 每次行动分为**一次移动 → 一次攻击**。可以跳过移动、跳过攻击，或直接结束行动；成功攻击后，动画播放完毕再交接给下一位。
 - 移动和攻击均按上下左右四方向计算，不允许斜走或斜向攻击。
@@ -96,16 +97,21 @@ E:\gamedesign\
 ├── scripts/export_source.py # 源码汇总生成与一致性检查
 ├── docs/
 │   ├── ARCHITECTURE_REVIEW.md # 对原整改报告的源码核对与评审
-│   ├── ARCHITECTURE.md      # 目标架构，尚未实施
+│   ├── ARCHITECTURE.md      # M1 已实施，其余为目标架构
+│   ├── M1_IMPLEMENTATION.md # M1 接口与验证记录
 │   ├── ROADMAP.md           # 阶段、前置与验收
 │   ├── ASSET_GUIDE.md       # 美术资源与动画规范
 │   ├── FEATURE_DEVELOPMENT.md # 后续开发约束
 │   └── references/architecture_proposal.md # 用户原始意见
 ├── tactics\
 │   ├── __init__.py
-│   ├── settings.py          # 棋盘和窗口尺寸
-│   ├── models.py            # 双方单位属性、初始位置、障碍
-│   ├── board.py             # 格子几何、BFS 可达范围、绘制
+│   ├── settings.py          # 格子像素、侧栏等表现默认值
+│   ├── models.py            # 单位运行状态
+│   ├── scenario.py          # 不可变场景、验证、默认阵容
+│   ├── board.py             # 纯逻辑地图、空间查询与 BFS
+│   ├── geometry.py          # 不依赖 Pygame 的坐标转换
+│   ├── view_models.py       # 最小只读棋盘视图
+│   ├── board_renderer.py    # 只读视图驱动的棋盘绘制
 │   ├── battle.py            # 伤害、击杀、速度队列、回合快照与回溯
 │   ├── effects.py           # 伤害跳字、几何击杀动画、逐帧更新
 │   ├── panel.py             # 字体回退、属性栏、按钮、日志和队列
@@ -114,6 +120,8 @@ E:\gamedesign\
 │   ├── test_battle.py       # 11 项战斗规则检查，无需创建窗口
 │   ├── test_game.py         # 11 项窗口交互、绘制与字体检查
 │   ├── test_effects.py      # 7 项动画、按键、血量显示和退出检查
+│   ├── test_core.py         # 12 项无第三方包的 M1 核心检查
+│   ├── test_rendering.py    # 4 项只读视图、渲染和场景注入检查
 │   └── test_rewind.py       # 12 项回溯、击杀及行动顺序检查
 ├── artifacts\               # 实际运行截图，不是游戏资源
 │   ├── initial.png          # 开局移动范围
@@ -125,7 +133,8 @@ E:\gamedesign\
 │   ├── defeat.png           # 击杀动画中间帧
 │   ├── defeat_disappeared.png # 击杀动画后消失
 │   ├── defeat_result.png    # 击杀后交接回合
-│   └── defeat_rewind.png    # 回溯恢复被击杀单位
+│   ├── defeat_rewind.png    # 回溯恢复被击杀单位
+│   └── m1_custom_scenario.png # M1 第二场景实际窗口
 └── .venv\                   # 本机独立环境，生成内容
 ```
 
@@ -142,18 +151,21 @@ python scripts/export_source.py --check
 
 ```powershell
 New-Item -ItemType Directory -Force dist
-git archive --format=zip --prefix=chrono-tactics-pygame/ --output=dist/chrono-tactics-pygame-v0.1.0.zip HEAD
+git archive --format=zip --prefix=chrono-tactics-pygame/ --output=dist/chrono-tactics-pygame-dev.zip HEAD
 ```
 
 源码包包含运行代码、测试、文档、配置和截图，不包含 `.venv`、缓存或凭据；解压后按上面的新机器安装步骤创建环境。这是 Python 源码包，未构建独立 EXE。
 
 ## 验证记录
 
+M1 开发版本目前共 **57 项检查通过**，其中 **12 项可在无第三方包环境执行**。原 41 项行为覆盖保留，8 个默认场景关键画面与重构前逐像素一致；另在 Windows 实际窗口验证了 5×4 场景。详情见 [M1 实施记录](docs/M1_IMPLEMENTATION.md)。
+
 ```powershell
+.\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_core.py -v
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-2026-10-22，本机 Python 3.9.1 / Pygame 2.6.1 / SDL 2.28.4 实测 **41 项检查全部通过，退出码 0**。覆盖速度和同速顺序、四方向范围、路径阻挡、移动次数、敌我与攻击距离限制、攻击 100% 结算及忽略防御、过量伤害归零、跳字生命周期、动画期间锁定操作及正常关闭、实际画面中击杀形体消失、死亡后的行动顺序、连续和跨轮回溯、回溯恢复已死单位与当前/最大生命、回溯战斗结束状态，以及原有窗口和字体回退。
+v0.1.0 基线记录：2026-10-22，本机 Python 3.9.1 / Pygame 2.6.1 / SDL 2.28.4 实测 **41 项检查全部通过，退出码 0**。覆盖速度和同速顺序、四方向范围、路径阻挡、移动次数、敌我与攻击距离限制、攻击 100% 结算及忽略防御、过量伤害归零、跳字生命周期、动画期间锁定操作及正常关闭、实际画面中击杀形体消失、死亡后的行动顺序、连续和跨轮回溯、回溯恢复已死单位与当前/最大生命、回溯战斗结束状态，以及原有窗口和字体回退。
 
 另外通过 `main.py` 实际入口创建窗口，使用 `windows` 显示驱动向事件队列投递鼠标和键盘事件，验证了两条完整流程，均退出码 0：默认配置下“移动 → 攻击 10 → 跳字 → 查看 90/100 → 红方回合 → 连续回溯”；测试场景下“攻击生命 5 的目标 → 击杀动画 → 形体消失 → 下一回合 → 回溯复活”。击杀场景仅在验证进程中设置目标生命为 5，没有改动游戏默认初始数据。已保存截图并查看跳字、扣血、击杀动画、消失和复活的实际画面。这是自动投递事件验证，并非人工鼠标逐次操作；其他系统尚未实测。
 

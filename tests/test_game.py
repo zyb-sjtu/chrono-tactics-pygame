@@ -9,7 +9,7 @@ import pygame
 
 from tactics.game import Game
 from tactics.panel import InfoPanel
-from tactics.settings import BOARD_HEIGHT, BOARD_WIDTH, CELL_SIZE, WINDOW_SIZE
+from tactics.settings import CELL_SIZE
 
 
 class GameChecks(unittest.TestCase):
@@ -23,9 +23,9 @@ class GameChecks(unittest.TestCase):
         self.game.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=position, button=button))
 
     def test_layout_and_initial_scenario(self):
-        self.assertEqual(WINDOW_SIZE, (896, 512))
+        self.assertEqual(self.game.screen.get_size(), (896, 512))
         self.assertEqual(CELL_SIZE, 64)
-        self.assertEqual((BOARD_WIDTH, BOARD_HEIGHT), (512, 512))
+        self.assertEqual((self.game.geometry.width, self.game.geometry.height), (512, 512))
         cells = [unit.cell for unit in self.game.board.units] + list(self.game.board.obstacles)
         self.assertEqual(len(self.game.board.allies), 3)
         self.assertEqual(len(self.game.board.enemies), 3)
@@ -36,7 +36,7 @@ class GameChecks(unittest.TestCase):
     def test_inspect_each_unit_without_changing_turn(self):
         actor = self.game.battle.active_unit
         for unit in self.game.board.units:
-            self.click(self.game.board.rect(unit.cell).center)
+            self.click(self.game.geometry.cell_center(unit.cell))
             self.assertIs(self.game.selected, unit)
             self.assertIs(self.game.battle.active_unit, actor)
             self.game.draw()
@@ -45,17 +45,17 @@ class GameChecks(unittest.TestCase):
         actor = self.game.battle.active_unit
         start = actor.cell
         positions = [(511, 511), (530, 20), (-1, 0), (0, 512)]
-        positions += [self.game.board.rect(cell).center for cell in self.game.board.obstacles]
+        positions += [self.game.geometry.cell_center(cell) for cell in self.game.board.obstacles]
         for position in positions:
             self.click(position)
             self.assertEqual(actor.cell, start)
             self.assertEqual(self.game.battle.phase, "move")
-        self.assertEqual(self.game.board.cell_at((511, 511)), (7, 7))
+        self.assertEqual(self.game.geometry.cell_at((511, 511)), (7, 7))
 
     def test_right_click_does_not_change_selection_or_scenario(self):
         before = tuple(unit.cell for unit in self.game.board.units)
         selected = self.game.selected
-        self.click(self.game.board.rect((4, 4)).center, button=3)
+        self.click(self.game.geometry.cell_center((4, 4)), button=3)
         self.assertIs(self.game.selected, selected)
         self.assertEqual(tuple(unit.cell for unit in self.game.board.units), before)
 
@@ -63,11 +63,11 @@ class GameChecks(unittest.TestCase):
         actor = self.game.battle.active_unit
         target = self.game.board.enemies[1]
         health = target.health
-        self.click(self.game.board.rect((4, 4)).center)
+        self.click(self.game.geometry.cell_center((4, 4)))
         self.assertEqual(actor.cell, (4, 4))
         self.assertEqual(self.game.battle.phase, "attack")
         self.game.draw()
-        self.click(self.game.board.rect(target.cell).center)
+        self.click(self.game.geometry.cell_center(target.cell))
         self.assertEqual(target.health, health - actor.attack)
         self.assertEqual(self.game.battle.phase, "resolving")
         self.assertTrue(self.game.effects.busy)
@@ -81,12 +81,12 @@ class GameChecks(unittest.TestCase):
         actor = self.game.battle.active_unit
         start = actor.cell
         other = self.game.board.allies[0]
-        self.click(self.game.board.rect(other.cell).center)
-        self.click(self.game.board.rect((4, 4)).center)
+        self.click(self.game.geometry.cell_center(other.cell))
+        self.click(self.game.geometry.cell_center((4, 4)))
         self.assertEqual(actor.cell, start)
         self.assertEqual(other.cell, (1, 1))
-        self.click(self.game.board.rect(actor.cell).center)
-        self.click(self.game.board.rect((4, 4)).center)
+        self.click(self.game.geometry.cell_center(actor.cell))
+        self.click(self.game.geometry.cell_center((4, 4)))
         self.assertEqual(actor.cell, (4, 4))
 
     def test_keyboard_and_sidebar_skip_controls(self):

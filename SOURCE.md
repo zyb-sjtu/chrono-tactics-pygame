@@ -44,6 +44,8 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
           cache: pip
+      - name: Verify core without site packages
+        run: python -S -m unittest discover -s tests -p test_core.py -v
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
       - name: Check source bundle
@@ -80,13 +82,13 @@ htmlcov/
 
 ## 先确认实际状态
 
-- 当前运行版本是 v0.1.0。架构评审与规划已经落库，M1–M5 尚未实施；以 `TASKS.md` 区分现有能力和规划，不把文档中的示意接口当成已实现代码。
+- 最近发布版本是 v0.1.0，开发代码已完成 M1：场景注入、纯逻辑 Board、Geometry、BoardRenderer 与最小只读棋盘视图。M2–M5 尚未实施；以 `TASKS.md` 区分现有能力和规划。
 - 修改玩法、结构或资源入口前，阅读 [整体架构](docs/ARCHITECTURE.md)、[实施路线](docs/ROADMAP.md) 与 [功能开发规范](docs/FEATURE_DEVELOPMENT.md)。接入美术时同时遵守 [资源规范](docs/ASSET_GUIDE.md)。用户提供的原始报告是评审材料，当前开发决策以这些评审后文档为准。
 
 ## 开发边界
 
 - 这是离线 Python/Pygame 战棋原型。保留几何绘制作为无素材时的默认回退，后续美术通过统一资源与渲染层接入；具体玩法按用户需求推进。
-- 业务规则放在 `tactics/battle.py`，空间与路径规则放在 `tactics/board.py`；按 M1–M4 迁移规则、协调与表现职责，不继续向主循环堆叠玩法和特殊角色分支。
+- 业务规则放在 `tactics/battle.py`，空间与路径规则放在 `tactics/board.py`。Board 显式接收 Scenario，不恢复像素坐标或绘图入口；坐标由 Geometry 转换，绘制由 BoardRenderer 读取 BoardView 完成。M2–M4 继续迁移协调与资源职责。
 - 后续功能必须建立在可扩展边界上：先明确规则入口、数据归属、回溯策略、表现/资源接入和验收证据。前置能力缺失时先补齐最小必要部分，与需求一并交付；不能以架构未完成为由无限延后任务，也不为每个小改动制造额外批准流程。
 - 新增规则代码不依赖 Pygame；渲染、UI、动画和未来 AI 不直接改战斗状态。UI/AI 共用合法性校验和指令入口，避免复制规则。
 - 新增运行状态必须明确快照与恢复行为；新增资源、图片、字体、动画进度不得进入规则快照。对外视图和结算结果使用独立数据与稳定 ID，不向表现层泄露可变实体。
@@ -98,6 +100,7 @@ htmlcov/
 - 修改代码、测试或配置时，同步维护 `TASKS.md` 和 `CHANGELOG.md`；行为或操作变化同步到 `README.md`。
 - 保留直接读取字体文件和字体扫描异常的回退逻辑，避免启动时再次因 Windows 字体注册表异常崩溃。
 - 完成修改后运行 `python -m unittest discover -s tests -v`，并说明真实窗口与无窗口测试的验证边界。
+- 修改规则、场景、几何或棋盘视图后，另运行 `python -S -m unittest discover -s tests -p test_core.py -v`，保证无第三方包时仍可运行。不要为兼容旧测试把 Pygame 加回核心。
 - 保留原有行为覆盖；接口迁移时可调整测试夹具，不为保留旧字段访问而保留架构漏洞。新增架构边界在相应阶段就加入检查，不推迟到最终验收。
 - 使用 `python scripts/export_source.py` 更新 `SOURCE.md`，再用 `python scripts/export_source.py --check` 检查一致性。
 - 不提交虚拟环境、缓存、安装器、凭据或 `dist/`、`.delivery/` 中的生成文件。`artifacts/*.png` 是随文档交付的运行截图。
@@ -109,6 +112,17 @@ htmlcov/
 # 更新记录
 
 ## 未发布
+
+### M1 · 规则与渲染职责分离
+
+- 提取不可变 UnitSpawn/Scenario、默认场景和验证；Board 必须显式接收场景，每局创建独立单位状态。
+- Board 不再依赖 Pygame、固定像素尺寸或默认阵容，仅管理逻辑地图、空间查询和 BFS。
+- 新增纯数值 BoardGeometry，棋盘、特效、点击与侧栏使用同一套场景尺寸。
+- 新增 BoardRenderer 与最小只读 BoardView；渲染器不接收活动 Unit/Board/Battle，不查询战斗合法性。
+- 迁移原有 41 项测试入口而保留行为断言，新增 16 项场景、几何、依赖边界和渲染检查，共 57 项通过。
+- 12 项核心检查可使用 `python -S` 在无第三方包的环境运行，并加入 CI 的依赖安装前步骤。
+- 默认场景 8 个关键画面与重构前逐像素一致；Windows 实际窗口验证 5×4 场景、攻击、回溯和退出。
+- M2 控制器/完整 UI 视图、M3 结算与快照迁移、M4 美术资源接入仍未实施。
 
 ### 2026-10-22 · 架构评审与整体规划
 
@@ -138,7 +152,7 @@ htmlcov/
 ````markdown
 # Chrono Tactics · 离线回溯战棋
 
-仓库名称：`chrono-tactics-pygame`，当前版本：`0.1.0`。
+仓库名称：`chrono-tactics-pygame`，最近发布版本：`0.1.0`；当前开发代码已完成 M1（未发布）。
 
 项目仓库：[zyb-sjtu/chrono-tactics-pygame](https://github.com/zyb-sjtu/chrono-tactics-pygame)。这是私有仓库，需要登录有权限的 GitHub 账号访问。
 
@@ -146,7 +160,7 @@ htmlcov/
 
 ## 整体规划与后续开发
 
-已对用户的架构整改意见进行源码核对，并建立后续开发约束。当前只完成评审与规划，运行架构仍为 v0.1.0；场景、控制器、只读视图和资源管理等拆分按下表文档逐步实施，不宣称已经具备。
+已完成评审与 M1：默认场景提取、纯逻辑 Board、纯数值 Geometry、独立 BoardRenderer 和最小只读棋盘视图。完整控制器、侧栏视图、ID 快照与资源管理仍属于 M2–M4，未提前标记完成。
 
 | 文档 | 内容 |
 | --- | --- |
@@ -155,8 +169,9 @@ htmlcov/
 | [实施路线](docs/ROADMAP.md) | M0–M5、前置能力、小批次提交与验收标准 |
 | [美术资源规范](docs/ASSET_GUIDE.md) | 路径、清单、缓存、透明图片、锚点、图层和动画 |
 | [功能开发规范](docs/FEATURE_DEVELOPMENT.md) | 新功能的数据归属、回溯方案、扩展边界与完成条件 |
+| [M1 实施与验收](docs/M1_IMPLEMENTATION.md) | 当前模块接口、场景示例、57 项检查与 8 帧像素对照 |
 
-开发从 **ARCH-01 / M1** 开始。后续功能需要先具备对应的最小架构边界；新增状态必须能回溯，新增美术通过资源与渲染入口接入。约束同时写入 [AGENTS.md](AGENTS.md)，实现进度见 [TASKS.md](TASKS.md)。
+下一任务是 **ARCH-02 / M2**。后续功能需要先具备对应的最小架构边界；新增状态必须能回溯，新增美术通过资源与渲染入口接入。约束同时写入 [AGENTS.md](AGENTS.md)，实现进度见 [TASKS.md](TASKS.md)。
 
 ## 运行
 
@@ -187,7 +202,7 @@ $env:PATH = 'D:\Miniconda3;D:\Miniconda3\Library\bin;' + $env:PATH
 
 ## 战斗规则
 
-- 3 个蓝色圆形友方与 3 个红色方形木桩均为单位，具有当前生命、最大生命、攻击、防御、速度、移动力。侧栏显示 `生命: 80/100` 这样的当前值/上限格式，棋盘单位下方显示血条。数值在 `tactics/models.py` 中配置，暂为功能演示占位值。
+- 3 个蓝色圆形友方与 3 个红色方形木桩均为单位，具有当前生命、最大生命、攻击、防御、速度、移动力。侧栏显示 `生命: 80/100` 这样的当前值/上限格式，棋盘单位下方显示血条。默认阵容和数值在 `tactics/scenario.py` 中配置，暂为功能演示占位值。
 - 入场时将双方单位按速度从高到低排序，同速按入场顺序排列。每轮各行动一次，全部行动后进入下一轮，按相同顺序继续。
 - 每次行动分为**一次移动 → 一次攻击**。可以跳过移动、跳过攻击，或直接结束行动；成功攻击后，动画播放完毕再交接给下一位。
 - 移动和攻击均按上下左右四方向计算，不允许斜走或斜向攻击。
@@ -234,16 +249,21 @@ E:\gamedesign\
 ├── scripts/export_source.py # 源码汇总生成与一致性检查
 ├── docs/
 │   ├── ARCHITECTURE_REVIEW.md # 对原整改报告的源码核对与评审
-│   ├── ARCHITECTURE.md      # 目标架构，尚未实施
+│   ├── ARCHITECTURE.md      # M1 已实施，其余为目标架构
+│   ├── M1_IMPLEMENTATION.md # M1 接口与验证记录
 │   ├── ROADMAP.md           # 阶段、前置与验收
 │   ├── ASSET_GUIDE.md       # 美术资源与动画规范
 │   ├── FEATURE_DEVELOPMENT.md # 后续开发约束
 │   └── references/architecture_proposal.md # 用户原始意见
 ├── tactics\
 │   ├── __init__.py
-│   ├── settings.py          # 棋盘和窗口尺寸
-│   ├── models.py            # 双方单位属性、初始位置、障碍
-│   ├── board.py             # 格子几何、BFS 可达范围、绘制
+│   ├── settings.py          # 格子像素、侧栏等表现默认值
+│   ├── models.py            # 单位运行状态
+│   ├── scenario.py          # 不可变场景、验证、默认阵容
+│   ├── board.py             # 纯逻辑地图、空间查询与 BFS
+│   ├── geometry.py          # 不依赖 Pygame 的坐标转换
+│   ├── view_models.py       # 最小只读棋盘视图
+│   ├── board_renderer.py    # 只读视图驱动的棋盘绘制
 │   ├── battle.py            # 伤害、击杀、速度队列、回合快照与回溯
 │   ├── effects.py           # 伤害跳字、几何击杀动画、逐帧更新
 │   ├── panel.py             # 字体回退、属性栏、按钮、日志和队列
@@ -252,6 +272,8 @@ E:\gamedesign\
 │   ├── test_battle.py       # 11 项战斗规则检查，无需创建窗口
 │   ├── test_game.py         # 11 项窗口交互、绘制与字体检查
 │   ├── test_effects.py      # 7 项动画、按键、血量显示和退出检查
+│   ├── test_core.py         # 12 项无第三方包的 M1 核心检查
+│   ├── test_rendering.py    # 4 项只读视图、渲染和场景注入检查
 │   └── test_rewind.py       # 12 项回溯、击杀及行动顺序检查
 ├── artifacts\               # 实际运行截图，不是游戏资源
 │   ├── initial.png          # 开局移动范围
@@ -263,7 +285,8 @@ E:\gamedesign\
 │   ├── defeat.png           # 击杀动画中间帧
 │   ├── defeat_disappeared.png # 击杀动画后消失
 │   ├── defeat_result.png    # 击杀后交接回合
-│   └── defeat_rewind.png    # 回溯恢复被击杀单位
+│   ├── defeat_rewind.png    # 回溯恢复被击杀单位
+│   └── m1_custom_scenario.png # M1 第二场景实际窗口
 └── .venv\                   # 本机独立环境，生成内容
 ```
 
@@ -280,18 +303,21 @@ python scripts/export_source.py --check
 
 ```powershell
 New-Item -ItemType Directory -Force dist
-git archive --format=zip --prefix=chrono-tactics-pygame/ --output=dist/chrono-tactics-pygame-v0.1.0.zip HEAD
+git archive --format=zip --prefix=chrono-tactics-pygame/ --output=dist/chrono-tactics-pygame-dev.zip HEAD
 ```
 
 源码包包含运行代码、测试、文档、配置和截图，不包含 `.venv`、缓存或凭据；解压后按上面的新机器安装步骤创建环境。这是 Python 源码包，未构建独立 EXE。
 
 ## 验证记录
 
+M1 开发版本目前共 **57 项检查通过**，其中 **12 项可在无第三方包环境执行**。原 41 项行为覆盖保留，8 个默认场景关键画面与重构前逐像素一致；另在 Windows 实际窗口验证了 5×4 场景。详情见 [M1 实施记录](docs/M1_IMPLEMENTATION.md)。
+
 ```powershell
+.\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_core.py -v
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-2026-10-22，本机 Python 3.9.1 / Pygame 2.6.1 / SDL 2.28.4 实测 **41 项检查全部通过，退出码 0**。覆盖速度和同速顺序、四方向范围、路径阻挡、移动次数、敌我与攻击距离限制、攻击 100% 结算及忽略防御、过量伤害归零、跳字生命周期、动画期间锁定操作及正常关闭、实际画面中击杀形体消失、死亡后的行动顺序、连续和跨轮回溯、回溯恢复已死单位与当前/最大生命、回溯战斗结束状态，以及原有窗口和字体回退。
+v0.1.0 基线记录：2026-10-22，本机 Python 3.9.1 / Pygame 2.6.1 / SDL 2.28.4 实测 **41 项检查全部通过，退出码 0**。覆盖速度和同速顺序、四方向范围、路径阻挡、移动次数、敌我与攻击距离限制、攻击 100% 结算及忽略防御、过量伤害归零、跳字生命周期、动画期间锁定操作及正常关闭、实际画面中击杀形体消失、死亡后的行动顺序、连续和跨轮回溯、回溯恢复已死单位与当前/最大生命、回溯战斗结束状态，以及原有窗口和字体回退。
 
 另外通过 `main.py` 实际入口创建窗口，使用 `windows` 显示驱动向事件队列投递鼠标和键盘事件，验证了两条完整流程，均退出码 0：默认配置下“移动 → 攻击 10 → 跳字 → 查看 90/100 → 红方回合 → 连续回溯”；测试场景下“攻击生命 5 的目标 → 击杀动画 → 形体消失 → 下一回合 → 回溯复活”。击杀场景仅在验证进程中设置目标生命为 5，没有改动游戏默认初始数据。已保存截图并查看跳字、扣血、击杀动画、消失和复活的实际画面。这是自动投递事件验证，并非人工鼠标逐次操作；其他系统尚未实测。
 
@@ -311,7 +337,7 @@ git archive --format=zip --prefix=chrono-tactics-pygame/ --output=dist/chrono-ta
 ````markdown
 # 项目进度
 
-当前运行版本：`0.1.0`。已实现能力与架构规划分开记录，不把方案或目标接口当成完成的代码。
+最近发布版本：`0.1.0`。开发代码已完成 M1（未发布）；已实现能力与后续规划分开记录。
 
 ## 已实现能力
 
@@ -324,7 +350,7 @@ git archive --format=zip --prefix=chrono-tactics-pygame/ --output=dist/chrono-ta
 | COMBAT-02 | 已完成 | 击杀动画、消失、死亡单位退出队列、一方全灭结束战斗 |
 | REWIND-01 | 已完成 | 回溯上一单位行动开始前、连续回溯、恢复死亡单位和战斗状态 |
 | FIX-01 | 已完成 | Windows 系统字体扫描异常回退，保留英文降级界面 |
-| QA-01 | 已完成 | 41 项回归检查、Windows 实际窗口流程验证与截图 |
+| QA-01 | 已完成 | 57 项回归检查，其中 12 项无第三方包；Windows 8 帧逐像素对照与第二场景实测 |
 | DELIVERY-01 | 已完成 | 运行文档、源码汇总生成脚本、忽略规则和自动测试配置 |
 
 CI 配置覆盖 Windows / Linux 与 Python 3.9 / 3.12。远程执行结果以 GitHub Actions 为准，配置存在不代表运行已通过。
@@ -336,13 +362,15 @@ CI 配置覆盖 Windows / Linux 与 Python 3.9 / 3.12。远程执行结果以 Gi
 | ID | 阶段 | 状态 | 内容与验收重点 |
 | --- | --- | --- | --- |
 | ARCH-00 | M0 | 已完成 | 评审用户意见、整体架构、资源与功能开发规范、分阶段路线；后续约束写入 AGENTS |
-| ARCH-01 | M1 | 未开始 | 场景注入、纯逻辑 Board、Geometry 与 BoardRenderer；保留原行为，规则不依赖 Pygame |
+| ARCH-01 | M1 | 已完成 | 场景注入、纯逻辑 Board、Geometry、BoardRenderer 与最小 BoardView；57 项检查及 8 帧一致性验收 |
 | ARCH-02 | M2 | 未开始 | Controller、只读 View、UIAction；输入适配与业务协调分开 |
 | ARCH-03 | M3 | 未开始 | 稳定 ID 结果、纯数据快照、结算编号与表现代次，可靠回溯和完成确认 |
 | ARCH-04 | M4 | 未开始 | 内容/资源清单与验证、加载缓存、图片/动画真实接入、无素材回退 |
 | ARCH-05 | M5 | 未开始 | 场景与外观扩展演练、完整回归、真实窗口与跨平台验收 |
 
-下一实施任务为 **ARCH-01**。阶段依赖、提交拆分和完成条件见 [ROADMAP](docs/ROADMAP.md)，技术边界见 [ARCHITECTURE](docs/ARCHITECTURE.md)。每个阶段同步增加所需边界测试，不等全部迁移后才测试。
+M1 实现与验证详见 [M1_IMPLEMENTATION](docs/M1_IMPLEMENTATION.md)。下一实施任务为 **ARCH-02 / M2**：Controller、完整 UI 只读视图及 UIAction。当前只有棋盘视图是独立数据；Panel 和战斗动画协调仍使用既有接口，不宣称已完成 M2/M3。
+
+阶段依赖、提交拆分和完成条件见 [ROADMAP](docs/ROADMAP.md)，技术边界见 [ARCHITECTURE](docs/ARCHITECTURE.md)。每个阶段同步增加所需边界测试，不等全部迁移后才测试。
 
 后续技能、AI、美术、地图、存档等需求，须先明确扩展点与最小必要前置，按 [FEATURE_DEVELOPMENT](docs/FEATURE_DEVELOPMENT.md) 实施。此表不是新增玩法承诺。
 ````
@@ -352,13 +380,13 @@ CI 配置覆盖 Windows / Linux 与 Python 3.9 / 3.12。远程执行结果以 Gi
 ````markdown
 # 整体架构与扩展边界
 
-状态：目标架构与开发决策。除现有 v0.1.0 功能外，本文描述的拆分尚未实施；进度以 [TASKS.md](../TASKS.md) 为准。
+状态：M1 已实施；M2–M5 仍为目标架构。M1 增加 Scenario、Geometry、BoardRenderer 和最小 BoardView，核心已不依赖 Pygame。完整进度以 [TASKS.md](../TASKS.md) 为准，实现细节见 [M1 验收记录](M1_IMPLEMENTATION.md)。
 
 最简单的划分：规则决定“能做什么、结果是什么”；协调层决定“接收哪次操作、何时继续”；表现层负责“输入来自哪里、画面怎样显示”。替换图片不应影响伤害，增加技能不应要求改写主循环。
 
 ## 现状与目标
 
-现状：`models` 存放属性和默认阵容；`Board` 管理地图并绘制；`Battle` 管理战斗与回溯；`Game` 同时协调输入、规则和动画；`panel/effects` 直接读取运行对象。
+现状：`models` 只存放运行单位状态；`scenario` 定义并验证初始阵容和障碍；`Board` 只管理逻辑地图；`Geometry` 转换坐标；`BoardRenderer` 读取独立的 BoardView 绘制。`Battle` 仍管理战斗与内存回溯；`Game` 仍协调输入与动画，Panel 仍读取运行对象，这些留给 M2/M3。
 
 目标仍使用 Python/Pygame，先维持当前平铺模块结构。模块职责稳定后才考虑按包分组，避免为目录美观改动所有导入。
 
@@ -378,7 +406,7 @@ tactics/
   game.py            初始化、组装、事件循环与退出
 ```
 
-这是规划目录，不要求提前创建空模块。
+这是分阶段职责图。scenario、geometry、board_renderer 及 view_models 中的棋盘子集已在 M1 落地；controller、完整 UI 视图与 assets 尚未实现，不提前创建空模块。
 
 ## 依赖方向
 
@@ -408,7 +436,7 @@ flowchart TD
 | renderer / panel / effects / assets | Pygame、只读视图、资源与布局 | 改写 Unit/Battle、自己计算第二套移动或攻击规则 |
 | game | 组装上述模块、适配操作系统输入 | 重复实现指令校验、伤害或回溯 |
 
-这些是迁移后的边界。M1 起按迁移范围加入自动检查，不把当前尚未迁移的代码声称为符合要求。
+M1 的规则、场景、几何与棋盘渲染边界已有测试。其余是后续迁移目标，不把尚未迁移的 Panel、Game 和动画结果声称为完全解耦。
 
 ## 数据模型
 
@@ -504,7 +532,7 @@ Game 在启动时将表现适配器交给 Controller。该接口只需要“播�
 ````markdown
 # 架构整改意见评审
 
-状态：评审与规划已完成，运行架构尚未整改。评审基线为 `ff67755` / `v0.1.0`。
+状态：M0 历史评审，基线为 `ff67755` / `v0.1.0`。下文源码事实对应评审时的结构；后续 M1 已实施，当前进度与验证见 [M1 实施记录](M1_IMPLEMENTATION.md) 和 TASKS。
 
 评审材料：[用户提供的原报告](references/architecture_proposal.md)。本文将原报告中的建议与已经实现的能力分开记录。
 
@@ -512,7 +540,7 @@ Game 在启动时将表现适配器交给 Controller。该接口只需要“播�
 
 原报告的主要判断准确，适合作为渐进重构的起点。建议采纳“规则、应用协调、表现与资源分离”的方向，并补齐数据身份、回溯与动画协议、资源制作规范、功能开发准入和逐阶段验收。当前原型无需推翻，也不需要先建设通用游戏引擎。
 
-本次交付的是项目整体规划和后续开发约束，不包括原报告列出的运行代码重构。`scenario.py`、`controller.py`、`assets.py` 等仍为规划模块，不应在任务记录中标记为已实现。
+M0 交付的是整体规划和后续开发约束，当时不包括运行代码重构。后续 M1 已完成 scenario、geometry、board_renderer 与最小棋盘视图；controller、assets 等仍为规划模块，不能标记为已实现。
 
 ## 对照源码的判断
 
@@ -567,7 +595,7 @@ Game 在启动时将表现适配器交给 Controller。该接口只需要“播�
 4. M4：资源清单、缓存和第一条可验证的美术接入链路。
 5. M5：扩展演练、跨平台回归、真实窗口检查与开发准入落实。
 
-各阶段依赖、验收和拆分提交见 [实施路线](ROADMAP.md)。本次只完成 M0：评审、规划及开发约束落库。
+各阶段依赖、验收和拆分提交见 [实施路线](ROADMAP.md)。M0 的评审结论保留供迁移对照，M1 的实际实现与测试证据单独记录。
 
 ## 暂缓
 
@@ -768,12 +796,134 @@ AssetManager 集中解析清单、加载原图、生成缩放/切帧结果。初
 CI 能自动检查的边界在相应迁移阶段加入，不宣称现在已有完整架构检查器。涉及不可逆接口或数据格式变化时，补一份简短决策记录，包含选择、取舍、迁移和回退办法；没有这类变化时不增加形式化流程。
 ````
 
+## docs/M1_IMPLEMENTATION.md
+
+````markdown
+# M1 实施与验收记录
+
+状态：代码和本机验收完成。评审前基线为 `b072548`；实施分支为 `refactor/m1-rule-render-separation`。远程结果以对应 PR / Actions 为准，任务状态见 [TASKS](../TASKS.md)。
+
+## 范围和结果
+
+本阶段完成场景、逻辑地图、数值几何和棋盘绘制分离，没有增加玩法，没有改动 Battle 的伤害、行动顺序或回溯算法。默认 8×8、64 像素、6 名单位与 5 个障碍保持原样。
+
+| 模块 | 实际职责 |
+| --- | --- |
+| models.py | 可变的 Unit 运行状态，不再决定默认阵容 |
+| scenario.py | 不可变 UnitSpawn/Scenario、验证与默认场景；为每局创建新的 Unit |
+| board.py | 从 Scenario 接收逻辑尺寸和状态，只提供空间查询、邻格与 BFS；无 Pygame、像素转换和绘制 |
+| geometry.py | 纯数值 BoardGeometry，提供 cell_at、cell_rect、cell_center 与 bounds |
+| view_models.py | 最小 BoardView/BoardUnitView 与只读棋盘投影，不含活动实体引用 |
+| board_renderer.py | 只读取 BoardView 和 Geometry，绘制地格、范围、单位、高亮及血条 |
+| game.py | 在组装处选择场景和 Geometry，调用 Renderer；旧输入/动画协调暂留到 M2 |
+| panel.py / effects.py | 接收实际棋盘宽高或同一 Geometry，不再使用全局固定地图像素尺寸 |
+
+## 关键决策
+
+### 显式注入场景
+
+`Board(scenario)` 不提供隐式默认场景，只有应用组装处的 `Game()` 使用 `default_scenario()`。测试和后续关卡都使用同一入口，不必修改 Board。
+
+Scenario 将集合与坐标规范为不可变数据。复用场景创建多个 Board 时，单位状态相互独立；场景模板不会随移动、扣血或回溯被改变。
+
+初始化拒绝越界、出生格重叠、障碍冲突、重复 UID、非法属性、空阵容、单方阵容或初始死亡单位。当前仅支持 ally/enemy；初始单位要求 `0 < health <= max_health`，防止进入不存在的首位行动者。这是新增场景 API 的初始化约定，不改变默认场景的玩法。
+
+### 几何与规则独立
+
+Board 的行列数来自场景；CELL_SIZE、侧栏宽度和最小窗口高度仅属于表现默认值。Geometry 返回数字元组，不返回 Pygame Rect。
+
+默认窗口仍为 896×512。小于 8 行的注入场景保留至少 512 像素窗口高度，以保证现有侧栏完整；空余区域是背景，不计入逻辑地图。M1 不增加窗口缩放操作或地图选择菜单。
+
+### 提前实现最小棋盘视图
+
+M2 规划了完整 View，但 M1 若继续将 Battle 交给 Renderer，就没有完成绘制边界。因此本次仅提前实现棋盘所需的独立值：单位显示属性、障碍、选中/行动 UID、合法移动格、攻击展示格和目标格。
+
+`build_board_view` 复用现有规则查询，不复制合法性算法；Renderer 不拿到可变 Unit/Board/Battle。完整 Panel 视图和 Controller 留给 M2，AttackResult / TurnSnapshot 的对象引用迁移留给 M3。
+
+### 不保留旧的像素兼容接口
+
+删除 Board.draw、Board.rect、Board.cell_at。原有测试中的像素操作迁移为 `game.geometry.cell_center(cell)` / `cell_at(pixel)`，没有为了兼容旧测试把 Pygame 放回核心。原 41 项测试的行为覆盖保留。
+
+## 当前可用的场景扩展入口
+
+下例使用的 API 已实现；无需额外数据加载库：
+
+```python
+from tactics.board import Board
+from tactics.battle import Battle
+from tactics.scenario import Scenario, UnitSpawn
+
+scene = Scenario(
+    "small", 5, 4,
+    (
+        UnitSpawn("blue", "Blue", "ally", "test", (0, 0),
+                  speed=20, movement=4, attack=17),
+        UnitSpawn("red", "Red", "enemy", "test", (3, 0),
+                  health=50, speed=5),
+    ),
+    frozenset(((1, 0),)),
+)
+board = Board(scene)
+battle = Battle(board)
+assert battle.move((2, 0))  # 绕过障碍，实际移动 4 步。
+assert battle.attack(board.enemies[0])
+assert board.enemies[0].health == 33
+battle.finish_attack()     # 纯规则调用方明确确认结算结束。
+assert battle.undo()
+assert board.enemies[0].health == 50
+```
+
+如需窗口，在安装 Pygame 后使用 `from tactics.game import Game; Game(scene).run()`。这不是 JSON 场景加载器，外部内容清单属于 M4。
+
+## 自动化验证
+
+```powershell
+.\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_core.py -v
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+.\.venv\Scripts\python.exe scripts\export_source.py --check
+```
+
+本机 Python 3.9.1 / Pygame 2.6.1：原 41 项行为检查加 16 项新增检查，共 **57 项通过**。其中 **12 项核心检查**在 `python -S` 下运行，禁用第三方包路径；独立子进程还明确拒绝导入 Pygame，实际跑通移动、扣血、交接和回溯。
+
+新增覆盖场景不可变与局间隔离、默认数据不变、非法场景拒绝、不同尺寸场景、四方向真实路径、非零原点与不同格子尺寸、边界落格、只读视图、Renderer 不查询规则、图层裁剪恢复以及注入场景的窗口交互。
+
+CI 在安装 requirements 之前执行上述 `-S` 核心检查，再安装 Pygame 执行完整回归。平台继续覆盖 Windows/Linux 与 Python 3.9/3.12。
+
+## Windows 实际窗口与像素对照
+
+使用 `windows` 显示驱动，在改动前、改动后以同一状态和固定动画时间保存画面，将每个画面的 RGBA 字节逐一比较：
+
+| 画面 | 对照结果 |
+| --- | --- |
+| 默认开局与移动范围 | 逐像素一致 |
+| 移动后攻击范围 | 逐像素一致 |
+| 攻击后 0.2 秒的伤害跳字 | 逐像素一致 |
+| 攻击后交接下一单位 | 逐像素一致 |
+| 回溯到上一行动 | 逐像素一致 |
+| 击杀后 0.2 秒的死亡动画 | 逐像素一致 |
+| 死亡动画结束后消失 | 逐像素一致 |
+| 回溯恢复被击杀单位 | 逐像素一致 |
+
+另外在真实窗口跑通 5×4 场景的鼠标事件、攻击 17、生命 50→33、回溯恢复 50 和 QUIT 清理。查看了重构后的伤害、死亡画面和第二场景截图，布局正常。验证通过程序调用和投递事件完成，不是人工逐次点击。
+
+像素对照是本次纯重构的迁移证据，不是以后更换美术必须维持原画面的永久约束；也不宣称不同操作系统的字体会产生相同像素。
+
+![M1 注入的第二场景](../artifacts/m1_custom_scenario.png)
+
+## 尚未实施
+
+- M2：Controller、完整 UI 视图、UIAction 命中封装。
+- M3：ID 化结算结果、纯数据快照和结算/表现代次协议。
+- M4：外部 JSON 内容、AssetManager、图片/动画素材加载。
+- M5：完整的后续扩展与资源交付演练。
+````
+
 ## docs/ROADMAP.md
 
 ````markdown
 # 架构实施路线与验收
 
-状态：M0 已完成；M1–M5 未开始。运行版本仍为 `v0.1.0`，不会因完成规划就标记为“已经解耦”或“已经支持美术资源”。
+状态：M0、M1 已完成；M2–M5 未开始。最近发布仍为 `v0.1.0`，M1 属于未发布的开发变更；不将本阶段称为“完整应用解耦”或“已经支持美术资源”。
 
 本路线以当前 41 项行为检查为迁移基线。测试数量可增加，导入和夹具可随接口迁移，关键行为不能丢失。每个阶段在专用分支完成小批次提交，先验证、再审查差异并合并；不在一次提交中同时迁移架构和改动玩法。
 
@@ -782,7 +932,7 @@ CI 能自动检查的边界在相应迁移阶段加入，不宣称现在已有�
 | 阶段 / 任务 ID | 前置 | 实际交付 | 验收证据 |
 | --- | --- | --- | --- |
 | M0 / ARCH-00 | v0.1.0 | 意见评审、整体架构、资源规范、开发约束、路线与状态记录 | 本次文档、源码汇总一致；原游戏回归通过 |
-| M1 / ARCH-01 | M0 | Scenario 纯数据初始化；Board 去除 Pygame；Geometry 与 BoardRenderer 实际接管旧绘制 | 核心在禁止导入 Pygame 的环境中可运行；默认场景不变；第二个测试场景可注入；几何边界测试与实际窗口对照 |
+| M1 / ARCH-01（已完成） | M0 | Scenario 纯数据初始化；Board 去除 Pygame；Geometry、BoardRenderer 和最小 BoardView 实际接管旧绘制 | 57 项检查通过；12 项无第三方包；8 帧逐像素一致；5×4 场景实际窗口验收，详见 M1 实施记录 |
 | M2 / ARCH-02 | M1 | Controller 操作入口、只读 View、UIAction 命中接口；Game 缩减为组装与循环 | UI/renderer 不再修改或拿到可变战斗对象；规则无重复实现；移动、攻击、选择、按钮、输入锁定和退出通过集成检查 |
 | M3 / ARCH-03 | M2 | ID 化的结算结果、纯数据快照、结算编号与表现代次；回溯清除旧表现 | 伤害与回溯行为不变；死亡及跨轮恢复一致；重复/过期完成通知不能推进回合；快照不含 Surface、Font 或活动实体引用 |
 | M4 / ARCH-04 | M3 | 外部内容/资源清单、验证、图片和缩放缓存；一条真实素材替换链路 | 替换单位和地砖只修改清单/素材；相同文件只加载一次；不同尺寸缓存正确；缺失可定位并按策略回退；场景/定义错误明确拒绝 |
@@ -862,7 +1012,9 @@ M1–M4 可以继续细分为下列小提交，不以“文件已经创建”作
 
 ## 当前下一步
 
-首个实施任务是 **ARCH-01 / M1**。它的交付不是一个更长的文件列表，而是“原画面与玩法保持一致，Board 与 Battle 可以不安装 Pygame 独立运行”。
+M1 已达到“原画面与玩法保持一致，Board 与 Battle 可以不安装 Pygame 独立运行”，见 [M1 实施与验收](M1_IMPLEMENTATION.md)。
+
+下一个任务是 **ARCH-02 / M2**：将 Game 中的操作协调收拢到 Controller，扩展现有棋盘视图以覆盖侧栏，并用 UIAction 隔离按钮布局。M1 提前引入棋盘视图是为了让 Renderer 不读取规则对象，不代表 M2 已完成。
 ````
 
 ## docs/references/architecture_proposal.md
@@ -1384,30 +1536,28 @@ class Battle:
 ## tactics/board.py
 
 ```python
-"""Board geometry, blocked-path movement range, and rendering."""
+"""Scenario-owned logical grid, spatial queries and blocked-path movement."""
 
 from collections import deque
 
-import pygame
-
-from .models import OBSTACLES, create_allies, create_enemies
-from .settings import BOARD_HEIGHT, BOARD_WIDTH, CELL_SIZE, COLS, ROWS
+from .scenario import Scenario
 
 
 class Board:
-    def __init__(self):
-        self.allies = create_allies()
-        self.enemies = create_enemies()
-        self.units = self.allies + self.enemies
-        self.obstacles = OBSTACLES
-        self.label_font = None
+    def __init__(self, scenario: Scenario):
+        self.scenario_id = scenario.scenario_id
+        self.cols = scenario.cols
+        self.rows = scenario.rows
+        self.units = scenario.create_units()
+        self.obstacles = scenario.obstacles
 
-    @staticmethod
-    def cell_at(position):
-        x, y = position
-        if 0 <= x < BOARD_WIDTH and 0 <= y < BOARD_HEIGHT:
-            return x // CELL_SIZE, y // CELL_SIZE
-        return None
+    @property
+    def allies(self):
+        return tuple(unit for unit in self.units if unit.team == "ally")
+
+    @property
+    def enemies(self):
+        return tuple(unit for unit in self.units if unit.team == "enemy")
 
     def unit_at(self, cell):
         return next((unit for unit in self.living_units if unit.cell == cell), None)
@@ -1417,12 +1567,11 @@ class Board:
         # Keep the complete roster for undo; defeated units leave play immediately.
         return tuple(unit for unit in self.units if unit.alive)
 
-    @staticmethod
-    def neighbors(cell):
+    def neighbors(self, cell):
         col, row = cell
         return tuple((x, y) for x, y in ((col - 1, row), (col + 1, row),
                                         (col, row - 1), (col, row + 1))
-                     if 0 <= x < COLS and 0 <= y < ROWS)
+                     if 0 <= x < self.cols and 0 <= y < self.rows)
 
     def reachable_cells(self, unit):
         """BFS counts real orthogonal steps; all occupied cells block paths."""
@@ -1438,54 +1587,82 @@ class Board:
                     distances[neighbor] = distances[cell] + 1
                     queue.append(neighbor)
         return set(distances) - {unit.cell}
+```
 
-    @staticmethod
-    def rect(cell):
-        col, row = cell
-        return pygame.Rect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+## tactics/board_renderer.py
 
-    def draw(self, surface, selected, battle):
+```python
+"""Draw detached board views, with no battle queries or state mutations."""
+
+import pygame
+
+from .geometry import BoardGeometry
+from .view_models import BoardView
+
+
+class BoardRenderer:
+    def __init__(self, geometry: BoardGeometry):
+        self.geometry = geometry
+        self.scale = geometry.cell_size / 64
+        self.label_font = None
+
+    def _size(self, value):
+        return max(1, round(value * self.scale))
+
+    def _rect(self, cell):
+        return pygame.Rect(self.geometry.cell_rect(cell))
+
+    def draw(self, surface, view: BoardView):
+        if (view.cols, view.rows) != (self.geometry.cols, self.geometry.rows):
+            raise ValueError("board view and geometry dimensions do not match")
         if self.label_font is None:
-            self.label_font = pygame.font.Font(None, 20)
-        for row in range(ROWS):
-            for col in range(COLS):
+            self.label_font = pygame.font.Font(None, self._size(20))
+        old_clip = surface.get_clip()
+        surface.set_clip(old_clip.clip(pygame.Rect(self.geometry.bounds)))
+        try:
+            self._draw(surface, view)
+        finally:
+            surface.set_clip(old_clip)
+
+    def _draw(self, surface, view):
+        for row in range(view.rows):
+            for col in range(view.cols):
                 color = (42, 55, 70) if (row + col) % 2 else (48, 63, 79)
-                rect = self.rect((col, row))
+                rect = self._rect((col, row))
                 pygame.draw.rect(surface, color, rect)
-                pygame.draw.rect(surface, (66, 81, 97), rect, 1)
+                pygame.draw.rect(surface, (66, 81, 97), rect, self._size(1))
 
-        active = battle.active_unit
-        if active is not None and selected is active and battle.phase in ("move", "attack"):
-            cells = battle.movement_range() if battle.phase == "move" else self.neighbors(active.cell)
-            color = (54, 109, 103) if battle.phase == "move" else (125, 65, 74)
+        for cells, color in ((view.move_cells, (54, 109, 103)), (view.attack_cells, (125, 65, 74))):
             for cell in cells:
-                if cell not in self.obstacles:
-                    pygame.draw.rect(surface, color, self.rect(cell).inflate(-4, -4), border_radius=4)
-            for target in battle.attack_targets():
-                pygame.draw.rect(surface, (255, 161, 128), self.rect(target.cell).inflate(-5, -5), 3)
+                pygame.draw.rect(surface, color, self._rect(cell).inflate(-self._size(4), -self._size(4)),
+                                 border_radius=self._size(4))
+        for cell in view.target_cells:
+            pygame.draw.rect(surface, (255, 161, 128),
+                             self._rect(cell).inflate(-self._size(5), -self._size(5)), self._size(3))
 
-        for cell in self.obstacles:
-            block = self.rect(cell).inflate(-12, -12)
-            pygame.draw.rect(surface, (111, 124, 135), block, border_radius=5)
-            pygame.draw.line(surface, (146, 157, 166), block.topleft, block.bottomright, 2)
-            pygame.draw.line(surface, (146, 157, 166), block.topright, block.bottomleft, 2)
+        for cell in view.obstacles:
+            block = self._rect(cell).inflate(-self._size(12), -self._size(12))
+            pygame.draw.rect(surface, (111, 124, 135), block, border_radius=self._size(5))
+            pygame.draw.line(surface, (146, 157, 166), block.topleft, block.bottomright, self._size(2))
+            pygame.draw.line(surface, (146, 157, 166), block.topright, block.bottomleft, self._size(2))
 
-        for unit in self.living_units:
-            rect = self.rect(unit.cell)
+        for unit in view.units:
+            rect = self._rect(unit.cell)
             if unit.team == "ally":
-                pygame.draw.circle(surface, (69, 156, 239), rect.center, 21)
-                pygame.draw.circle(surface, (146, 207, 255), rect.center, 21, 2)
+                pygame.draw.circle(surface, (69, 156, 239), rect.center, self._size(21))
+                pygame.draw.circle(surface, (146, 207, 255), rect.center, self._size(21), self._size(2))
             else:
-                block = rect.inflate(-24, -24)
-                pygame.draw.rect(surface, (231, 88, 94), block, border_radius=3)
-                pygame.draw.rect(surface, (255, 153, 146), block, 2, border_radius=3)
+                block = rect.inflate(-self._size(24), -self._size(24))
+                pygame.draw.rect(surface, (231, 88, 94), block, border_radius=self._size(3))
+                pygame.draw.rect(surface, (255, 153, 146), block, self._size(2), border_radius=self._size(3))
             label = self.label_font.render(unit.uid, True, (255, 255, 255))
             surface.blit(label, label.get_rect(center=rect.center))
-            if unit is active:
-                pygame.draw.rect(surface, (255, 219, 116), rect.inflate(-4, -4), 3)
-            if unit is selected:
-                pygame.draw.circle(surface, (246, 248, 252), rect.center, 27, 2)
-            bar = pygame.Rect(rect.x + 10, rect.y + 58, 44, 4)
+            if unit.uid == view.active_uid:
+                pygame.draw.rect(surface, (255, 219, 116),
+                                 rect.inflate(-self._size(4), -self._size(4)), self._size(3))
+            if unit.uid == view.selected_uid:
+                pygame.draw.circle(surface, (246, 248, 252), rect.center, self._size(27), self._size(2))
+            bar = pygame.Rect(rect.x + self._size(10), rect.y + self._size(58), self._size(44), self._size(4))
             pygame.draw.rect(surface, (26, 31, 39), bar)
             fill = bar.copy()
             fill.width = round(bar.width * min(1, unit.health / max(1, unit.max_health)))
@@ -1502,7 +1679,7 @@ from dataclasses import dataclass
 
 import pygame
 
-from .settings import BOARD_HEIGHT, BOARD_WIDTH, CELL_SIZE
+from .geometry import BoardGeometry
 
 DAMAGE_DURATION = 0.9
 DEATH_DURATION = 0.65
@@ -1524,7 +1701,8 @@ class DeathEffect:
 
 
 class CombatEffects:
-    def __init__(self):
+    def __init__(self, geometry: BoardGeometry):
+        self.geometry = geometry
         self.damage_texts = []
         self.deaths = []
         self.damage_font = pygame.font.Font(None, 32)
@@ -1551,15 +1729,17 @@ class CombatEffects:
 
     def draw(self, surface):
         old_clip = surface.get_clip()
-        surface.set_clip((0, 0, BOARD_WIDTH, BOARD_HEIGHT))
+        surface.set_clip(old_clip.clip(pygame.Rect(self.geometry.bounds)))
+        cell_size = self.geometry.cell_size
+        scale = cell_size / 64
         for effect in self.deaths:
             progress = effect.age / DEATH_DURATION
-            layer = pygame.Surface((CELL_SIZE, CELL_SIZE), pygame.SRCALPHA)
-            size = max(4, round(42 * (1 - progress * 0.6)))
+            layer = pygame.Surface((cell_size, cell_size), pygame.SRCALPHA)
+            size = max(1, round(max(4, 42 * (1 - progress * 0.6)) * scale))
             color = (69, 156, 239) if effect.team == "ally" else (231, 88, 94)
             if int(effect.age * 20) % 2 == 0:
                 color = (255, 224, 192)
-            center = (CELL_SIZE // 2, CELL_SIZE // 2)
+            center = (cell_size // 2, cell_size // 2)
             if effect.team == "ally":
                 pygame.draw.circle(layer, color, center, size // 2)
             else:
@@ -1570,12 +1750,12 @@ class CombatEffects:
             layer.blit(label, label.get_rect(center=center))
             for index in range(6):
                 angle = index * math.tau / 6
-                radius = 8 + 23 * progress
+                radius = (8 + 23 * progress) * scale
                 point = (round(center[0] + math.cos(angle) * radius),
                          round(center[1] + math.sin(angle) * radius))
-                pygame.draw.circle(layer, (255, 192, 132), point, max(1, round(3 * (1 - progress))))
+                pygame.draw.circle(layer, (255, 192, 132), point, max(1, round(3 * (1 - progress) * scale)))
             layer.set_alpha(round(255 * (1 - progress)))
-            surface.blit(layer, (effect.cell[0] * CELL_SIZE, effect.cell[1] * CELL_SIZE))
+            surface.blit(layer, self.geometry.cell_rect(effect.cell)[:2])
 
         for effect in self.damage_texts:
             progress = effect.age / DAMAGE_DURATION
@@ -1585,8 +1765,9 @@ class CombatEffects:
             alpha = round(255 * min(1, (1 - progress) * 3))
             label.set_alpha(alpha)
             shadow.set_alpha(alpha)
-            x = effect.cell[0] * CELL_SIZE + CELL_SIZE // 2
-            y = max(5, effect.cell[1] * CELL_SIZE + 8 - round(progress * 30))
+            _, cell_y, _, _ = self.geometry.cell_rect(effect.cell)
+            x = self.geometry.cell_center(effect.cell)[0]
+            y = max(self.geometry.origin[1] + 5, cell_y + 8 - round(progress * 30))
             rect = label.get_rect(midtop=(x, y))
             surface.blit(shadow, rect.move(2, 2))
             surface.blit(label, rect)
@@ -1601,24 +1782,31 @@ class CombatEffects:
 import pygame
 
 from .board import Board
+from .board_renderer import BoardRenderer
 from .battle import Battle
 from .effects import CombatEffects
+from .geometry import BoardGeometry
 from .panel import InfoPanel
-from .settings import FPS, WINDOW_SIZE
+from .scenario import default_scenario
+from .settings import CELL_SIZE, FPS, MIN_WINDOW_HEIGHT, PANEL_WIDTH
+from .view_models import build_board_view
 
 
 class Game:
-    def __init__(self):
+    def __init__(self, scenario=None):
+        self.board = Board(default_scenario() if scenario is None else scenario)
+        self.geometry = BoardGeometry(self.board.cols, self.board.rows, CELL_SIZE)
+        window_size = (self.geometry.width + PANEL_WIDTH, max(MIN_WINDOW_HEIGHT, self.geometry.height))
         # The prototype needs only display and fonts, so do not initialize audio.
         pygame.display.init()
         pygame.font.init()
-        self.screen = pygame.display.set_mode(WINDOW_SIZE)
+        self.screen = pygame.display.set_mode(window_size)
         pygame.display.set_caption("Grid Tactics - Battle Prototype")
         self.clock = pygame.time.Clock()
-        self.board = Board()
+        self.renderer = BoardRenderer(self.geometry)
         self.battle = Battle(self.board)
-        self.panel = InfoPanel()
-        self.effects = CombatEffects()
+        self.panel = InfoPanel(self.geometry.width, window_size[1])
+        self.effects = CombatEffects(self.geometry)
         self.selected = self.battle.active_unit
         self.running = True
 
@@ -1651,7 +1839,7 @@ class Game:
     def board_click(self, position):
         if self.battle.phase == "resolving":
             return
-        cell = self.board.cell_at(position)
+        cell = self.geometry.cell_at(position)
         if cell is None:
             return
         unit = self.board.unit_at(cell)
@@ -1678,7 +1866,8 @@ class Game:
             self.selected = self.battle.active_unit
 
     def draw(self):
-        self.board.draw(self.screen, self.selected, self.battle)
+        self.screen.fill((21, 30, 42))
+        self.renderer.draw(self.screen, build_board_view(self.board, self.battle, self.selected))
         self.effects.draw(self.screen)
         self.panel.draw(self.screen, self.selected, self.battle)
         pygame.display.flip()
@@ -1696,10 +1885,67 @@ class Game:
             pygame.quit()
 ```
 
+## tactics/geometry.py
+
+```python
+"""Pure numeric conversion between logical grid cells and screen coordinates."""
+
+from dataclasses import dataclass
+from typing import Tuple
+
+from .models import Cell
+
+
+@dataclass(frozen=True)
+class BoardGeometry:
+    cols: int
+    rows: int
+    cell_size: int
+    origin: Tuple[int, int] = (0, 0)
+
+    def __post_init__(self):
+        if any(type(value) is not int or value <= 0 for value in (self.cols, self.rows, self.cell_size)):
+            raise ValueError("geometry dimensions and cell_size must be positive integers")
+        if (not isinstance(self.origin, (tuple, list)) or len(self.origin) != 2
+                or any(type(value) is not int for value in self.origin)):
+            raise ValueError("origin must be a pair of integers")
+        object.__setattr__(self, "origin", tuple(self.origin))
+
+    @property
+    def width(self):
+        return self.cols * self.cell_size
+
+    @property
+    def height(self):
+        return self.rows * self.cell_size
+
+    @property
+    def bounds(self):
+        return (*self.origin, self.width, self.height)
+
+    def cell_at(self, position):
+        x, y = position[0] - self.origin[0], position[1] - self.origin[1]
+        if 0 <= x < self.width and 0 <= y < self.height:
+            return int(x // self.cell_size), int(y // self.cell_size)
+        return None
+
+    def cell_rect(self, cell: Cell):
+        if (not isinstance(cell, (tuple, list)) or len(cell) != 2
+                or any(type(value) is not int for value in cell)
+                or not (0 <= cell[0] < self.cols and 0 <= cell[1] < self.rows)):
+            raise ValueError("cell is outside the geometry: {}".format(cell))
+        return (self.origin[0] + cell[0] * self.cell_size,
+                self.origin[1] + cell[1] * self.cell_size, self.cell_size, self.cell_size)
+
+    def cell_center(self, cell: Cell):
+        x, y, width, height = self.cell_rect(cell)
+        return x + width // 2, y + height // 2
+```
+
 ## tactics/models.py
 
 ```python
-"""Unit attributes and the initial scenario. All numbers are placeholders."""
+"""Mutable unit state and shared grid coordinates; no scene or rendering data."""
 
 from dataclasses import dataclass
 from typing import Tuple
@@ -1724,25 +1970,6 @@ class Unit:
     @property
     def alive(self):
         return self.health > 0
-
-
-def create_allies():
-    return (
-        Unit("A1", "先锋", "ally", "近卫", (1, 1), speed=12),
-        Unit("A2", "斥候", "ally", "侦察", (1, 3), health=80, speed=14, movement=4),
-        Unit("A3", "卫士", "ally", "守备", (2, 6), health=120, max_health=120, speed=10, movement=2),
-    )
-
-
-DUMMIES = ((6, 1), (5, 4), (6, 6))
-OBSTACLES = frozenset(((3, 1), (3, 2), (3, 3), (4, 5), (4, 6)))
-
-
-def create_enemies():
-    return tuple(
-        Unit("D{}".format(index), "木桩{}".format(index), "enemy", "训练木桩", cell, speed=speed)
-        for index, (cell, speed) in enumerate(zip(DUMMIES, (11, 9, 8)), start=1)
-    )
 ```
 
 ## tactics/panel.py
@@ -1755,7 +1982,7 @@ from pathlib import Path
 
 import pygame
 
-from .settings import BOARD_HEIGHT, BOARD_WIDTH, PANEL_WIDTH
+from .settings import MIN_WINDOW_HEIGHT, PANEL_WIDTH
 
 
 def load_fonts():
@@ -1781,16 +2008,18 @@ def load_fonts():
 
 
 class InfoPanel:
-    def __init__(self):
+    def __init__(self, board_width=512, height=MIN_WINDOW_HEIGHT):
+        self.board_width = board_width
+        self.height = height
         fonts, self.chinese = load_fonts()
         self.title_font, self.font, self.small_font = fonts
-        self.skip_button = pygame.Rect(BOARD_WIDTH + 24, 284, 162, 38)
-        self.end_button = pygame.Rect(BOARD_WIDTH + 198, 284, 162, 38)
-        self.undo_button = pygame.Rect(BOARD_WIDTH + 208, 14, 152, 32)
+        self.skip_button = pygame.Rect(self.board_width + 24, 284, 162, 38)
+        self.end_button = pygame.Rect(self.board_width + 198, 284, 162, 38)
+        self.undo_button = pygame.Rect(self.board_width + 208, 14, 152, 32)
 
     def text(self, surface, value, y, color=(220, 230, 241), small=False, title=False, x=None, width=None):
         font = self.title_font if title else self.small_font if small else self.font
-        x = BOARD_WIDTH + 24 if x is None else x
+        x = self.board_width + 24 if x is None else x
         width = PANEL_WIDTH - 48 if width is None else width
         if font.size(value)[0] > width:
             while value and font.size(value + "...")[0] > width:
@@ -1805,7 +2034,7 @@ class InfoPanel:
         surface.blit(text, text.get_rect(center=rect.center))
 
     def draw(self, surface, selected, battle):
-        pygame.draw.rect(surface, (21, 30, 42), (BOARD_WIDTH, 0, PANEL_WIDTH, BOARD_HEIGHT))
+        pygame.draw.rect(surface, (21, 30, 42), (self.board_width, 0, PANEL_WIDTH, self.height))
         cn = self.chinese
         actor = battle.active_unit
         name = (actor.name if cn else actor.uid) if actor is not None else ""
@@ -1829,7 +2058,7 @@ class InfoPanel:
             status = "{} / {} / Move {} / Attack {}".format(actor.team.upper(), battle.phase.upper(),
                                                            int(moving), int(battle.phase != "resolving"))
         self.text(surface, status, 86, (132, 159, 185), small=True)
-        pygame.draw.line(surface, (60, 77, 96), (BOARD_WIDTH + 24, 116), (BOARD_WIDTH + PANEL_WIDTH - 24, 116))
+        pygame.draw.line(surface, (60, 77, 96), (self.board_width + 24, 116), (self.board_width + PANEL_WIDTH - 24, 116))
         if selected is None:
             self.text(surface, "点击单位查看属性" if cn else "Click a unit to inspect.", 134)
         else:
@@ -1843,7 +2072,7 @@ class InfoPanel:
                      ("防御", "DEF", selected.defense), ("速度", "SPD", selected.speed),
                      ("移动力", "MOVE", selected.movement), ("攻击范围", "RANGE", 1))
             for index, (chinese, english, value) in enumerate(stats):
-                x = BOARD_WIDTH + 24 + (index % 2) * 174
+                x = self.board_width + 24 + (index % 2) * 174
                 self.text(surface, "{}: {}".format(chinese if cn else english, value),
                           192 + (index // 2) * 27, x=x, width=162)
 
@@ -1875,22 +2104,177 @@ class InfoPanel:
             color = (255, 219, 116) if unit is actor else (161, 178, 196)
             label = "{}.{}({})".format(index + 1, name, unit.speed)
             self.text(surface, label, 459 + (index // 3) * 25, color, small=True,
-                      x=BOARD_WIDTH + 24 + (index % 3) * 114, width=108)
+                      x=self.board_width + 24 + (index % 3) * 114, width=108)
+```
+
+## tactics/scenario.py
+
+```python
+"""Immutable, validated scenario inputs and fresh runtime-unit construction."""
+
+from dataclasses import asdict, dataclass
+from typing import FrozenSet, Tuple
+
+from .models import Cell, Unit
+
+
+def _cell(value, label):
+    if (not isinstance(value, (tuple, list)) or len(value) != 2
+            or any(type(number) is not int for number in value)):
+        raise ValueError("{} must be a pair of integer grid coordinates".format(label))
+    return tuple(value)
+
+
+@dataclass(frozen=True)
+class UnitSpawn:
+    uid: str
+    name: str
+    team: str
+    role: str
+    cell: Cell
+    health: int = 100
+    max_health: int = 100
+    attack: int = 10
+    defense: int = 5
+    speed: int = 10
+    movement: int = 3
+
+    def __post_init__(self):
+        object.__setattr__(self, "cell", _cell(self.cell, "unit {} cell".format(self.uid)))
+
+
+@dataclass(frozen=True)
+class Scenario:
+    scenario_id: str
+    cols: int
+    rows: int
+    units: Tuple[UnitSpawn, ...]
+    obstacles: FrozenSet[Cell] = frozenset()
+
+    def __post_init__(self):
+        if not isinstance(self.scenario_id, str) or not self.scenario_id.strip():
+            raise ValueError("scenario_id must be a nonempty string")
+        if any(type(value) is not int or value <= 0 for value in (self.cols, self.rows)):
+            raise ValueError("scenario dimensions must be positive integers")
+        object.__setattr__(self, "units", tuple(self.units))
+        object.__setattr__(self, "obstacles", frozenset(_cell(cell, "obstacle") for cell in self.obstacles))
+        for cell in self.obstacles:
+            self._check_bounds(cell, "obstacle")
+        occupied = set(self.obstacles)
+        uids = set()
+        teams = set()
+        for spawn in self.units:
+            if not isinstance(spawn, UnitSpawn):
+                raise ValueError("scenario units must be immutable UnitSpawn values")
+            for name in ("uid", "name", "role"):
+                value = getattr(spawn, name)
+                if not isinstance(value, str) or not value.strip():
+                    raise ValueError("unit {} must be a nonempty string".format(name))
+            if spawn.uid in uids:
+                raise ValueError("duplicate unit uid: {}".format(spawn.uid))
+            if spawn.team not in ("ally", "enemy"):
+                raise ValueError("unit {} has an unknown team".format(spawn.uid))
+            self._check_bounds(spawn.cell, spawn.uid)
+            if spawn.cell in occupied:
+                raise ValueError("unit {} overlaps an obstacle or another unit".format(spawn.uid))
+            for name in ("health", "max_health", "attack", "defense", "speed", "movement"):
+                value = getattr(spawn, name)
+                if type(value) is not int or value < 0:
+                    raise ValueError("unit {} {} must be a nonnegative integer".format(spawn.uid, name))
+            if not 0 < spawn.health <= spawn.max_health:
+                raise ValueError("unit {} must start alive with health <= max_health".format(spawn.uid))
+            occupied.add(spawn.cell)
+            uids.add(spawn.uid)
+            teams.add(spawn.team)
+        if teams != {"ally", "enemy"}:
+            raise ValueError("a scenario must start with at least one living unit on each team")
+
+    def _check_bounds(self, cell, label):
+        if not (0 <= cell[0] < self.cols and 0 <= cell[1] < self.rows):
+            raise ValueError("{} cell {} is outside the scenario".format(label, cell))
+
+    def create_units(self):
+        """Each battle owns its Unit instances; the reusable scenario stays unchanged."""
+        return tuple(Unit(**asdict(spawn)) for spawn in self.units)
+
+
+def default_scenario():
+    return Scenario(
+        "training_ground", 8, 8,
+        (
+            UnitSpawn("A1", "先锋", "ally", "近卫", (1, 1), speed=12),
+            UnitSpawn("A2", "斥候", "ally", "侦察", (1, 3), health=80, speed=14, movement=4),
+            UnitSpawn("A3", "卫士", "ally", "守备", (2, 6), health=120, max_health=120, speed=10, movement=2),
+            UnitSpawn("D1", "木桩1", "enemy", "训练木桩", (6, 1), speed=11),
+            UnitSpawn("D2", "木桩2", "enemy", "训练木桩", (5, 4), speed=9),
+            UnitSpawn("D3", "木桩3", "enemy", "训练木桩", (6, 6), speed=8),
+        ),
+        frozenset(((3, 1), (3, 2), (3, 3), (4, 5), (4, 6))),
+    )
 ```
 
 ## tactics/settings.py
 
 ```python
-"""Shared layout settings. Board coordinates are (column, row), zero based."""
+"""Presentation defaults only; logical board dimensions come from the scenario."""
 
-COLS = 8
-ROWS = 8
 CELL_SIZE = 64
-BOARD_WIDTH = COLS * CELL_SIZE
-BOARD_HEIGHT = ROWS * CELL_SIZE
 PANEL_WIDTH = 384
-WINDOW_SIZE = (BOARD_WIDTH + PANEL_WIDTH, BOARD_HEIGHT)
+MIN_WINDOW_HEIGHT = 512
 FPS = 60
+```
+
+## tactics/view_models.py
+
+```python
+"""Detached board-render data; the complete application/UI view belongs to M2."""
+
+from dataclasses import dataclass
+from typing import FrozenSet, Optional, Tuple
+
+from .models import Cell
+
+
+@dataclass(frozen=True)
+class BoardUnitView:
+    uid: str
+    team: str
+    cell: Cell
+    health: int
+    max_health: int
+
+
+@dataclass(frozen=True)
+class BoardView:
+    cols: int
+    rows: int
+    obstacles: FrozenSet[Cell]
+    units: Tuple[BoardUnitView, ...]
+    active_uid: Optional[str]
+    selected_uid: Optional[str]
+    move_cells: FrozenSet[Cell]
+    attack_cells: FrozenSet[Cell]
+    target_cells: FrozenSet[Cell]
+
+
+def build_board_view(board, battle, selected):
+    """Project existing legal queries into values; never expose live Unit objects."""
+    active = battle.active_unit
+    move_cells = attack_cells = target_cells = frozenset()
+    if active is not None and selected is active:
+        if battle.phase == "move":
+            move_cells = frozenset(battle.movement_range())
+        elif battle.phase == "attack":
+            attack_cells = frozenset(board.neighbors(active.cell)) - board.obstacles
+            target_cells = frozenset(unit.cell for unit in battle.attack_targets())
+    return BoardView(
+        board.cols, board.rows, frozenset(board.obstacles),
+        tuple(BoardUnitView(unit.uid, unit.team, tuple(unit.cell), unit.health, unit.max_health)
+              for unit in board.living_units),
+        active.uid if active is not None else None,
+        selected.uid if selected is not None else None,
+        move_cells, attack_cells, target_cells,
+    )
 ```
 
 ## tests/test_battle.py
@@ -1902,11 +2286,12 @@ import unittest
 
 from tactics.battle import Battle
 from tactics.board import Board
+from tactics.scenario import default_scenario
 
 
 class BattleChecks(unittest.TestCase):
     def setUp(self):
-        self.board = Board()
+        self.board = Board(default_scenario())
         self.battle = Battle(self.board)
         self.actor = self.battle.active_unit
 
@@ -2033,6 +2418,187 @@ if __name__ == "__main__":
     unittest.main()
 ```
 
+## tests/test_core.py
+
+```python
+"""M1 contracts; runnable with python -S and no third-party packages installed."""
+
+from dataclasses import FrozenInstanceError, replace
+import os
+from pathlib import Path
+import subprocess
+import sys
+import unittest
+
+from tactics.battle import Battle
+from tactics.board import Board
+from tactics.geometry import BoardGeometry
+from tactics.scenario import Scenario, UnitSpawn, default_scenario
+
+
+def alternate_scenario():
+    return Scenario("detour", 5, 4, (
+        UnitSpawn("blue", "Blue", "ally", "test", (0, 0), speed=20, movement=4, attack=17),
+        UnitSpawn("red", "Red", "enemy", "test", (3, 0), health=50, speed=5),
+    ), frozenset(((1, 0),)))
+
+
+class ScenarioChecks(unittest.TestCase):
+    def test_default_layout_and_stats_match_original(self):
+        scenario = default_scenario()
+        self.assertEqual((scenario.cols, scenario.rows), (8, 8))
+        board = Board(scenario)
+        self.assertEqual([(unit.uid, unit.cell, unit.health, unit.max_health, unit.speed, unit.movement)
+                          for unit in board.units], [
+            ("A1", (1, 1), 100, 100, 12, 3), ("A2", (1, 3), 80, 100, 14, 4),
+            ("A3", (2, 6), 120, 120, 10, 2), ("D1", (6, 1), 100, 100, 11, 3),
+            ("D2", (5, 4), 100, 100, 9, 3), ("D3", (6, 6), 100, 100, 8, 3),
+        ])
+        self.assertEqual(board.obstacles, {(3, 1), (3, 2), (3, 3), (4, 5), (4, 6)})
+        self.assertTrue(all(unit.attack == 10 and unit.defense == 5 for unit in board.units))
+
+    def test_reused_scenario_does_not_share_runtime_units(self):
+        scenario = default_scenario()
+        first, second = Board(scenario), Board(scenario)
+        first.units[0].health = 1
+        first.units[0].cell = (0, 0)
+        self.assertEqual(second.units[0].health, 100)
+        self.assertEqual(scenario.units[0].cell, (1, 1))
+        self.assertIsNot(first.units[0], second.units[0])
+
+    def test_immutable_configuration_normalizes_mutable_inputs(self):
+        source = list(alternate_scenario().units)
+        obstacles = [[1, 0]]
+        scenario = Scenario("copied", 5, 4, source, obstacles)
+        source.clear()
+        obstacles[0][0] = 4
+        self.assertEqual(len(scenario.units), 2)
+        self.assertEqual(scenario.obstacles, {(1, 0)})
+        with self.assertRaises(FrozenInstanceError):
+            scenario.units[0].health = 1
+
+    def test_alternate_board_runs_path_attack_handoff_and_undo(self):
+        board = Board(alternate_scenario())
+        battle = Battle(board)
+        actor, target = board.units
+        self.assertEqual(board.neighbors((4, 3)), ((3, 3), (4, 2)))
+        self.assertIn((2, 0), battle.movement_range())
+        self.assertNotIn((1, 0), battle.movement_range())
+        self.assertNotIn((4, 0), battle.movement_range())
+        self.assertTrue(battle.move((2, 0)))
+        self.assertTrue(battle.attack(target))
+        self.assertEqual(target.health, 33)
+        battle.finish_attack()
+        self.assertIs(battle.active_unit, target)
+        self.assertTrue(battle.undo())
+        self.assertIs(battle.active_unit, actor)
+        self.assertEqual(actor.cell, (0, 0))
+        self.assertEqual(target.health, 50)
+
+    def test_rejects_invalid_dimensions_empty_or_one_sided_scenarios(self):
+        source = alternate_scenario()
+        for changes in ({"cols": 0}, {"rows": -1}, {"cols": True}, {"rows": 3.5},
+                        {"scenario_id": ""}, {"units": ()}, {"units": source.units[:1]}):
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                replace(source, **changes)
+
+    def test_rejects_bad_spawn_coordinates_collisions_and_duplicate_ids(self):
+        source = alternate_scenario()
+        for changes in ({"cell": (5, 0)}, {"cell": (-1, 0)}, {"cell": (1, 0)},
+                        {"cell": (3, 0)}, {"cell": (True, 0)}, {"cell": (0.5, 0)}, {"uid": "red"}):
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                replace(source, units=(replace(source.units[0], **changes), source.units[1]))
+        for obstacles in ([(5, 0)], [(1,)], [(1, False)]):
+            with self.subTest(obstacles=obstacles), self.assertRaises(ValueError):
+                replace(source, obstacles=obstacles)
+
+    def test_rejects_invalid_teams_attributes_and_initially_dead_units(self):
+        source = alternate_scenario()
+        for changes in ({"health": 0}, {"health": 101}, {"max_health": 0}, {"team": "unknown"},
+                        {"attack": -1}, {"defense": -1}, {"speed": -1}, {"movement": -1},
+                        {"movement": 1.5}, {"speed": True}, {"uid": ""}, {"role": ""}):
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                replace(source, units=(replace(source.units[0], **changes), source.units[1]))
+
+
+class GeometryChecks(unittest.TestCase):
+    def test_nonzero_origin_and_odd_cell_size_roundtrip(self):
+        geometry = BoardGeometry(5, 3, 31, (17, 29))
+        self.assertEqual(geometry.bounds, (17, 29, 155, 93))
+        self.assertEqual(geometry.cell_rect((1, 1)), (48, 60, 31, 31))
+        for row in range(3):
+            for col in range(5):
+                self.assertEqual(geometry.cell_at(geometry.cell_center((col, row))), (col, row))
+
+    def test_half_open_pixel_edges_and_sidebar(self):
+        geometry = BoardGeometry(8, 8, 64)
+        self.assertEqual(geometry.cell_at((0, 0)), (0, 0))
+        self.assertEqual(geometry.cell_at((511, 511)), (7, 7))
+        for pixel in ((512, 0), (0, 512), (-1, 0), (0, -1), (799, 511)):
+            self.assertIsNone(geometry.cell_at(pixel))
+        offset = BoardGeometry(2, 2, 32, (10, 20))
+        self.assertIsNone(offset.cell_at((9, 20)))
+        self.assertEqual(offset.cell_at((73, 83)), (1, 1))
+        self.assertIsNone(offset.cell_at((74, 84)))
+
+    def test_invalid_geometry_and_cells_are_rejected(self):
+        for args in ((0, 8, 64), (8, -1, 64), (8, 8, 0), (True, 8, 64), (8, 8, 32.5)):
+            with self.subTest(args=args), self.assertRaises(ValueError):
+                BoardGeometry(*args)
+        with self.assertRaises(ValueError):
+            BoardGeometry(8, 8, 64, (0.5, 0))
+        for cell in ((8, 0), (-1, 0), (0, 8), (False, 0), (0.5, 0)):
+            with self.subTest(cell=cell), self.assertRaises(ValueError):
+                BoardGeometry(8, 8, 64).cell_rect(cell)
+
+
+class CoreBoundaryChecks(unittest.TestCase):
+    def test_board_has_no_pixel_or_rendering_entrypoints(self):
+        board = Board(default_scenario())
+        for name in ("draw", "rect", "cell_at", "label_font"):
+            self.assertFalse(hasattr(board, name), name)
+
+    def test_full_rule_flow_without_site_packages_and_with_pygame_blocked(self):
+        root = Path(__file__).resolve().parents[1]
+        script = """
+import importlib.abc
+import importlib.util
+import sys
+assert importlib.util.find_spec('pygame') is None
+class NoPygame(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname == 'pygame' or fullname.startswith('pygame.'):
+            raise AssertionError('Core imported Pygame: ' + fullname)
+sys.meta_path.insert(0, NoPygame())
+from tactics.board import Board
+from tactics.battle import Battle
+from tactics.scenario import default_scenario
+from tactics.geometry import BoardGeometry
+from tactics.view_models import build_board_view
+board = Board(default_scenario())
+battle = Battle(board)
+assert battle.move((4, 4))
+assert battle.attack(board.enemies[1])
+assert board.enemies[1].health == 90
+battle.finish_attack()
+assert battle.undo()
+assert board.enemies[1].health == 100
+assert build_board_view(board, battle, battle.active_unit).active_uid == 'A2'
+assert BoardGeometry(8, 8, 64).cell_at((511, 511)) == (7, 7)
+assert 'pygame' not in sys.modules
+print('core-without-pygame: OK')
+"""
+        result = subprocess.run([sys.executable, "-S", "-c", script], cwd=str(root),
+                                env={**os.environ, "PYTHONPATH": str(root)},
+                                capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("core-without-pygame: OK", result.stdout)
+
+
+if __name__ == "__main__":
+    unittest.main()
+```
+
 ## tests/test_effects.py
 
 ```python
@@ -2064,8 +2630,8 @@ class CombatInteractionChecks(unittest.TestCase):
             self.target.health = 5
             self.game.battle = Battle(self.game.board)
             self.game.selected = self.game.battle.active_unit
-        self.click(self.game.board.rect((4, 4)).center)
-        self.click(self.game.board.rect(self.target.cell).center)
+        self.click(self.game.geometry.cell_center((4, 4)))
+        self.click(self.game.geometry.cell_center(self.target.cell))
 
     def test_damage_popup_and_controls_are_locked_until_effect_finishes(self):
         self.start_attack()
@@ -2077,7 +2643,7 @@ class CombatInteractionChecks(unittest.TestCase):
             self.game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=key))
         for rect in (self.game.panel.skip_button, self.game.panel.end_button, self.game.panel.undo_button):
             self.click(rect.center)
-        self.click(self.game.board.rect(self.target.cell).center)
+        self.click(self.game.geometry.cell_center(self.target.cell))
         self.assertEqual(self.target.health, self.target.max_health - self.actor.attack)
         self.assertIs(self.game.battle.active_unit, self.actor)
         self.assertEqual(self.game.battle.phase, "resolving")
@@ -2091,7 +2657,7 @@ class CombatInteractionChecks(unittest.TestCase):
         self.assertEqual(len(self.game.effects.deaths), 1)
         self.assertFalse(self.target.alive)
         self.game.draw()
-        center = self.game.board.rect(self.target.cell).center
+        center = self.game.geometry.cell_center(self.target.cell)
         background = (42, 55, 70)
         self.assertNotEqual(tuple(self.game.screen.get_at(center))[:3], background)
         self.game.update(0.4)
@@ -2120,7 +2686,7 @@ class CombatInteractionChecks(unittest.TestCase):
     def test_backspace_rewinds_previous_turn_and_discards_partial_current_move(self):
         self.start_attack()
         self.game.update(1.0)
-        self.click(self.game.board.rect((0, 1)).center)
+        self.click(self.game.geometry.cell_center((0, 1)))
         self.game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_BACKSPACE))
         self.assertEqual(self.game.battle.active_unit.uid, "A2")
         self.assertEqual(self.target.health, self.target.max_health)
@@ -2174,7 +2740,7 @@ import pygame
 
 from tactics.game import Game
 from tactics.panel import InfoPanel
-from tactics.settings import BOARD_HEIGHT, BOARD_WIDTH, CELL_SIZE, WINDOW_SIZE
+from tactics.settings import CELL_SIZE
 
 
 class GameChecks(unittest.TestCase):
@@ -2188,9 +2754,9 @@ class GameChecks(unittest.TestCase):
         self.game.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=position, button=button))
 
     def test_layout_and_initial_scenario(self):
-        self.assertEqual(WINDOW_SIZE, (896, 512))
+        self.assertEqual(self.game.screen.get_size(), (896, 512))
         self.assertEqual(CELL_SIZE, 64)
-        self.assertEqual((BOARD_WIDTH, BOARD_HEIGHT), (512, 512))
+        self.assertEqual((self.game.geometry.width, self.game.geometry.height), (512, 512))
         cells = [unit.cell for unit in self.game.board.units] + list(self.game.board.obstacles)
         self.assertEqual(len(self.game.board.allies), 3)
         self.assertEqual(len(self.game.board.enemies), 3)
@@ -2201,7 +2767,7 @@ class GameChecks(unittest.TestCase):
     def test_inspect_each_unit_without_changing_turn(self):
         actor = self.game.battle.active_unit
         for unit in self.game.board.units:
-            self.click(self.game.board.rect(unit.cell).center)
+            self.click(self.game.geometry.cell_center(unit.cell))
             self.assertIs(self.game.selected, unit)
             self.assertIs(self.game.battle.active_unit, actor)
             self.game.draw()
@@ -2210,17 +2776,17 @@ class GameChecks(unittest.TestCase):
         actor = self.game.battle.active_unit
         start = actor.cell
         positions = [(511, 511), (530, 20), (-1, 0), (0, 512)]
-        positions += [self.game.board.rect(cell).center for cell in self.game.board.obstacles]
+        positions += [self.game.geometry.cell_center(cell) for cell in self.game.board.obstacles]
         for position in positions:
             self.click(position)
             self.assertEqual(actor.cell, start)
             self.assertEqual(self.game.battle.phase, "move")
-        self.assertEqual(self.game.board.cell_at((511, 511)), (7, 7))
+        self.assertEqual(self.game.geometry.cell_at((511, 511)), (7, 7))
 
     def test_right_click_does_not_change_selection_or_scenario(self):
         before = tuple(unit.cell for unit in self.game.board.units)
         selected = self.game.selected
-        self.click(self.game.board.rect((4, 4)).center, button=3)
+        self.click(self.game.geometry.cell_center((4, 4)), button=3)
         self.assertIs(self.game.selected, selected)
         self.assertEqual(tuple(unit.cell for unit in self.game.board.units), before)
 
@@ -2228,11 +2794,11 @@ class GameChecks(unittest.TestCase):
         actor = self.game.battle.active_unit
         target = self.game.board.enemies[1]
         health = target.health
-        self.click(self.game.board.rect((4, 4)).center)
+        self.click(self.game.geometry.cell_center((4, 4)))
         self.assertEqual(actor.cell, (4, 4))
         self.assertEqual(self.game.battle.phase, "attack")
         self.game.draw()
-        self.click(self.game.board.rect(target.cell).center)
+        self.click(self.game.geometry.cell_center(target.cell))
         self.assertEqual(target.health, health - actor.attack)
         self.assertEqual(self.game.battle.phase, "resolving")
         self.assertTrue(self.game.effects.busy)
@@ -2246,12 +2812,12 @@ class GameChecks(unittest.TestCase):
         actor = self.game.battle.active_unit
         start = actor.cell
         other = self.game.board.allies[0]
-        self.click(self.game.board.rect(other.cell).center)
-        self.click(self.game.board.rect((4, 4)).center)
+        self.click(self.game.geometry.cell_center(other.cell))
+        self.click(self.game.geometry.cell_center((4, 4)))
         self.assertEqual(actor.cell, start)
         self.assertEqual(other.cell, (1, 1))
-        self.click(self.game.board.rect(actor.cell).center)
-        self.click(self.game.board.rect((4, 4)).center)
+        self.click(self.game.geometry.cell_center(actor.cell))
+        self.click(self.game.geometry.cell_center((4, 4)))
         self.assertEqual(actor.cell, (4, 4))
 
     def test_keyboard_and_sidebar_skip_controls(self):
@@ -2319,6 +2885,110 @@ if __name__ == "__main__":
     unittest.main()
 ```
 
+## tests/test_rendering.py
+
+```python
+"""M1 renderer/view contracts, separate from the retained gameplay checks."""
+
+from dataclasses import FrozenInstanceError, asdict, replace
+import unittest
+from unittest.mock import patch
+
+import pygame
+
+from tactics.battle import Battle
+from tactics.board import Board
+from tactics.board_renderer import BoardRenderer
+from tactics.game import Game
+from tactics.geometry import BoardGeometry
+from tactics.scenario import Scenario, UnitSpawn, default_scenario
+from tactics.view_models import build_board_view
+
+
+class RenderBoundaryChecks(unittest.TestCase):
+    def setUp(self):
+        pygame.font.init()
+        self.board = Board(default_scenario())
+        self.battle = Battle(self.board)
+        self.actor = self.battle.active_unit
+
+    def tearDown(self):
+        pygame.quit()
+
+    def test_view_is_detached_and_deeply_read_only(self):
+        view = build_board_view(self.board, self.battle, self.actor)
+        unit_view = next(unit for unit in view.units if unit.uid == self.actor.uid)
+        self.actor.health = 1
+        self.actor.cell = (0, 0)
+        self.assertEqual((unit_view.health, unit_view.cell), (80, (1, 3)))
+        self.assertIsInstance(view.move_cells, frozenset)
+        self.assertIsInstance(view.units, tuple)
+        with self.assertRaises(FrozenInstanceError):
+            unit_view.health = 0
+        with self.assertRaises(FrozenInstanceError):
+            view.active_uid = "D1"
+
+    def test_ranges_follow_selection_phase_and_legal_queries(self):
+        view = build_board_view(self.board, self.battle, self.actor)
+        self.assertEqual(view.move_cells, self.battle.movement_range())
+        self.assertFalse(view.attack_cells)
+        hidden = build_board_view(self.board, self.battle, self.board.enemies[0])
+        self.assertFalse(hidden.move_cells or hidden.attack_cells or hidden.target_cells)
+        self.battle.move((4, 4))
+        view = build_board_view(self.board, self.battle, self.actor)
+        self.assertFalse(view.move_cells)
+        self.assertEqual(view.attack_cells, {(4, 3), (3, 4), (5, 4)})
+        self.assertEqual(view.target_cells, {(5, 4)})
+        self.battle.attack(self.board.enemies[1])
+        resolving = build_board_view(self.board, self.battle, self.actor)
+        self.assertFalse(resolving.move_cells or resolving.attack_cells or resolving.target_cells)
+
+    def test_renderer_needs_only_values_and_preserves_state_and_surface_clip(self):
+        view = build_board_view(self.board, self.battle, self.actor)
+        before = [asdict(unit) for unit in self.board.units]
+        geometry = BoardGeometry(8, 8, 32, (11, 13))
+        surface = pygame.Surface((300, 300))
+        surface.fill("magenta")
+        surface.set_clip((5, 5, 280, 280))
+        clip = surface.get_clip()
+        with patch.object(self.battle, "movement_range", side_effect=AssertionError("renderer queried rules")), \
+             patch.object(self.battle, "attack_targets", side_effect=AssertionError("renderer queried targets")):
+            BoardRenderer(geometry).draw(surface, view)
+        self.assertEqual([asdict(unit) for unit in self.board.units], before)
+        self.assertEqual(surface.get_clip(), clip)
+        self.assertEqual(tuple(surface.get_at((10, 13)))[:3], (255, 0, 255))
+        self.assertNotEqual(tuple(surface.get_at((11, 13)))[:3], (255, 0, 255))
+        with self.assertRaises(ValueError):
+            BoardRenderer(geometry).draw(surface, replace(view, cols=5))
+
+    def test_injected_scenario_uses_its_dimensions_for_window_clicks_and_effects(self):
+        scenario = Scenario("small", 5, 4, (
+            UnitSpawn("blue", "Blue", "ally", "test", (0, 0), speed=20, movement=4, attack=17),
+            UnitSpawn("red", "Red", "enemy", "test", (3, 0), health=50, speed=5),
+        ), frozenset(((1, 0),)))
+        game = Game(scenario)
+        self.assertEqual(game.geometry.bounds, (0, 0, 320, 256))
+        self.assertEqual(game.screen.get_size(), (704, 512))
+        self.assertEqual(game.panel.skip_button.left, 344)
+        self.assertIs(game.effects.geometry, game.geometry)
+        game.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1,
+                                            pos=game.geometry.cell_center((2, 0))))
+        self.assertEqual(game.battle.phase, "attack")
+        game.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1,
+                                            pos=game.geometry.cell_center((3, 0))))
+        self.assertEqual(game.board.enemies[0].health, 33)
+        self.assertEqual(game.effects.damage_texts[0].cell, (3, 0))
+        game.draw()
+        game.update(1)
+        game.undo()
+        self.assertEqual(game.board.enemies[0].health, 50)
+        game.draw()
+
+
+if __name__ == "__main__":
+    unittest.main()
+```
+
 ## tests/test_rewind.py
 
 ```python
@@ -2329,11 +2999,12 @@ import unittest
 
 from tactics.battle import Battle
 from tactics.board import Board
+from tactics.scenario import default_scenario
 
 
 class RewindAndDefeatChecks(unittest.TestCase):
     def setUp(self):
-        self.board = Board()
+        self.board = Board(default_scenario())
         self.battle = Battle(self.board)
         self.actor = self.battle.active_unit
         self.target = self.board.enemies[1]
