@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "status": "diagnostic_only",
+  "image": "assets/skins/war_torn/backgrounds/battlefield.png",
+  "sha256": "f3ae6033599a5cc9047a8509c3d3f2269e3604513aa29cb0ec7e4db1051f5d2a",
+  "image_size": [1672, 941],
+  "viewport_size": [1280, 720],
+  "physical_span": [2, 6],
+  "corners": {"p00":[1169,278],"p10":[1392,342],"p11":[757,694],"p01":[515,568]},
+  "samples": [
+    {"node":[1,1],"image":[1196,349],"band":"far"},
+    {"node":[1,2],"image":[1103,395],"band":"middle"},
+    {"node":[1,3],"image":[1000,445],"band":"middle"},
+    {"node":[1,4],"image":[883,503],"band":"near"},
+    {"node":[1,5],"image":[765,561],"band":"near"}
+  ],
+  "annotation": "Manually read seam-center intersections from native PNG. Four corners define a visible 2x6 stone strip; five interior landmarks are independent of the homography. This is not an 8x8 game calibration; no projected/interpolated point is an observation. Seam width and hand annotation introduce several source pixels of uncertainty."
+}

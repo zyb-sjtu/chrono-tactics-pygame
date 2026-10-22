@@ -4,6 +4,7 @@
 
 - 阶段版本是 v0.2.0，M1–M5 已实施：规则/表现分离、纯数据回溯与结算确认、JSON/PNG 链路、第二场景/外观与开发模板。发布状态以 tag/Release 为准；以 `TASKS.md` 区分现有能力和规划。
 - 当前开发代码另有透视战场模式，阅读 `docs/PERSPECTIVE_BATTLEFIELD.md`；原图已接入，角色是明确几何回退，原画局部砖缝的最终校准仍待美术确认。
+- 地砖对齐不是仅待美术认可：旧选区未对应8×8整砖边界，完整校准尚未通过，先读 `docs/WAR_TORN_CALIBRATION.md`。仅2×6实测样带的局部误差合格，不能当作完整8×8结果，也不能把外推/插值坐标当成真实控制点。
 - 修改玩法、结构或资源入口前，阅读 [整体架构](docs/ARCHITECTURE.md)、[实施路线](docs/ROADMAP.md) 与 [功能开发规范](docs/FEATURE_DEVELOPMENT.md)。接入美术时同时遵守 [资源规范](docs/ASSET_GUIDE.md)。用户提供的原始报告是评审材料，当前开发决策以这些评审后文档为准。
 
 ## 开发边界
@@ -35,6 +36,7 @@
 - 修改快照、结算或动画交接后，另运行 `python -S -m unittest discover -s tests -p test_resolution.py -v`；CI 安装依赖前执行三组共 44 项检查。真实动画还需完整回归验证，纯测试不能代替实际完成通知与清理检查。
 - 修改内容或清单后，另运行 `python -S -m unittest discover -s tests -p test_content.py -v`，CI 安装依赖前合计 57 项；原图/缩放缓存和实际资源链路由 `test_assets.py` 及真实窗口检查。Windows 无创建符号链接权限时该项可明确跳过，路径越界等其他检查仍须通过。
 - 涉及透视几何/布局时，另以 `-S` 运行 test_perspective_geometry.py 与 test_presentation_layout.py；六组共 69 项。test_perspective_rendering.py 覆盖缓存、背景、HUD、CLI、资源动画和矩形/透视完整状态一致；真实窗口仍需单独观察校准和遮挡。
+- 校准工具/观测变化另以 `-S` 运行 test_calibration.py；七组纯检查共75项。用 `scripts/calibrate_board.py` 重算原图坐标观测和独立内部误差；先确认完整实测对应，再决定是否升级映射，不以测试绿灯替代对齐验收。
 - 保留原有行为覆盖；接口迁移时可调整测试夹具，不为保留旧字段访问而保留架构漏洞。新增架构边界在相应阶段就加入检查，不推迟到最终验收。
 - 使用 `python scripts/export_source.py` 更新 `SOURCE.md`，再用 `python scripts/export_source.py --check` 检查一致性。
 - 后续需求参考 `docs/templates/FEATURE_TEMPLATE.md`；换场景/外观参考 `docs/EXTENSION_EXERCISE.md`。新增内容要补真实集成，不能只验证文件存在。阶段发布按 `docs/RELEASE.md` 从确切提交打包并验证解压产物。

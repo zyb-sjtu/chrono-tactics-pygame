@@ -82,6 +82,30 @@ class PerspectiveRenderingChecks(unittest.TestCase):
     def tearDown(self):
         pygame.quit()
 
+    def test_calibration_picker_undo_preview_and_save_raw_draft(self):
+        from scripts.calibrate_board import DEFAULT, load_observations, pick
+        data,geometry=load_observations(DEFAULT)
+        points=list(data['corners'].values())+[s['image'] for s in data['samples']]
+        events=[]
+        # Mark then undo a duplicate corner; saved points must be actual clicks only.
+        for index,point in enumerate(points):
+            position=geometry.fit.to_screen(point)
+            click=pygame.event.Event(pygame.MOUSEBUTTONDOWN,button=1,pos=position)
+            events.append(click)
+            if index==1:
+                events.extend((pygame.event.Event(pygame.KEYDOWN,key=pygame.K_BACKSPACE),click))
+        events.extend(pygame.event.Event(pygame.KEYDOWN,key=key) for key in (pygame.K_p,pygame.K_s))
+        events.append(pygame.event.Event(pygame.QUIT))
+        with tempfile.TemporaryDirectory() as temp:
+            output=Path(temp)/'draft.json'
+            with patch('pygame.event.get',return_value=events):
+                pick(ROOT/data['image'],2,6,output)
+            saved=json.loads(output.read_text(encoding='utf-8'))
+            self.assertEqual(saved['status'],'draft')
+            self.assertEqual(list(saved['corners'].values()),points[:4])
+            self.assertEqual([s['image'] for s in saved['samples']],points[4:])
+            self.assertFalse(pygame.display.get_init())
+
     def test_same_full_combat_trace_as_rectangular_mode(self):
         original=load_content(scenario_file='scenarios/war_torn.json').scenario
         scenario=replace(original,units=tuple(replace(u,health=5) if u.team=='enemy' else u for u in original.units))
