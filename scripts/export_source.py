@@ -12,14 +12,14 @@ def source_files():
     files = {path for path in ROOT.iterdir()
              if path.is_file() and (path.suffix in SUFFIXES or path.name in (".gitignore", ".gitattributes"))
              and path != OUTPUT}
-    for folder in ("tactics", "tests", "scripts", ".github", "docs"):
+    for folder in ("tactics", "tests", "scripts", ".github", "docs", "content", "assets"):
         files.update(path for path in (ROOT / folder).rglob("*")
                      if path.is_file() and path.suffix in SUFFIXES)
     return sorted(files, key=lambda path: path.relative_to(ROOT).as_posix())
 
 
 def render():
-    parts = ["# 完整项目源码\n\n本文件由 `python scripts/export_source.py` 生成。包含项目全部文本源码、配置和文档；不包含自身、截图、虚拟环境、缓存及压缩包。\n"]
+    parts = ["# 完整项目源码\n\n本文件由 `python scripts/export_source.py` 生成。包含项目全部文本源码、配置和文档；不包含自身、二进制 PNG、截图、虚拟环境、缓存及压缩包。演示 PNG 可由 scripts/generate_demo_assets.py 重建。\n"]
     for path in source_files():
         name = path.relative_to(ROOT).as_posix()
         language = {".py": "python", ".md": "markdown", ".yml": "yaml", ".yaml": "yaml"}.get(path.suffix, "text")

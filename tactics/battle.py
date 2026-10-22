@@ -106,6 +106,7 @@ class Battle:
         self.pending_attack = AttackResult(
             self._next_resolution_id, actor.uid, target.uid, tuple(target.cell), target.team,
             damage, previous_hp, target.health, not target.alive,
+            actor.definition_id, target.definition_id, tuple(actor.cell),
         )
         self._next_resolution_id += 1
         self.phase = "resolving"

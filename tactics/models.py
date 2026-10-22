@@ -19,6 +19,7 @@ class Unit:
     defense: int = 5
     speed: int = 10
     movement: int = 3
+    definition_id: str = ""
 
     @property
     def alive(self):
@@ -40,6 +41,7 @@ class UnitSnapshot:
     defense: int
     speed: int
     movement: int
+    definition_id: str
 
     @classmethod
     def capture(cls, unit):
@@ -62,3 +64,6 @@ class AttackResult:
     previous_hp: int
     current_hp: int
     killed: bool
+    actor_definition_id: str = ""
+    target_definition_id: str = ""
+    actor_cell: Cell = (0, 0)

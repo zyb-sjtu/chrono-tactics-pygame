@@ -12,7 +12,7 @@ from tactics.game import Game
 
 class CombatInteractionChecks(unittest.TestCase):
     def setUp(self):
-        self.game = Game()
+        self.game = Game(geometric=True)
 
     @property
     def view(self):
@@ -39,7 +39,7 @@ class CombatInteractionChecks(unittest.TestCase):
                           for unit in scenario.units)
             if final:
                 units = tuple(unit for unit in units if unit.uid in ("A2", "D2"))
-            self.game = Game(replace(scenario, units=units))
+            self.game = Game(replace(scenario, units=units), geometric=True)
         self.click(self.game.geometry.cell_center((4, 4)))
         self.click(self.game.geometry.cell_center(self.target.cell))
 
@@ -119,7 +119,7 @@ class CombatInteractionChecks(unittest.TestCase):
         scenario = default_scenario()
         self.game = Game(replace(scenario, units=tuple(
             replace(unit, health=800, max_health=1000) if unit.uid == "A2" else unit
-            for unit in scenario.units)))
+            for unit in scenario.units)), geometric=True)
         with patch.object(self.game.panel, "text", wraps=self.game.panel.text) as draw_text:
             self.game.draw()
         expected = "生命: 800/1000" if self.game.panel.chinese else "HP: 800/1000"

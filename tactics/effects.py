@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import pygame
 
 from .geometry import BoardGeometry
+from .assets import Clip, SpriteBody
 from .view_models import AttackPresentation
 
 DAMAGE_DURATION = 0.9
@@ -27,9 +28,19 @@ class DeathEffect:
     age: float = 0.0
 
 
+@dataclass
+class SpriteEffect:
+    uid: str
+    cell: tuple
+    clip: Clip
+    age: float = 0.0
+
+
 class CombatEffects:
-    def __init__(self, geometry: BoardGeometry):
+    def __init__(self, geometry: BoardGeometry, assets=None):
         self.geometry = geometry
+        self.assets = assets
+        self.sprites = []
         self.damage_texts = []
         self.deaths = []
         self._pending_token = None
@@ -38,30 +49,44 @@ class CombatEffects:
 
     @property
     def busy(self):
-        return bool(self.damage_texts or self.deaths)
+        return bool(self.damage_texts or self.deaths or self.sprites)
 
     def play_attack(self, event: AttackPresentation):
         self.clear()
         self._pending_token = event.token
         result = event.result
+        scale = self.geometry.cell_size / 64
+        attack = self.assets.visual(result.actor_definition_id, "attack", scale) if self.assets else None
+        if attack is not None:
+            self.sprites.append(SpriteEffect(result.actor_uid, result.actor_cell, attack))
         self.damage_texts.append(DamageText(result.target_cell, result.damage))
         if result.killed:
-            self.deaths.append(DeathEffect(result.target_cell, result.target_team, result.target_uid))
+            death = self.assets.visual(result.target_definition_id, "death", scale) if self.assets else None
+            if death is not None:
+                self.sprites.append(SpriteEffect(result.target_uid, result.target_cell, death))
+            else:
+                self.deaths.append(DeathEffect(result.target_cell, result.target_team, result.target_uid))
 
     def clear(self):
         self.damage_texts.clear()
         self.deaths.clear()
+        self.sprites.clear()
         self._pending_token = None
 
     def update(self, elapsed):
-        for effect in self.damage_texts + self.deaths:
+        for effect in self.damage_texts + self.deaths + self.sprites:
             effect.age += max(0, elapsed)
         self.damage_texts = [effect for effect in self.damage_texts if effect.age < DAMAGE_DURATION]
         self.deaths = [effect for effect in self.deaths if effect.age < DEATH_DURATION]
+        self.sprites = [effect for effect in self.sprites if not effect.clip.finished(effect.age)]
         if self._pending_token is not None and not self.busy:
             token, self._pending_token = self._pending_token, None
             return (token,)
         return ()
+
+    def body_views(self):
+        return tuple(SpriteBody(effect.uid, effect.cell, effect.clip.frame_at(effect.age))
+                     for effect in self.sprites)
 
     def draw(self, surface):
         old_clip = surface.get_clip()
