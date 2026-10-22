@@ -53,6 +53,10 @@ jobs:
         run: python -S -m unittest discover -s tests -p test_resolution.py -v
       - name: Verify content and manifest without site packages
         run: python -S -m unittest discover -s tests -p test_content.py -v
+      - name: Verify perspective geometry without site packages
+        run: python -S -m unittest discover -s tests -p test_perspective_geometry.py -v
+      - name: Verify presentation configuration without site packages
+        run: python -S -m unittest discover -s tests -p test_presentation_layout.py -v
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
       - name: Check source bundle
@@ -94,6 +98,7 @@ htmlcov/
 ## 先确认实际状态
 
 - 阶段版本是 v0.2.0，M1–M5 已实施：规则/表现分离、纯数据回溯与结算确认、JSON/PNG 链路、第二场景/外观与开发模板。发布状态以 tag/Release 为准；以 `TASKS.md` 区分现有能力和规划。
+- 当前开发代码另有透视战场模式，阅读 `docs/PERSPECTIVE_BATTLEFIELD.md`；原图已接入，角色是明确几何回退，原画局部砖缝的最终校准仍待美术确认。
 - 修改玩法、结构或资源入口前，阅读 [整体架构](docs/ARCHITECTURE.md)、[实施路线](docs/ROADMAP.md) 与 [功能开发规范](docs/FEATURE_DEVELOPMENT.md)。接入美术时同时遵守 [资源规范](docs/ASSET_GUIDE.md)。用户提供的原始报告是评审材料，当前开发决策以这些评审后文档为准。
 
 ## 开发边界
@@ -112,6 +117,7 @@ htmlcov/
 - 新增规则代码不依赖 Pygame；渲染、UI、动画和未来 AI 不直接改战斗状态。UI/AI 共用合法性校验和指令入口，避免复制规则。
 - 新增运行状态必须明确快照与恢复行为；新增资源、图片、字体、动画进度不得进入规则快照。对外视图和结算结果使用独立数据与稳定 ID，不向表现层泄露可变实体。
 - 图片集中加载和缓存，不在每帧读盘；路径相对资源根解析。替换美术不能改变占格、移动、攻击或回溯语义。
+- 透视配置在 presentations/，规则场景仍在 content/；矩阵、像素、资源与 HUD 不进规则/快照。完整背景只按 contain 缓存，深度预载只处理单位/障碍；沿用统一脚底/尺度/表现矩形接口与屏幕 Y 排序。不要改原图来掩盖网格误差，也不要把装饰自动当障碍。
 - 抽象和模块必须有实际调用方。不提前创建空的插件、ECS、通用注册中心或未使用扩展层。结构性整改使用专用分支、分阶段验证与审查差异。
 
 ## 验证和维护
@@ -123,6 +129,7 @@ htmlcov/
 - 修改协调、动作或完整视图后，另运行 `python -S -m unittest discover -s tests -p test_controller.py -v`。CI 在安装依赖前执行这两组检查。
 - 修改快照、结算或动画交接后，另运行 `python -S -m unittest discover -s tests -p test_resolution.py -v`；CI 安装依赖前执行三组共 44 项检查。真实动画还需完整回归验证，纯测试不能代替实际完成通知与清理检查。
 - 修改内容或清单后，另运行 `python -S -m unittest discover -s tests -p test_content.py -v`，CI 安装依赖前合计 57 项；原图/缩放缓存和实际资源链路由 `test_assets.py` 及真实窗口检查。Windows 无创建符号链接权限时该项可明确跳过，路径越界等其他检查仍须通过。
+- 涉及透视几何/布局时，另以 `-S` 运行 test_perspective_geometry.py 与 test_presentation_layout.py；六组共 69 项。test_perspective_rendering.py 覆盖缓存、背景、HUD、CLI、资源动画和矩形/透视完整状态一致；真实窗口仍需单独观察校准和遮挡。
 - 保留原有行为覆盖；接口迁移时可调整测试夹具，不为保留旧字段访问而保留架构漏洞。新增架构边界在相应阶段就加入检查，不推迟到最终验收。
 - 使用 `python scripts/export_source.py` 更新 `SOURCE.md`，再用 `python scripts/export_source.py --check` 检查一致性。
 - 后续需求参考 `docs/templates/FEATURE_TEMPLATE.md`；换场景/外观参考 `docs/EXTENSION_EXERCISE.md`。新增内容要补真实集成，不能只验证文件存在。阶段发布按 `docs/RELEASE.md` 从确切提交打包并验证解压产物。
@@ -133,6 +140,15 @@ htmlcov/
 
 ````markdown
 # 更新记录
+
+## 未发布 · 透视战场
+
+- 原样接入用户 1672×941 战场 PNG，新增独立 war_torn 场景、必需背景清单与 presentation 布局；保留原训练场/渡口、单位定义和现有战斗规则。
+- 纯 Python 单应投影与逆向拾取、半开边界、contain 共享变换和缓存；拒绝退化角点、错误背景尺寸、未知字段和越界路径。
+- 独立透视 Renderer 与 SceneHUD，透明四边形、脚底/屏幕 Y 深度排序、形体后血条；复用 AssetManager/Clip，启动预载离散深度尺度，绘制不读盘/缩放。字体异常保留英文降级。
+- Geometry 提供脚底/尺度/表现矩形，Effects 沿用结算 token 与清理协议；新增 --presentation/--debug-grid 和 F3，旧 CLI 保持，混用配置明确拒绝。
+- 新增 19 项检查，共 152 项，本机 151 通过、1 项符号链接权限跳过；dummy/windows 分别验证，矩形/透视状态一致，旧几何 13 帧逐像素不变，新增 4 张实际窗口截图。
+- 六组纯检查共 69 项；CI 与解压验收纳入新模式，SOURCE 纳入 presentations。当前角色为临时几何回退，绘画砖缝与单应细分局部有偏差，最终美术校准待确认。
 
 ## 0.2.0 - 2026-10-22
 
@@ -219,13 +235,15 @@ htmlcov/
 
 仓库名称：`chrono-tactics-pygame`，阶段版本：`0.2.0`；M0–M5 已实施。发布状态以仓库 tag / Release 为准。
 
+当前开发代码另已接入用户原图的 **8×8 透视战场**：完整背景、透视点击/高亮、深度排序、独立叠加 HUD 与调试网格。该扩展尚未单独发布；角色暂用几何回退，原画砖缝与均匀单应网格存在局部偏差，见 [实施与校准记录](docs/PERSPECTIVE_BATTLEFIELD.md)。
+
 项目仓库：[zyb-sjtu/chrono-tactics-pygame](https://github.com/zyb-sjtu/chrono-tactics-pygame)。这是私有仓库，需要登录有权限的 GitHub 账号访问。
 
 使用 Python 和 Pygame 绘制，运行时不访问网络，不需要另行下载美术。默认显示随项目提供的演示地砖与斥候 PNG，也可用 --geometry 回到几何模式。默认棋盘 8×8，每格 64×64，侧栏 384 像素，窗口 896×512；渡口场景为 6×5，窗口 768×512。
 
 ## 整体规划与后续开发
 
-已完成评审和 M1–M5：规则与表现分离、纯数据回溯、结算确认、JSON 内容/资源清单、PNG 缓存和实际素材动画。M5 增加 6×5 渡口场景及 `dusk` 外观，复用全部游戏代码；三种显示模式的相同操作产生一致战斗状态。当前美术仍为程序生成的演示素材。
+已完成评审和 M1–M5：规则与表现分离、纯数据回溯、结算确认、JSON 内容/资源清单、PNG 缓存和实际素材动画。M5 增加 6×5 渡口场景及 `dusk` 外观；透视扩展继续复用战斗与回溯，仅增加表现与输入映射。经典/dusk 为程序生成素材，war_torn 背景为用户提供的原图。
 
 | 文档 | 内容 |
 | --- | --- |
@@ -242,6 +260,7 @@ htmlcov/
 | [扩展演练](docs/EXTENSION_EXERCISE.md) | 渡口试玩与仅通过 JSON/PNG 扩展的具体步骤 |
 | [功能模板](docs/templates/FEATURE_TEMPLATE.md) | 可复制的规则、数据、回溯、表现与验收模板 |
 | [源码发布](docs/RELEASE.md) | 提交树打包、SHA256 与解压验收 |
+| [透视战场](docs/PERSPECTIVE_BATTLEFIELD.md) | 原图、配置、四角/边界、独立 HUD、152 项检查与校准限制 |
 
 架构整改 M0–M5 已落实，后续按实际功能需求继续开发；新增状态必须能回溯，新增美术通过资源与渲染入口接入。约束同时写入 [AGENTS.md](AGENTS.md)，实现进度见 [TASKS.md](TASKS.md)。
 
@@ -262,9 +281,13 @@ cd E:\gamedesign
 .\.venv\Scripts\python.exe main.py --geometry
 .\.venv\Scripts\python.exe main.py --scenario scenarios/training_ground.json --assets assets
 .\.venv\Scripts\python.exe main.py --scenario scenarios/river_crossing.json --assets assets/skins/dusk
+.\.venv\Scripts\python.exe main.py --presentation presentations/war_torn_8x8.json
+.\.venv\Scripts\python.exe main.py --presentation presentations/war_torn_8x8.json --debug-grid
 ```
 
 默认内容/资源路径相对项目位置解析，与工作目录无关。--scenario 相对 content 根；显式传入 --content-root 或 --assets 时，目录相对当前工作目录或使用绝对路径。更换单位、地砖和动画只改 JSON/PNG，步骤见 [M4 记录](docs/M4_IMPLEMENTATION.md) 和 [资源来源](assets/README.md)。
+
+透视入口固定 1280×720，F3 切换调试网格。`--presentation` 的路径相对项目根；它与 `--scenario`、`--assets`、`--content-root`、`--geometry` 互斥，冲突会报错退出，不隐含覆盖。`--debug-grid` 需要透视入口。快速体验：移动 A2 到内部坐标 `(4,3)`，再攻击 D1 `(5,3)`，击杀后退格恢复；坐标可用调试网格查看。
 
 在新机器安装（Python 3.9 或以上、可用的桌面环境）：
 
@@ -339,6 +362,7 @@ E:\gamedesign\
 │   ├── M5_IMPLEMENTATION.md # M5 扩展与阶段交付记录
 │   ├── EXTENSION_EXERCISE.md # 第二场景与外观演练
 │   ├── RELEASE.md          # 提交树打包与解压验收
+│   ├── PERSPECTIVE_BATTLEFIELD.md # 透视模式与校准记录
 │   ├── templates/FEATURE_TEMPLATE.md # 可复制开发模板
 │   ├── ROADMAP.md           # 阶段、前置与验收
 │   ├── ASSET_GUIDE.md       # 美术资源与动画规范
@@ -355,10 +379,14 @@ E:\gamedesign\
 │   ├── assets.py            # PNG/缩放缓存、锚点与帧列表
 │   ├── board.py             # 纯逻辑地图、空间查询与 BFS
 │   ├── geometry.py          # 不依赖 Pygame 的坐标转换
+│   ├── perspective_geometry.py # 纯单应投影/逆变换与缓存
+│   ├── presentation_layout.py # 严格视觉布局配置
 │   ├── actions.py           # UIAction 与操作结果
 │   ├── controller.py        # 统一操作、选中 UID、代次与结算确认
 │   ├── view_models.py       # 完整只读视图与独立表现数据
 │   ├── board_renderer.py    # 只读视图驱动的棋盘绘制
+│   ├── perspective_board_renderer.py # 整张背景与透视绘制
+│   ├── scene_hud.py         # 独立叠加 UI 与动作命中
 │   ├── battle.py            # 规则、结算编号、纯数据快照与回溯
 │   ├── effects.py           # 伤害/击杀动画、逐帧更新与完成通知
 │   ├── panel.py             # 字体回退、只读侧栏与动作命中
@@ -370,14 +398,18 @@ E:\gamedesign\
 │   ├── test_assets.py       # 16 项 PNG、缓存、渲染和动画检查
 │   ├── test_milestone.py    # 6 项跨场景/外观集成验收
 │   ├── test_release.py      # 4 项发布包损坏/来源/路径检查
+│   ├── test_perspective_geometry.py # 7 项纯透视几何检查
+│   ├── test_presentation_layout.py # 5 项纯配置/背景检查
+│   ├── test_perspective_rendering.py # 7 项显示/输入/战斗集成
 │   ├── test_content.py      # 13 项无第三方包的内容/清单检查
 │   ├── test_core.py         # 12 项无第三方包的 M1 核心检查
 │   ├── test_controller.py   # 16 项无第三方包的协调与数据边界检查
 │   ├── test_resolution.py   # 16 项无第三方包的快照和结算协议检查
 │   ├── test_rendering.py    # 6 项只读视图、渲染、按钮和场景注入检查
 │   └── test_rewind.py       # 12 项回溯、击杀及行动顺序检查
-├── content/                 # units.json、训练场与渡口两个场景
-├── assets/                  # 默认 9 张 PNG；skins/dusk 自包含清单与 17 张 PNG
+├── content/                 # units.json、训练场/渡口/war_torn 三个场景
+├── presentations/war_torn_8x8.json # 透视角点、视口、HUD、调试
+├── assets/                  # 默认/dusk 共 26 张 PNG；war_torn 原始背景与独立清单
 ├── scripts/generate_demo_assets.py # 重建演示 PNG，不下载外部资源
 ├── scripts/generate_dusk_assets.py # 重建第二套演示 PNG
 ├── scripts/build_release.py # 从确切提交构建源码 ZIP 与 SHA256
@@ -423,6 +455,8 @@ $releaseCommit = git rev-parse HEAD
 
 ## 验证记录
 
+当前透视扩展共 **152 项：本机 151 通过、1 项符号链接权限跳过**，dummy 与 windows 实际窗口分别执行；六组纯检查 69 项，另 4 项包完整性检查可用 `-S`。矩形/透视完整战斗状态一致；旧几何 13 帧逐像素不变。实际截图、自动事件验证与待人工认可的接缝校准分开记录，见 [透视实施记录](docs/PERSPECTIVE_BATTLEFIELD.md)。
+
 M5 共 **133 项测试**，本机 **132 通过、1 项跳过**（Windows 无创建符号链接权限，其他路径检查通过）。四组核心/内容检查共 **57 项无需第三方包**，另 4 项发布完整性检查也可用 `-S`。dummy 与 Windows 实际窗口分别回归；两场景 × 三模式的完整状态一致，覆盖击杀、跨轮、战斗结束、连续回溯、旧通知、字体异常及异地 CLI/QUIT。真实窗口使用自动投递事件，非人工逐次点击。详见 [M5 记录](docs/M5_IMPLEMENTATION.md)。M4 的 123 项基线及 13 帧几何像素对照记录保留。
 
 ```powershell
@@ -430,6 +464,8 @@ M5 共 **133 项测试**，本机 **132 通过、1 项跳过**（Windows 无创�
 .\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_controller.py -v
 .\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_resolution.py -v
 .\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_content.py -v
+.\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_perspective_geometry.py -v
+.\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_presentation_layout.py -v
 .\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_release.py -v
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
@@ -460,6 +496,8 @@ v0.1.0 基线记录：2026-10-22，本机 Python 3.9.1 / Pygame 2.6.1 / SDL 2.28
 
 阶段版本：`0.2.0`，M0–M5 已实施；发布状态以仓库 tag / Release 为准。已实现能力与后续规划分开记录。
 
+当前另已实施未单独发布的透视战场扩展，最终美术接缝校准与正式角色图仍待确认；不将这些人工事项标为完成。
+
 ## 已实现能力
 
 | ID | 状态 | 内容 |
@@ -471,11 +509,13 @@ v0.1.0 基线记录：2026-10-22，本机 Python 3.9.1 / Pygame 2.6.1 / SDL 2.28
 | COMBAT-02 | 已完成 | 击杀动画、消失、死亡单位退出队列、一方全灭结束战斗 |
 | REWIND-01 | 已完成 | 回溯上一单位行动开始前、连续回溯、恢复死亡单位和战斗状态 |
 | FIX-01 | 已完成 | Windows 系统字体扫描异常回退，保留英文降级界面 |
-| QA-01 | 已完成 | 133 项测试，本机 132 通过、1 项符号链接权限跳过；核心/内容 57 项与发布完整性 4 项无需第三方包；两场景 × 三模式状态一致，真实窗口实测 |
+| QA-01 | 已完成 | 152 项测试，本机 151 通过、1 项符号链接权限跳过；六组核心/内容/透视 69 项与包完整性 4 项无需第三方包；旧几何 13 帧不变，矩形/透视状态一致，真实窗口实测 |
 | ASSET-01 | 已完成 | JSON 单位/场景、清单验证、PNG 与缩放缓存、可选缺失回退、必需缺失拒绝、静态和循环/非循环素材接入 |
 | DELIVERY-01 | 已完成 | 运行文档、源码汇总生成脚本、忽略规则和自动测试配置 |
 | EXTENSION-01 | 已完成 | 6×5 渡口场景、17 PNG 的 dusk 外观；复用现有运行代码；可复制功能开发模板 |
 | RELEASE-01 | 已完成 | VERSION、提交树源码 ZIP、SHA256、解压验收脚本；四组 CI 包含产物检查，发布见 tag/Release |
+| PERSPECTIVE-01 | 已完成 | 原始 1672×941 背景、纯单应投影/拾取、严格布局、完整背景/透明高亮/深度排序、HUD、CLI/F3、特效与回溯适配 |
+| PERSPECTIVE-02 | 待美术确认 | 当前四角/均匀逻辑细分与原画局部不规则砖缝的最终贴合；正式角色暂缺，使用明确几何回退 |
 
 CI 配置覆盖 Windows / Linux 与 Python 3.9 / 3.12。远程执行结果以 GitHub Actions 为准，配置存在不代表运行已通过。
 
@@ -513,6 +553,8 @@ CI 配置覆盖 Windows / Linux 与 Python 3.9 / 3.12。远程执行结果以 Gi
 # 演示资源来源与替换
 
 默认 9 张 PNG 由 `scripts/generate_demo_assets.py` 使用 Pygame 几何图形生成；M5 增加 [dusk 外观](skins/dusk/README.md) 的 17 张 PNG，由 `scripts/generate_dusk_assets.py` 生成。没有下载或引用第三方美术，不代表最终风格。资源无第三方素材许可要求；项目整体授权仍由仓库所有者决定，本文件不另设开源许可证。
+
+透视扩展另有 [war_torn 背景](skins/war_torn/README.md)：用户提供的原始 PNG，来源、真实尺寸与 SHA256 单独记录，不由上述生成脚本重建。角色暂用几何回退，背景作为必需资源通过 presentation 使用。
 
 | 文件 | 原始 / 基准显示尺寸 | 锚点 | 用途 |
 | --- | --- | --- | --- |
@@ -634,6 +676,43 @@ CI 配置覆盖 Windows / Linux 与 Python 3.9 / 3.12。远程执行结果以 Gi
 }
 ```
 
+## assets/skins/war_torn/README.md
+
+````markdown
+# 战后荒原背景资源
+
+- 来源：用户本机提供的 `硝烟暮色中的荒废战场棋盘.png`，位于 `D:/download from edge/`；用户同时提供了透视战场设计稿。
+- 接入文件：`backgrounds/battlefield.png`，PNG，真实尺寸 1672×941，2,265,886 字节。原样复制，没有重绘、裁切或改写图片内容。
+- 原图与接入文件 SHA256 均为 `f3ae6033599a5cc9047a8509c3d3f2269e3604513aa29cb0ec7e4db1051f5d2a`。
+- 未随图提供独立作者、来源链接或许可文本；来源记录为用户提供，项目原有授权约定继续适用。
+- 清单将背景声明为必需资源，`display_size=[1672,941]`、`pivot=[0,0]`。透视渲染器核对真实解码尺寸，启动时按 contain 统一缩放并缓存，缺失/损坏拒绝启动。
+
+目前没有提供新角色 PNG，因此四个 visual 明确使用临时几何回退。引入正式角色时，在本资源根增加 PNG/帧与状态映射即可；实际深度缓存、pivot、Clip、攻击/死亡与回溯链路已使用 dusk 测试素材通过集成验证，不需要把角色路径写入规则。
+
+使用入口：
+
+```powershell
+.\.venv\Scripts\python.exe main.py --presentation presentations/war_torn_8x8.json
+.\.venv\Scripts\python.exe main.py --presentation presentations/war_torn_8x8.json --debug-grid
+```
+
+不是平铺地砖资源包。背景外的场景/四角/HUD 在 presentation JSON 中维护，阵容/障碍在独立场景 JSON 中维护。具体坐标与校准边界见 [透视场景实施记录](../../../docs/PERSPECTIVE_BATTLEFIELD.md)。
+````
+
+## assets/skins/war_torn/manifest.json
+
+```text
+{
+  "schema_version": 1,
+  "images": {
+    "battlefield": {"path":"backgrounds/battlefield.png","display_size":[1672,941],"pivot":[0,0],"optional":false}
+  },
+  "animations": {},
+  "visuals": {"unit.vanguard":{},"unit.scout":{},"unit.guard":{},"unit.dummy":{}},
+  "board": {"background":"battlefield"}
+}
+```
+
 ## content/scenarios/river_crossing.json
 
 ```text
@@ -672,6 +751,25 @@ CI 配置覆盖 Windows / Linux 与 Python 3.9 / 3.12。远程执行结果以 Gi
 }
 ```
 
+## content/scenarios/war_torn.json
+
+```text
+{
+  "schema_version":1,
+  "id":"war_torn",
+  "cols":8,"rows":8,
+  "obstacles":[[0,1],[7,6],[6,0]],
+  "spawns":[
+    {"uid":"A2","definition_id":"scout","team":"ally","cell":[1,4],"overrides":{"health":80}},
+    {"uid":"A1","definition_id":"vanguard","team":"ally","cell":[1,6]},
+    {"uid":"A3","definition_id":"guard","team":"ally","cell":[2,6]},
+    {"uid":"D1","definition_id":"dummy","team":"enemy","cell":[5,3],"overrides":{"health":5}},
+    {"uid":"D2","definition_id":"dummy","team":"enemy","cell":[6,2],"overrides":{"speed":9}},
+    {"uid":"D3","definition_id":"dummy","team":"enemy","cell":[6,5],"overrides":{"speed":8}}
+  ]
+}
+```
+
 ## content/units.json
 
 ```text
@@ -692,6 +790,8 @@ CI 配置覆盖 Windows / Linux 与 Python 3.9 / 3.12。远程执行结果以 Gi
 # 整体架构与扩展边界
 
 状态：M1–M5 已实施。规则与 Controller 不依赖 Pygame；内容/清单用纯加载器验证，图片由资源层缓存，界面、动画和快照保持职责分离。M5 在不修改运行代码的情况下交付第二场景/外观并验证一致性，见 [M5 验收记录](M5_IMPLEMENTATION.md)。当前接口见 [M4 记录](M4_IMPLEMENTATION.md)，进度见 [TASKS](../TASKS.md)。
+
+后续透视扩展沿用这些边界：`presentation_layout` 与 `perspective_geometry` 为纯布局/数学，`PerspectiveBoardRenderer` 与 `SceneHUD` 是独立表现实现；Game 选择组装，不在旧渲染器/侧栏堆条件。规则与快照完全不感知透视模式。资源与效果复用统一脚底/尺度接口，见 [透视实施记录](PERSPECTIVE_BATTLEFIELD.md)。
 
 最简单的划分：规则决定“能做什么、结果是什么”；协调层决定“接收哪次操作、何时继续”；表现层负责“输入来自哪里、画面怎样显示”。替换图片不应影响伤害，增加技能不应要求改写主循环。
 
@@ -1022,6 +1122,8 @@ AssetManager 集中解析清单、加载原图、生成缩放/切帧结果。初
 | 中文系统字体不可用或扫描异常 | 保留现有系统字体优先与内置字体/英文回退，不因资源整改删除该修复 |
 
 ## 图层顺序
+
+透视模式使用 `board.background` 引用必需 PNG（optional=false、pivot=[0,0]），native/display 尺寸须匹配 presentation.reference_image_size。整图仅按 contain 缩放并缓存，不平铺、不按深度尺度重复缩放。四角在原图坐标系，背景、网格、拾取共用同一变换；角色/障碍预载有限深度尺度。角色脚底为投影站立点，按屏幕 Y/稳定 UID 排序，HUD 最后绘制。实际例子见 [透视战场](PERSPECTIVE_BATTLEFIELD.md)。旧 floor/obstacle 入口继续可用。
 
 1. 地砖、地面装饰。
 2. 移动/攻击范围与目标格提示。
@@ -1665,6 +1767,94 @@ M0–M5 架构规划已落实；后续按真实功能需求继续开发。技能
 ![dusk 外观渡口](../artifacts/m5_dusk_initial.png)
 ````
 
+## docs/PERSPECTIVE_BATTLEFIELD.md
+
+````markdown
+# 透视战场：实现与验收
+
+本功能基于已发布 v0.2.0，以独立透视模式接入用户背景。设计依据见 [用户设计稿](references/perspective_battlefield_design.md)；其中的示意零角点没有用于运行。本次只改变表现与输入映射，规则、Controller、Unit、ViewModel 和规则快照未修改。无 AI、技能、存档、网络或新依赖。
+
+## 使用与参数约定
+
+```powershell
+cd E:\gamedesign
+.\.venv\Scripts\python.exe main.py --presentation presentations/war_torn_8x8.json
+.\.venv\Scripts\python.exe main.py --presentation presentations/war_torn_8x8.json --debug-grid
+```
+
+窗口固定 1280×720，不支持 resize 或镜头。F3 在正式画面和四角/网格/中心/编号之间切换；只改表现，不影响行动。鼠标、空格、回车、退格与旧版一致；HUD 标签/背景会消费点击，按钮只返回 UIAction，仍由 Controller 校验。默认角色是临时蓝圆/红方块，正式角色美术尚未提供。
+
+`--presentation` 与 `--scenario`、`--assets`、`--content-root`、`--geometry` **互斥**，不采用隐含覆盖优先级；冲突清楚报错并退出 2。`--debug-grid` 需要 presentation。无 presentation 时原入口、几何模式、训练场和渡口/dusk 均保持原行为。默认路径和 presentation 路径相对项目根，与当前工作目录无关；显式资源/内容目录在旧模式仍按当前工作目录解析。
+
+Python API 可用 `Game(scenario, presentation_file=...)` 注入独立 Scenario 夹具，尺寸必须匹配布局；CLI 不提供绕过互斥的参数。正式入口使用布局引用的 war_torn.json。
+
+## 数据与职责
+
+| 文件 | 实际职责 |
+| --- | --- |
+| `content/scenarios/war_torn.json` | 独立 8×8、双方各 3 人、3 个显式障碍；不修改旧两张地图 |
+| `assets/skins/war_torn/manifest.json` | 必需完整背景、临时几何角色绑定；原图不改像素 |
+| `presentations/war_torn_8x8.json` | 背景参考尺寸、四角、视口、HUD、调试开关；不含规则数值 |
+| `tactics/presentation_layout.py` | 使用既有严格 JSON/路径工具；拒绝未知字段、版本、路径逃逸、零/退化角点、尺寸与 HUD 越界 |
+| `tactics/perspective_geometry.py` | 纯 Python 单应矩阵/逆矩阵、contain 变换、缓存 64 格多边形/中心/脚底/尺度、半开反向命中 |
+| `tactics/perspective_board_renderer.py` | 完整背景、透明四边形、阴影、屏幕脚底 Y/稳定 ID 排序、全部形体后的标记与血条 |
+| `tactics/scene_hud.py` | 独立半透明状态/属性/按钮卡与队列/日志卡；复用已修复的字体加载 |
+| `tactics/geometry.py` | 矩形模式补充脚底、尺度、表现形体矩形接口，原有矩形映射不变 |
+| `tactics/effects.py` | 通过同一几何接口定位跳字/攻击/死亡，token/generation、锁定和清理流程不变 |
+| `tactics/assets.py` / `asset_manifest.py` | 兼容新增 board.background；验证实际尺寸、缓存整图；只为单位/障碍预载离散深度尺寸 |
+| `tactics/game.py` / `main.py` | 选择组装模式、CLI 互斥、HUD 点击消费和 F3；初始化失败释放显示资源 |
+
+背景不是 64×64 地砖。contain 缩放率 `min(1280/1672,720/941)`，偏移居中；图片、投影、反向点击共用 BackgroundFit。没有每帧 IO、缩放或矩阵求解；F3 仅重建调试层。人物站立点为投影 `(col+0.5,row+0.82)`，位于格内近侧；深度尺寸量化到 1/8，范围 0.5–1.5，启动时预载有限组合。
+
+PNG 以该站立点作脚底锚定；临时几何形体、标签和选中环围绕逻辑格中心绘制，点击形体中心仍命中同一格，避免斜向投影时点到邻格。几何死亡与跳字使用相同表现形体矩形，规则占格不变。
+
+## 当前校准与实际试玩
+
+原图真实为 1672×941，SHA256 与来源见 [资源记录](../assets/skins/war_torn/README.md)。四角以原图坐标保存，按画面中部的铺石区域选取并用实际窗口调试网格检查，不是报告中的零占位：
+
+| 逻辑外角 | 原图坐标 |
+| --- | --- |
+| p00 / (0,0) | (1060,270) |
+| p10 / (8,0) | (1530,452) |
+| p11 / (8,8) | (892,898) |
+| p01 / (0,8) | (340,568) |
+
+列轴向画面右下，行轴向左下，不假定屏幕横纵轴就是棋盘轴。区域避开两杆主要军旗；左上属性卡与上方日志卡没有占用当前棋盘。石砖是绘画纹理，大小、裂缝和接缝并非严格的规则平面网格：当前 64 格是这个区域的均匀透视细分，**不能保证每条格线都恰好等于一块原画砖缝**。截图记录当前首版校准；最终美术级接缝与角点仍需人工认可，可编辑 JSON 后重启检查。未据此新增多点编辑器或逐行校准。
+
+开局 A2 在 `(1,4)`；点击 `(4,3)` 移动，再点击 D1 `(5,3)`，造成 10 点伤害并击杀生命 5 的训练木桩。动画完成后退格，可恢复初始位置和木桩生命 5。其他木桩生命保持 100，数值仍是演示值。图片中的旗帜、碎石和裂缝不自动阻挡；只使用 JSON 的 `(0,1)`、`(7,6)`、`(6,0)` 三个障碍。
+
+## 自动化与实际窗口结果
+
+新增 7 项几何、5 项配置、7 项渲染/集成，共 19 项；保留全部 133 项旧检查，总计 **152 项**。本机 Windows Python 3.9.1 / Pygame 2.6.1 / SDL 2.28.4：dummy 与 windows 实际窗口分别执行，**151 通过，1 项符号链接创建权限跳过**。六组纯检查合计 69 项（68 通过、同一权限跳过），另 4 项包完整性检查可使用 `-S`。
+
+```powershell
+.\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_perspective_geometry.py -v
+.\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_presentation_layout.py -v
+.\.venv\Scripts\python.exe -m unittest discover -s tests -p test_perspective_rendering.py -v
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+```
+
+- 数学检查：四角、64 中心、内部点、相邻边、半开边界、留边、非有限输入、分母为零、退化/反序四角、contain 后反向命中。
+- 配置/资源：旧清单兼容、背景 ID/必需标记、缺失/损坏/真实尺寸不匹配、严格字段/路径、互斥 CLI 与异地目录真实 main.py；失败后关闭显示资源。
+- 战斗：同一 Scenario/操作在矩形与透视下逐点比较完整 BattleView，一致；覆盖查看远近单位、移动、攻击锁定、三次击杀、跨轮、胜利、连续回溯、复活及拒绝旧 token。快速全灭夹具仅将三只木桩生命设为 5，不改交付场景/单位定义。
+- 资源表现：临时组合 dusk PNG 与背景，实际走 idle/attack/death、按屏幕脚底排序和回溯清理；在禁止 image.load/smoothscale 的绘制阶段仍能运行。背景/高亮保留原纹理。
+- 旧画面：13 帧几何截图与 M4 留存基线逐像素一致，包含跳字、死亡、回溯、英文降级和结束状态；不是用删旧测试实现兼容。
+- 真实窗口：windows 驱动保存并查看下列 4 张实际绘制画面；点击由事件自动投递，不是人工鼠标逐次试玩。字体扫描异常时 HUD 英文回退，结算中 QUIT 正常释放。
+- CI：Windows/Linux × Python 3.9/3.12 增加两组依赖安装前检查；SOURCE 导出包含 presentations；交付包解压验证同时运行 M5 与透视集成。远程结果以当前 PR/Actions 为准。
+
+## 待人工确认与后续
+
+角色仍为临时几何回退；当前角点是首版可交互校准，原画局部砖缝与严格单应网格存在偏差，需要最终美术确认。窗口暂不支持 resize、相机、音频、图集或编辑器；这些没有标记为已实现。新增规则状态仍须按功能模板补快照/恢复，本次没有改变玩法和防御计算。
+
+![实际窗口：透视战场](../artifacts/perspective_initial.png)
+
+![实际窗口：调试网格](../artifacts/perspective_debug.png)
+
+![实际窗口：击杀与伤害](../artifacts/perspective_attack.png)
+
+![实际窗口：回溯复活](../artifacts/perspective_revived.png)
+````
+
 ## docs/RELEASE.md
 
 ````markdown
@@ -1685,7 +1875,7 @@ Get-FileHash dist/chrono-tactics-pygame-0.2.0-source.zip -Algorithm SHA256
 
 产物：`dist/chrono-tactics-pygame-0.2.0-source.zip` 和 `.zip.sha256`。构建使用 git archive；ZIP comment 保存格式、版本、完整提交 SHA，不把生成元数据混入 SOURCE 扫描。相同提交重复构建字节一致；未提交文件、`.git`、`.venv`、缓存、`.delivery` 和旧包不进入交付。
 
-校验器检查 SHA256、ZIP CRC、路径、版本与指定提交，然后在临时目录解压，使用调用者已有 Python/Pygame 离线执行 SOURCE 一致性、`main.py --help` 和六项 M5 集成验收。通过不代表安装了独立运行时，也不代表人工点击验收；完整回归在打包前执行。
+校验器检查 SHA256、ZIP CRC、路径、版本与指定提交，然后在临时目录解压，使用调用者已有 Python/Pygame 离线执行 SOURCE 一致性、`main.py --help`、六项 M5 与七项透视集成验收。通过不代表安装了独立运行时，也不代表人工点击验收；完整回归在打包前执行。已发布 v0.2.0 保留其原始六项验收脚本；未发布透视扩展在当前提交中另纳入新验收，不覆盖已发布附件。
 
 显式校验其他位置的文件：
 
@@ -2076,6 +2266,486 @@ Chrono Tactics 当前已经具备可继续迭代的基础结构，没有必要�
 **实施状态：** 本报告为整改方案。实际代码修改、自动化测试和合并均须在具备仓库写入权限的环境中完成并验证。
 ````
 
+## docs/references/perspective_battlefield_design.md
+
+````markdown
+# Chrono Tactics：透视战场背景与棋盘接入设计报告
+
+-   用途：交付 Codex 的实施规格与验收清单
+-   项目：`zyb-sjtu/chrono-tactics-pygame`
+-   目标：将用户提供的古代战后战场背景接入为可交互的 8×8
+    透视战棋场景，同时保持现有战斗规则、回溯和旧场景兼容
+-   建议分支：`feature/perspective-battlefield`
+
+## 0. 给 Codex 的执行指令
+
+先检查当前工作树、`git status`、`AGENTS.md`、README、架构文档和测试命令。以实际代码为准，不假设文档和代码完全一致。不得覆盖用户未提交修改，不得删除或放宽旧测试，不得执行破坏性
+Git 操作。
+
+按本报告分阶段实施。先确认用户提供的原始背景 PNG
+是否能从工作树或附件挂载目录读取；若不可访问，明确报告并请求文件，不得生成相似图片冒充原图。每阶段先实现、测试、汇报，再继续。最终必须提供实际修改文件、测试命令和真实结果、真实窗口截图（如果环境允许）以及尚未完成事项。本文是设计规范，不代表功能已经实现。
+
+## 1. 目标和边界
+
+### 目标
+
+1.  将原图作为一张完整背景绘制，不重复平铺地砖。
+2.  在原图可辨认的石砖区域上校准 8×8 逻辑棋盘。
+3.  将逻辑格子投影为透视四边形，支持屏幕坐标和逻辑格坐标双向转换。
+4.  复用当前单位规则、移动/攻击范围、行动顺序、胜负判定和回溯。
+5.  复用现有 PNG、Sprite pivot、Clip 动画和 AssetManager 缓存。
+6.  新增叠加式 HUD；旧矩形棋盘和旧右侧面板保持可用。
+7.  提供调试网格、角点、中心点和行列编号，便于人工校准。
+8.  新增独立场景和资源包，不修改原训练场与渡口场景。
+
+### 本阶段不做
+
+-   不重写战斗规则，不新增 AI、技能、存档、联网或地图编辑器。
+-   不做随机地形、地面破坏、镜头移动或自动识别碎石障碍。
+-   不要求第一版为每块砖单独制作图片。
+-   不新增 NumPy/OpenCV 等依赖。
+-   不把屏幕像素、透视矩阵或资源路径写进
+    Unit、Board、规则快照或战斗判定。
+
+### 核心决策
+
+**固定背景 + 透视逻辑网格 + 独立角色资源 + 叠加式 HUD。**
+背景负责环境纹理和砖缝；几何模块负责坐标映射；规则层只处理整数格坐标；资源层负责图片与动画；渲染层负责画面。
+
+## 2. 当前项目基线与改造原则
+
+根据已检查到的源码：
+
+  --------------------------------------------------------------------------------------------------------------------
+  文件                                           当前职责                           本次原则
+  ---------------------------------------------- ---------------------------------- ----------------------------------
+  `tactics/game.py`                              窗口、事件、主循环和渲染调度       增加新模式选择，旧模式保持
+
+  `tactics/geometry.py`                          `BoardGeometry` 矩形格子映射       保留，新增透视几何类
+
+  `tactics/board_renderer.py`                    矩形格子、范围、单位和血条绘制     保留旧渲染路径；新增透视渲染路径
+
+  `tactics/assets.py`                            PNG、缩放缓存、Sprite pivot、Clip  复用并只做必要扩展
+
+  `tactics/asset_manifest.py`                    严格校验图片、动画、视觉绑定和     扩展背景字段，旧清单继续兼容
+                                                 `board.floor/obstacle`
+
+  `tactics/effects.py`                           伤害数字、死亡表现和动画结算通知   检查并适配透视坐标
+
+  `tactics/view_models.py`                       不可变 `BoardView` / `BattleView`  继续只读，不引入像素状态
+
+  `tactics/controller.py`                        规则指令、玩家输入协调             继续只接收逻辑格坐标
+
+  `tactics/panel.py`                             固定宽度右侧栏和按钮               旧模式保留；新建场景 HUD
+
+  `tactics/content.py` / `tactics/scenario.py`   JSON 规则内容和场景合法性校验      与视觉配置分离
+
+  `content/scenarios/training_ground.json`       8×8、双方各三个单位                作为回归基线，不修改
+
+  `content/scenarios/river_crossing.json`        6×5 第二场景                       作为回归基线，不修改
+
+  `assets/manifest.json`、`assets/skins/dusk/`   现有资源包                         保持兼容
+  --------------------------------------------------------------------------------------------------------------------
+
+旧 `BoardGeometry` 假设每格是固定大小矩形；旧 `BoardRenderer`
+会逐格绘制矩形并可平铺 `board.floor`；`Game` 默认窗口由棋盘区域和 384px
+侧栏构成；`effects.py` 部分定位依赖
+`cell_rect()`。这些逻辑不能直接承担完整透视背景，不能只换一张 PNG
+就算接入完成。
+
+## 3. 目录与资源组织
+
+推荐新增以下内容；如果仓库已有等价模块，优先复用，避免重复实现。
+
+``` text
+assets/skins/war_torn/
+  manifest.json
+  README.md
+  backgrounds/
+    battlefield.png       # 用户提供的原始背景，不改图像内容
+
+content/scenarios/
+  war_torn.json            # 新的 8×8 规则场景
+
+presentations/
+  war_torn_8x8.json        # 背景、透视角点、HUD、调试配置
+
+tactics/
+  perspective_geometry.py
+  presentation_layout.py
+  perspective_board_renderer.py
+  scene_hud.py
+  # geometry.py、board_renderer.py、assets.py、effects.py、game.py 按需修改
+
+tests/
+  test_perspective_geometry.py
+  test_presentation_layout.py
+  test_perspective_rendering.py
+  # 保留现有测试
+```
+
+### 背景接入
+
+-   先确认原始 PNG 可读，读取实际宽高、格式；对话预览约为
+    1672×941，但必须以实际文件为准。
+-   可读取时，复制到
+    `assets/skins/war_torn/backgrounds/battlefield.png`，记录资源来源和许可信息。
+-   不可读取时停止背景接入步骤并报告，不得使用生成的替代图。
+-   背景是必需资源；缺失或解码失败时启动阶段给出清晰错误。
+-   角色美术未提供时可暂用现有几何回退验证交互，但最终报告必须标记为临时回退。
+
+## 4. 视觉规范
+
+### 视口与背景
+
+-   初始设计视口 1280×720，接近原图 16:9。
+-   读取真实图像尺寸，等比例缩放并保持完整构图，不拉伸、不随意裁切。
+-   新模式背景占据完整游戏视口，不再为右侧 384px 固定面板预留棋盘空间。
+-   背景、棋盘、角色、特效和鼠标映射共用同一套缩放和平移参数。
+-   首版不要求动态镜头；如果支持窗口 resize，必须统一重建几何缓存。
+
+### 棋盘与地块
+
+-   逻辑棋盘首版为 8 列×8 行。
+-   每格是逻辑单元，屏幕表现是四边形，不是 64×64 像素矩形。
+-   选择原图中可辨认的地砖区域，标记四个外角后投影内部网格。
+-   逻辑行列方向必须根据实际砖缝校准，不可假设列轴水平、行轴垂直。
+-   默认不画粗重的完整网格线；使用原图已有砖缝。
+-   移动范围：低饱和灰青色半透明填充；攻击范围：暗红色半透明填充；目标格：细亮边框；当前行动者：金色边框；选中单位：浅色圆环。
+-   调试模式显示四角、所有格线、中心点和 `(col,row)` 编号。
+-   背景中的旗帜、碎石、裂缝等装饰不自动成为障碍。障碍只由场景 JSON
+    明确指定。
+
+### 角色与深度
+
+-   角色 PNG 使用 Alpha 通道；默认脚底中心 pivot `(0.5, 1.0)`。
+-   角色的逻辑占格不因图片尺寸改变。
+-   脚底锚点放在投影格子的站立点/近侧边中点；不要用精灵左上角定位。
+-   近远缩放首版可依据棋盘行方向插值，但不得修改逻辑坐标。
+-   单位和障碍按屏幕空间脚底 Y 坐标排序，稳定 UID 作为次序键。
+-   单位本体绘制完后，再绘制选中框和血条，避免被相邻大精灵遮住。
+-   HUD 最后绘制。
+
+### HUD
+
+新增 `SceneHUD`，不要将新布局塞进旧 `InfoPanel`
+的大量条件分支。保留回合数、当前行动者、选中单位属性、回溯、跳过阶段、结束行动、近期日志和行动顺序。建议将紧凑半透明状态卡放在左上方较暗区域，按钮与状态卡组合布置；最终位置必须结合实际背景窗口检查，避免遮挡棋盘中央、两杆军旗和角色。
+
+HUD 的 `hit_test()` 只返回现有 `UIAction`，仍由 Controller
+判定是否合法；HUD 不得直接修改单位或回溯历史。
+
+## 5. 透视几何设计
+
+### 接口
+
+新增 `PerspectiveBoardGeometry`，保留原 `BoardGeometry` 行为。至少提供：
+
+``` python
+cell_polygon(cell)  # 屏幕上的四个顶点
+cell_center(cell)   # 格子屏幕中心
+cell_anchor(cell)   # 角色脚底/站立点
+cell_at(screen_pos) # 鼠标像素转逻辑格；棋盘外返回 None
+depth_at(cell)      # 用于绘制排序的屏幕深度
+```
+
+Controller、Board、Unit 和 ViewModel 仍只处理 `(col,row)`。
+
+### 单应性变换
+
+使用平面单应性（Homography）将逻辑矩形映射到背景透视四边形。配置角点按逻辑顺序定义：
+
+-   `p00`：逻辑外角 `(0,0)`
+-   `p10`：逻辑外角 `(cols,0)`
+-   `p11`：逻辑外角 `(cols,rows)`
+-   `p01`：逻辑外角 `(0,rows)`
+
+注意 `cols`、`rows`
+是外边界坐标，不是最后一个格子的索引。四角在屏幕上可以倾斜，行列方向应沿实际地砖纹理。
+
+对每个格子，投影
+`(col,row)`、`(col+1,row)`、`(col+1,row+1)`、`(col,row+1)`
+四点。初始化时计算并缓存矩阵 `H` 和逆矩阵
+`H⁻¹`，只在角点或视口变化时重建。不得每帧求解矩阵。
+
+### 鼠标反向映射
+
+1.  屏幕坐标先逆转背景缩放和平移，转换为原图参考坐标。
+2.  用 `H⁻¹` 转成连续逻辑坐标 `(u,v)`。
+3.  检查变换分母、有限数和范围。
+4.  若 `0 <= u < cols` 且 `0 <= v < rows`，返回
+    `(floor(u), floor(v))`，否则返回 `None`。
+5.  使用明确的半开区间规则处理共享边界，避免同一像素随机命中不同格。
+
+### 数值与依赖
+
+-   不新增 NumPy/OpenCV 依赖；优先用纯 Python 计算四点映射和 3×3
+    逆矩阵。
+-   拒绝重复、共线、退化角点，给出具体配置错误。
+-   防止除零、非有限坐标和不可逆矩阵。
+-   角点数据必须通过实际原图校准，不可猜测后写成正式值。
+-   若单一 Homography
+    对画作中的砖缝拟合不够好，先调整棋盘范围和四角；确实无法满足视觉要求时，把逐行/逐列校准作为后续扩展，不要首版直接开发复杂编辑器。
+
+### 缩放一致性
+
+角点保存在原图参考坐标系。背景按等比例缩放至视口并记录实际缩放率和偏移；网格投影与鼠标输入必须使用同一变换。背景留边不能被映射为棋盘格。
+
+## 6. Presentation 配置和资源接口
+
+规则、资源和视觉布局分开： -
+`content/scenarios/war_torn.json`：行列、单位阵容、逻辑坐标、障碍。 -
+`assets/skins/war_torn/manifest.json`：图片、动画、视觉绑定、资源路径、显示尺寸和
+pivot。 -
+`presentations/war_torn_8x8.json`：背景模式、角点、参考视口、HUD、调试开关。
+
+建议 presentation 至少包含
+`schema_version`、`id`、`mode`、`scenario_file`、`asset_root`、`viewport.reference_size`、`viewport.background_fit`、`board.cols/rows/reference_image_size/corners`、`hud`
+和 `debug`。字段名可按项目风格调整，但 schema 必须严格校验。
+
+配置示意（角点是占位值，不能用于正式运行）：
+
+``` json
+{
+  "schema_version": 1,
+  "id": "war_torn_8x8",
+  "mode": "perspective",
+  "scenario_file": "scenarios/war_torn.json",
+  "asset_root": "assets/skins/war_torn",
+  "viewport": {
+    "reference_size": [1280, 720],
+    "background_fit": "contain"
+  },
+  "board": {
+    "cols": 8,
+    "rows": 8,
+    "reference_image_size": [0, 0],
+    "corners": {
+      "p00": [0, 0],
+      "p10": [0, 0],
+      "p11": [0, 0],
+      "p01": [0, 0]
+    }
+  },
+  "hud": {"layout": "overlay", "safe_margin": 24},
+  "debug": {
+    "show_grid": false,
+    "show_cell_centers": false,
+    "show_coordinates": false
+  }
+}
+```
+
+占位角点为零时，正式运行必须明确报错或进入校准模式，不得静默显示错误棋盘。
+
+复用现有 `data_files.py` 的 `read_json()`、`fields()`、`rooted_path()`
+等严格校验工具。路径必须是相对路径并解析在允许的资源根目录内。背景资源必需；旧
+`board.floor` / `board.obstacle` 配置仍然有效。背景不能被缩放成 64×64
+地砖。CLI 显式参数、presentation 配置和默认值的优先级必须明确并测试。
+
+## 7. 渲染管线与模块职责
+
+### 绘制顺序
+
+1.  清屏；
+2.  完整背景；
+3.  调试网格（仅开启时）；
+4.  移动/攻击/目标格高亮；
+5.  地面阴影；
+6.  障碍和角色，按屏幕脚底 Y + 稳定 UID 排序；
+7.  当前行动者/选中标记、血条和标签；
+8.  攻击、死亡、伤害数字等战斗特效；
+9.  场景 HUD；
+10. `pygame.display.flip()`。
+
+### 渲染器隔离
+
+首选新增 `PerspectiveBoardRenderer`： - 旧 `BoardRenderer`
+继续服务矩形模式； - 新渲染器绘制完整背景和透视四边形； - 两者都接收只读
+`BoardView`，不查询或修改 Battle； - 通过 `Game`
+选择渲染器，避免在旧渲染器中堆积大量模式分支； - 复用 AssetManager
+的图片、Sprite、Clip 与缓存。
+
+高亮使用 `pygame.draw.polygon()` 或透明 Surface，不能用轴对齐
+`pygame.Rect` 替代。调试网格与正式高亮分别控制。
+
+### 特效适配
+
+检查 `tactics/effects.py` 对 `cell_rect()`、`cell_center()` 和
+`geometry.bounds` 的使用： - 伤害数字锚定目标格中心/站立点上方； -
+攻击动画锚定攻击者脚底； - 死亡表现锚定目标格中心/脚底； -
+裁剪使用当前视口或投影区域； - 如需按远近调整粒子尺寸，增加
+`cell_scale(cell)` 等明确接口； - 保持当前 resolution token / generation
+协议、输入锁定和回溯代次清理； - 像素坐标和动画时钟不进入战斗快照。
+
+## 8. 新场景与 CLI
+
+新增 `content/scenarios/war_torn.json`，使用
+8×8、双方各三个单位，优先复用现有 `vanguard`、`scout`、`guard`、`dummy`
+定义。红方木桩仍按当前规则由玩家手动操作，不增加
+AI。少量障碍只放在明确的格子上，中央保留通路。坐标必须在角点校准后确定，不要预先声称固定坐标一定对应某块砖。
+
+建议增加入口：
+
+``` powershell
+python main.py --presentation presentations/war_torn_8x8.json
+python main.py --presentation presentations/war_torn_8x8.json --debug-grid
+```
+
+具体参数名可按现有 CLI 调整，但需更新 README。无 `--presentation`
+时旧默认行为不变。以下旧用法必须继续可用：
+
+``` powershell
+python main.py
+python main.py --geometry
+python main.py --scenario scenarios/river_crossing.json
+python main.py --scenario scenarios/river_crossing.json --geometry
+python main.py --scenario scenarios/river_crossing.json --assets assets/skins/dusk
+```
+
+明确 `--presentation` 与 `--scenario`、`--assets`、`--content-root`
+同时出现时的优先级。`--geometry`
+与透视模式的组合也必须有明确行为并通过测试，不得静默切换到意外配置。
+
+## 9. 分阶段实施计划
+
+### A. 检查与资源确认
+
+检查工作树、规范、测试；确认原图可访问并读取真实尺寸；列出预计修改文件。缺图时停止资源接入。
+
+### B. 资源和配置
+
+新增战场资源包、背景 manifest 字段和 presentation
+解析；严格检查角点、行列、资源引用和路径。旧清单必须继续加载。
+
+### C. 透视几何
+
+实现正向/反向映射、四边形、中心、锚点和深度；加入 debug
+grid。完成边界和缩放测试。
+
+### D. 透视渲染
+
+绘制背景、高亮、角色和障碍；复用资源缓存；旧渲染器保持不变。完成后先做真实窗口校准。
+
+### E. 输入、HUD、特效
+
+接入反向点击映射和 HUD；适配攻击/死亡/伤害文字；保持
+token、输入锁定和回溯语义。
+
+### F. 场景校准
+
+角点贴合地砖；确认行列方向；配置双方阵容与障碍；关闭 debug
+后检查角色大小、深度和 UI。
+
+### G. 回归和文档
+
+运行完整测试，启动真实窗口，更新
+README、资源规范和架构文档。报告中区分自动化验证和人工视觉检查。
+
+每个阶段先运行对应测试，不要一次性大规模重构。
+
+## 10. 自动化测试与验收
+
+### 几何测试
+
+-   四角映射正确；
+-   64 个格子中心反向映射回原格；
+-   每格四边形顶点顺序一致、格子相邻边连续；
+-   内部点命中正确，棋盘外/留边返回 `None`；
+-   共享边界遵守半开区间规则；
+-   重复、共线、退化角点被拒绝；
+-   变换分母接近零、非有限坐标不导致崩溃；
+-   背景缩放/偏移后映射仍正确；
+-   行列反转能被测试发现。
+
+### 资源和配置测试
+
+-   旧 `assets/manifest.json` 和 `assets/skins/dusk/manifest.json`
+    继续通过；
+-   背景必需资源缺失时启动阶段报出具体路径；
+-   可选角色图缺失时保留几何回退；
+-   未知背景 ID、错误 schema、非法角点、未知字段和越界路径被拒绝；
+-   从不同工作目录启动时路径行为符合文档；
+-   背景和缩放缓存不在每帧重复加载。
+
+### 战斗集成测试
+
+对新场景执行选择、移动、攻击、跳过、结束行动、击杀、胜负、连续回溯。相同初始场景和输入序列下，矩形模式与透视模式的完整
+`BattleView`
+应一致，至少包含单位位置、生命、行动顺序、阶段、轮数、日志、胜负、回溯和表现
+token。
+
+### 真实窗口检查
+
+-   背景无拉伸，网格与主要砖缝视觉对齐；
+-   近处、中部、远处点击均命中正确格；
+-   HUD 与棋盘点击区域不冲突；
+-   高亮保留原图纹理；
+-   脚底、血条、选中标记稳定；
+-   角色近远遮挡正确；
+-   攻击、死亡、伤害数字和回溯正常；
+-   旧矩形模式仍可运行。
+
+Surface
+自动化不能替代真实窗口检查；不要把像素哈希当成唯一跨平台视觉标准。
+
+## 11. 性能、风险与约束
+
+-   背景 Surface 在启动时加载并缓存；每帧禁止磁盘 IO 和重复缩放。
+-   透视矩阵只在角点/视口变化时重算；64 个格子的多边形可预计算。
+-   不让规则层读取透视矩阵或屏幕像素。
+-   新 HUD 独立于旧 `InfoPanel`，减少回归风险。
+-   如果画作中的砖缝不是严格平面投影，先调整棋盘范围和四角；单应性无法满足时再提议逐行/逐列校准。
+-   若原图不可访问，不能伪造替代图；若真实角色素材缺失，明确说明几何回退状态。
+-   不得以降低旧测试覆盖、删除旧模式或改动战斗规则来解决渲染问题。
+
+## 12. 最终交付物
+
+1.  用户提供的背景原图，路径和真实尺寸已确认；
+2.  `assets/skins/war_torn/manifest.json` 与资源说明；
+3.  `presentations/war_torn_8x8.json`，含实际校准角点；
+4.  `content/scenarios/war_torn.json`，双方各三个单位的独立场景；
+5.  `PerspectiveBoardGeometry` 及单元测试；
+6.  背景渲染、透视高亮和角色深度排序；
+7.  场景 HUD、输入与特效适配；
+8.  新 CLI 入口，旧命令保持兼容；
+9.  README、资源规范和架构文档更新；
+10. 自动化测试结果和真实窗口检查记录；
+11. 一张实际游戏窗口截图（若环境无法生成，明确说明；不能用设计示意图冒充）；
+12. 最终变更摘要、未完成项和需人工确认的美术事项。
+
+## 13. 验收清单
+
+-   [ ] 原始背景 PNG 已接入，真实尺寸和路径已确认。
+-   [ ] 背景按比例显示，没有重复平铺地砖。
+-   [ ] 8×8 逻辑棋盘已校准，调试模式可显示角点、网格、中心和坐标。
+-   [ ] 正向投影、反向点击、边界和缩放测试通过。
+-   [ ] 背景、网格、角色、特效共用同一套视口变换。
+-   [ ] 移动/攻击高亮沿透视四边形绘制。
+-   [ ] 角色脚底、深度排序、血条和选中标记正常。
+-   [ ] HUD 与棋盘输入互不干扰。
+-   [ ] 攻击、死亡、伤害数字和回溯正常。
+-   [ ] 新场景配置独立，旧场景 JSON 未被意外修改。
+-   [ ] 默认启动、`--geometry`、渡口和 dusk 资源路径仍然工作。
+-   [ ] 完整旧测试和新增测试通过。
+-   [ ] 真实 Pygame 窗口已检查，结果如实记录。
+-   [ ] README 与资源来源/许可信息已更新。
+-   [ ] 最终报告明确区分已完成、未完成和人工校准项。
+
+## 14. 给 Codex 的最终任务摘要
+
+请在当前 `chrono-tactics-pygame`
+工作树中，以新增透视场景模式的方式完成该功能。第一目标不是重写游戏，也不是制作大量角色美术，而是让用户提供的战场背景成为可交互的
+8×8 透视棋盘。
+
+按"资源确认 → 配置 → 透视几何 → 调试网格 → 独立渲染器 → 点击与 HUD →
+特效 → 新场景 →
+回归测试"的顺序实现。旧矩形模式必须保留。战斗状态仍由现有规则和
+Controller
+管理；新增模块负责把逻辑格投影到背景，并把鼠标输入反向映射回逻辑格。
+
+若原图不可访问、角点无法合理贴合地砖，或现有架构与本报告假设不符，请先报告证据与影响，再做最小安全调整；不得猜测资源路径、伪造测试结果或进行无关的大规模重构。
+````
+
 ## docs/templates/FEATURE_TEMPLATE.md
 
 ````markdown
@@ -2135,17 +2805,39 @@ import argparse
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--scenario", default="scenarios/training_ground.json",
+    parser.add_argument("--scenario",
                         help="JSON path relative to content root")
     parser.add_argument("--content-root", help="unit definitions and scenarios root")
     parser.add_argument("--assets", help="asset root containing manifest.json")
     parser.add_argument("--geometry", action="store_true", help="use geometry without loading asset files")
+    parser.add_argument("--presentation", help="presentation JSON path relative to project root (exclusive with content/asset flags)")
+    parser.add_argument("--debug-grid", action="store_true", help="show perspective corners, grid, centers and coordinates (F3 toggles)")
     args = parser.parse_args()
     try:
         Game(content_root=args.content_root, scenario_file=args.scenario,
-             asset_root=args.assets, geometric=args.geometry).run()
+             asset_root=args.assets, geometric=args.geometry,
+             presentation_file=args.presentation, debug_grid=args.debug_grid).run()
     except DataError as error:
         parser.exit(2, "Configuration error: {}\n".format(error))
+```
+
+## presentations/war_torn_8x8.json
+
+```text
+{
+  "schema_version": 1,
+  "id": "war_torn_8x8",
+  "mode": "perspective",
+  "scenario_file": "scenarios/war_torn.json",
+  "asset_root": "assets/skins/war_torn",
+  "viewport": {"reference_size":[1280,720],"background_fit":"contain"},
+  "board": {
+    "cols":8,"rows":8,"reference_image_size":[1672,941],
+    "corners":{"p00":[1060,270],"p10":[1530,452],"p11":[892,898],"p01":[340,568]}
+  },
+  "hud": {"layout":"overlay","safe_margin":24},
+  "debug": {"show_grid":false,"show_cell_centers":false,"show_coordinates":false}
+}
 ```
 
 ## requirements.txt
@@ -2219,7 +2911,7 @@ def source_files():
     files = {path for path in ROOT.iterdir()
              if path.is_file() and (path.suffix in SUFFIXES or path.name in (".gitignore", ".gitattributes"))
              and path != OUTPUT}
-    for folder in ("tactics", "tests", "scripts", ".github", "docs", "content", "assets"):
+    for folder in ("tactics", "tests", "scripts", ".github", "docs", "content", "assets", "presentations"):
         files.update(path for path in (ROOT / folder).rglob("*")
                      if path.is_file() and path.suffix in SUFFIXES)
     return sorted(files, key=lambda path: path.relative_to(ROOT).as_posix())
@@ -2427,7 +3119,8 @@ def verify(archive, expected_commit=None):
         env = dict(os.environ, PYTHONPATH=str(root), PYGAME_HIDE_SUPPORT_PROMPT="1",
                    SDL_VIDEODRIVER="dummy", SDL_AUDIODRIVER="dummy")
         for args in (("scripts/export_source.py", "--check"), ("main.py", "--help"),
-                     ("-m", "unittest", "discover", "-s", "tests", "-p", "test_milestone.py", "-v")):
+                     ("-m", "unittest", "discover", "-s", "tests", "-p", "test_milestone.py", "-v"),
+                     ("-m", "unittest", "discover", "-s", "tests", "-p", "test_perspective_rendering.py", "-v")):
             subprocess.run([sys.executable, *args], cwd=root, env=env, check=True, timeout=180)
     print("Verified version={} commit={} sha256={}".format(info["version"], info["commit"], digest))
     return info
@@ -2569,10 +3262,12 @@ def load_manifest(root):
                 raise DataError(where + ": " + state + " needs a known " +
                                 ("looping idle animation or image" if state == "idle" else "non-looping animation"))
         visuals.append((visual_id, tuple(record.items())))
-    fields(data["board"], (), ("floor", "obstacle"), label + ".board")
+    fields(data["board"], (), ("floor", "obstacle", "background"), label + ".board")
     for state, asset_id in data["board"].items():
         if text(asset_id, label + ".board." + state) not in data["images"]:
             raise DataError(label + ".board: unknown image " + asset_id)
+        if state == "background" and data["images"][asset_id]["optional"]:
+            raise DataError(label + ".board.background: background image must be required (optional=false)")
     return Manifest(tuple(images), tuple(animations), tuple(visuals), tuple(data["board"].items()))
 ```
 
@@ -2713,11 +3408,32 @@ class AssetManager:
         asset_id = dict(self.manifest.board).get(state)
         return self.get_image(asset_id, scale) if asset_id else None
 
+    def background(self, reference_size, scale):
+        """Validate native reference pixels and cache the complete contain-fitted image."""
+        asset_id = dict(self.manifest.board).get("background")
+        if asset_id is None:
+            raise DataError("perspective presentation needs board.background in asset manifest")
+        spec = self._images[asset_id]
+        sprite = self.get_image(asset_id, scale)
+        if (spec.display_size != tuple(reference_size) or spec.pivot != (0, 0)
+                or self._originals[spec.path].get_size() != tuple(reference_size)):
+            raise DataError("{}: background native/display size must match presentation {} and pivot [0,0]".format(
+                spec.path, reference_size))
+        return sprite
+
     def preload(self, scale=1):
         for asset_id in self._images:
             self.get_image(asset_id, scale)
         for asset_id in self._animations:
             self.get_clip(asset_id, scale)
+
+    def preload_units(self, scales):
+        """Cache discrete depth sizes without scaling the full background at each depth."""
+        for scale in scales:
+            for definition_id in self._bindings:
+                for state in ("idle", "attack", "death"):
+                    self.visual(definition_id, state, scale)
+            self.board_image("obstacle", scale)
 ```
 
 ## tactics/battle.py
@@ -3424,13 +4140,12 @@ class CombatEffects:
         self.clear()
         self._pending_token = event.token
         result = event.result
-        scale = self.geometry.cell_size / 64
-        attack = self.assets.visual(result.actor_definition_id, "attack", scale) if self.assets else None
+        attack = self.assets.visual(result.actor_definition_id, "attack", self.geometry.cell_scale(result.actor_cell)) if self.assets else None
         if attack is not None:
             self.sprites.append(SpriteEffect(result.actor_uid, result.actor_cell, attack))
         self.damage_texts.append(DamageText(result.target_cell, result.damage))
         if result.killed:
-            death = self.assets.visual(result.target_definition_id, "death", scale) if self.assets else None
+            death = self.assets.visual(result.target_definition_id, "death", self.geometry.cell_scale(result.target_cell)) if self.assets else None
             if death is not None:
                 self.sprites.append(SpriteEffect(result.target_uid, result.target_cell, death))
             else:
@@ -3460,9 +4175,10 @@ class CombatEffects:
     def draw(self, surface):
         old_clip = surface.get_clip()
         surface.set_clip(old_clip.clip(pygame.Rect(self.geometry.bounds)))
-        cell_size = self.geometry.cell_size
-        scale = cell_size / 64
         for effect in self.deaths:
+            body_rect = self.geometry.body_rect(effect.cell)
+            cell_size = body_rect[2]
+            scale = self.geometry.cell_scale(effect.cell)
             progress = effect.age / DEATH_DURATION
             layer = pygame.Surface((cell_size, cell_size), pygame.SRCALPHA)
             size = max(1, round(max(4, 42 * (1 - progress * 0.6)) * scale))
@@ -3485,7 +4201,7 @@ class CombatEffects:
                          round(center[1] + math.sin(angle) * radius))
                 pygame.draw.circle(layer, (255, 192, 132), point, max(1, round(3 * (1 - progress) * scale)))
             layer.set_alpha(round(255 * (1 - progress)))
-            surface.blit(layer, self.geometry.cell_rect(effect.cell)[:2])
+            surface.blit(layer, body_rect[:2])
 
         for effect in self.damage_texts:
             progress = effect.age / DAMAGE_DURATION
@@ -3495,9 +4211,9 @@ class CombatEffects:
             alpha = round(255 * min(1, (1 - progress) * 3))
             label.set_alpha(alpha)
             shadow.set_alpha(alpha)
-            _, cell_y, _, _ = self.geometry.cell_rect(effect.cell)
-            x = self.geometry.cell_center(effect.cell)[0]
-            y = max(self.geometry.origin[1] + 5, cell_y + 8 - round(progress * 30))
+            _, cell_y, _, _ = self.geometry.body_rect(effect.cell)
+            x = self.geometry.cell_anchor(effect.cell)[0]
+            y = max(self.geometry.bounds[1] + 5, cell_y + 8 - round(progress * 30))
             rect = label.get_rect(midtop=(x, y))
             surface.blit(shadow, rect.move(2, 2))
             surface.blit(label, rect)
@@ -3519,17 +4235,34 @@ from .effects import CombatEffects
 from .geometry import BoardGeometry
 from .panel import InfoPanel
 from .content import load_content
-from .data_files import PROJECT_ROOT
+from .data_files import DataError, PROJECT_ROOT
+from .presentation_layout import load_presentation
+from .perspective_board_renderer import PerspectiveBoardRenderer
+from .scene_hud import SceneHUD
 from .settings import CELL_SIZE, FPS, MIN_WINDOW_HEIGHT, PANEL_WIDTH
 
 
 class Game:
-    def __init__(self, scenario=None, *, content_root=None, scenario_file="scenarios/training_ground.json",
-                 asset_root=None, geometric=False):
+    def __init__(self, scenario=None, *, content_root=None, scenario_file=None,
+                 asset_root=None, geometric=False, presentation_file=None, debug_grid=False):
+        layout = load_presentation(presentation_file) if presentation_file is not None else None
+        if layout is not None:
+            if any(value is not None for value in (content_root,scenario_file,asset_root)) or geometric:
+                raise DataError("--presentation cannot be combined with --scenario, --assets, --content-root or --geometry")
+            scenario_file, asset_root = layout.scenario_file, layout.asset_root
+        elif debug_grid:
+            raise DataError("--debug-grid needs --presentation")
+        scenario_file = scenario_file or "scenarios/training_ground.json"
         content = load_content(content_root, scenario_file)
         scenario = content.scenario if scenario is None else scenario
-        self.geometry = BoardGeometry(scenario.cols, scenario.rows, CELL_SIZE)
-        window_size = (self.geometry.width + PANEL_WIDTH, max(MIN_WINDOW_HEIGHT, self.geometry.height))
+        if layout is not None:
+            self.geometry = layout.geometry
+            if (scenario.cols,scenario.rows) != (self.geometry.cols,self.geometry.rows):
+                raise DataError("presentation board dimensions differ from scenario")
+            window_size = self.geometry.viewport_size
+        else:
+            self.geometry = BoardGeometry(scenario.cols, scenario.rows, CELL_SIZE)
+            window_size = (self.geometry.width + PANEL_WIDTH, max(MIN_WINDOW_HEIGHT, self.geometry.height))
         # The prototype needs only display and fonts, so do not initialize audio.
         pygame.display.init()
         pygame.font.init()
@@ -3541,19 +4274,28 @@ class Game:
                 PROJECT_ROOT / "assets" if asset_root is None else asset_root, content.definitions)
             if self.assets is not None:
                 self.assets.preload(CELL_SIZE / 64)
+            if layout is not None:
+                debug = dict(layout.debug)
+                if debug_grid:
+                    debug = dict.fromkeys(debug,True)
+                self.renderer = PerspectiveBoardRenderer(self.geometry,self.assets,debug.items())
+                self.panel = SceneHUD(window_size,layout.safe_margin)
+            else:
+                self.renderer = BoardRenderer(self.geometry, self.assets)
+                self.panel = InfoPanel(self.geometry.width, window_size[1])
+            self.effects = CombatEffects(self.geometry, self.assets)
+            self.controller = Controller(scenario, self.effects)
         except Exception:
             pygame.quit()
             raise
-        self.renderer = BoardRenderer(self.geometry, self.assets)
-        self.panel = InfoPanel(self.geometry.width, window_size[1])
-        self.effects = CombatEffects(self.geometry, self.assets)
-        self.controller = Controller(scenario, self.effects)
         self.running = True
 
     def handle_event(self, event):
         if event.type == pygame.QUIT:
             self.running = False
         elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_F3 and isinstance(self.renderer,PerspectiveBoardRenderer):
+                self.renderer.toggle_debug()
             action = {pygame.K_BACKSPACE: UIAction.UNDO,
                       pygame.K_SPACE: UIAction.SKIP_PHASE,
                       pygame.K_RETURN: UIAction.END_TURN}.get(event.key)
@@ -3563,6 +4305,8 @@ class Game:
             action = self.panel.hit_test(event.pos)
             if action is not None:
                 self.controller.handle_action(action)
+            elif isinstance(self.panel,SceneHUD) and self.panel.contains(event.pos):
+                return
             else:
                 self.controller.click_cell(self.geometry.cell_at(event.pos))
 
@@ -3646,6 +4390,17 @@ class BoardGeometry:
     def cell_center(self, cell: Cell):
         x, y, width, height = self.cell_rect(cell)
         return x + width // 2, y + height // 2
+
+    def cell_anchor(self, cell: Cell):
+        x, y, width, height = self.cell_rect(cell)
+        return x + width // 2, y + height
+
+    def cell_scale(self, cell: Cell):
+        self.cell_rect(cell)
+        return self.cell_size / 64
+
+    def body_rect(self, cell: Cell):
+        return self.cell_rect(cell)
 ```
 
 ## tactics/models.py
@@ -3866,6 +4621,377 @@ class InfoPanel:
                       x=self.board_width + 24 + (index % 3) * 114, width=108)
 ```
 
+## tactics/perspective_board_renderer.py
+
+```python
+"""Full background, translucent projected ranges and screen-depth body sorting."""
+
+import pygame
+
+
+class PerspectiveBoardRenderer:
+    def __init__(self, geometry, assets, debug=()):
+        self.geometry = geometry
+        self.assets = assets
+        self.elapsed = 0
+        self.debug = dict(debug)
+        self.background = assets.background(geometry.reference_size, geometry.fit.scale)
+        assets.preload_units(geometry.scales)
+        self.label_font = pygame.font.Font(None, 19)
+        self.debug_font = pygame.font.Font(None, 16)
+        self._debug_layer = self._build_debug_layer()
+        self._range_layer = pygame.Surface(tuple(map(int, geometry.viewport_size)), pygame.SRCALPHA)
+
+    def _build_debug_layer(self):
+        layer = pygame.Surface(tuple(map(int, self.geometry.viewport_size)), pygame.SRCALPHA)
+        for row in range(self.geometry.rows):
+            for col in range(self.geometry.cols):
+                cell = (col,row)
+                polygon = self.geometry.cell_polygon(cell)
+                center = self.geometry.cell_center(cell)
+                if self.debug.get("show_grid"):
+                    pygame.draw.polygon(layer,(130,210,236,180),polygon,1)
+                if self.debug.get("show_cell_centers"):
+                    pygame.draw.circle(layer,(255,210,90),center,2)
+                if self.debug.get("show_coordinates"):
+                    label = self.debug_font.render("{},{}".format(col,row),True,(255,248,199))
+                    layer.blit(label,label.get_rect(center=center))
+        if self.debug.get("show_grid"):
+            for name, point in zip(("p00","p10","p11","p01"),self.geometry.corners):
+                screen = self.geometry.fit.to_screen(point)
+                pygame.draw.circle(layer,(255,160,100),screen,5)
+                label = self.debug_font.render(name,True,(255,238,200))
+                layer.blit(label,(screen[0]+6,screen[1]-18))
+        return layer
+
+    def update(self, elapsed):
+        self.elapsed += max(0,elapsed)
+
+    def toggle_debug(self):
+        enabled = not any(self.debug.values())
+        self.debug = dict.fromkeys(("show_grid","show_cell_centers","show_coordinates"),enabled)
+        self._debug_layer = self._build_debug_layer()
+
+    def draw(self, surface, view, bodies=()):
+        if (view.cols,view.rows) != (self.geometry.cols,self.geometry.rows):
+            raise ValueError("board view and perspective geometry dimensions do not match")
+        self.background.blit(surface,self.geometry.fit.offset)
+        surface.blit(self._debug_layer,(0,0))
+        layer = self._range_layer
+        layer.fill((0,0,0,0))
+        for cells, color in ((view.move_cells,(76,139,137,70)),(view.attack_cells,(150,57,59,85))):
+            for cell in cells:
+                pygame.draw.polygon(layer,color,self.geometry.cell_polygon(cell))
+        for cell in view.target_cells:
+            pygame.draw.polygon(layer,(255,186,146,225),self.geometry.cell_polygon(cell),2)
+        surface.blit(layer,(0,0))
+
+        overrides = {body.uid:body for body in bodies}
+        drawables = [(self.geometry.depth_at(c),"obstacle:{}:{}".format(*c),"obstacle",c) for c in view.obstacles]
+        drawables += [(self.geometry.depth_at(u.cell),u.uid,"unit",u) for u in view.units if u.uid not in overrides]
+        drawables += [(self.geometry.depth_at(b.cell),b.uid,"sprite",b) for b in bodies]
+        # Shadows precede all bodies. Cached sprites are never modified in-place.
+        for _,_,kind,item in drawables:
+            cell = item if kind == "obstacle" else item.cell
+            x,y = self.geometry.cell_anchor(cell)
+            scale = self.geometry.cell_scale(cell)
+            pygame.draw.ellipse(surface,(42,33,29),(x-23*scale,y-6*scale,46*scale,11*scale))
+        for _,_,kind,item in sorted(drawables,key=lambda entry:entry[:2]):
+            cell = item if kind == "obstacle" else item.cell
+            anchor = self.geometry.cell_anchor(cell)
+            scale = self.geometry.cell_scale(cell)
+            rect = pygame.Rect(self.geometry.body_rect(cell))
+            if kind == "sprite":
+                item.sprite.blit(surface,anchor)
+                continue
+            if kind == "obstacle":
+                sprite = self.assets.board_image("obstacle",scale)
+                if sprite:
+                    sprite.blit(surface,anchor)
+                else:
+                    rock = rect.inflate(-rect.width*.3,-rect.height*.3)
+                    pygame.draw.rect(surface,(92,89,84),rock,border_radius=6)
+                    pygame.draw.line(surface,(172,159,133),rock.topleft,rock.bottomright,2)
+                continue
+            clip = self.assets.visual(item.definition_id,"idle",scale)
+            if clip:
+                clip.frame_at(self.elapsed).blit(surface,anchor)
+            elif item.team == "ally":
+                pygame.draw.circle(surface,(61,131,177),rect.center,round(19*scale))
+                pygame.draw.circle(surface,(163,215,227),rect.center,round(19*scale),2)
+            else:
+                block = rect.inflate(-rect.width*.4,-rect.height*.4)
+                pygame.draw.rect(surface,(170,72,64),block,border_radius=3)
+                pygame.draw.rect(surface,(235,162,128),block,2,border_radius=3)
+        # Every mark and health bar remains above all large neighboring bodies.
+        for unit in view.units:
+            rect = pygame.Rect(self.geometry.body_rect(unit.cell))
+            if unit.uid == view.active_uid:
+                pygame.draw.polygon(surface,(239,204,113),self.geometry.cell_polygon(unit.cell),2)
+            if unit.uid == view.selected_uid:
+                pygame.draw.ellipse(surface,(235,238,219),rect.inflate(8,8),2)
+            label = self.label_font.render(unit.uid,True,(255,249,225))
+            surface.blit(label,label.get_rect(center=rect.center))
+            bar = pygame.Rect(rect.x+6,rect.bottom-3,max(12,rect.width-12),4)
+            pygame.draw.rect(surface,(33,30,28),bar)
+            fill = bar.copy()
+            fill.width = round(bar.width*min(1,unit.health/max(1,unit.max_health)))
+            pygame.draw.rect(surface,(116,192,151),fill)
+```
+
+## tactics/perspective_geometry.py
+
+```python
+"""Cached planar projection and inverse picking, with no graphics dependency."""
+
+import math
+from dataclasses import dataclass, field
+
+EPSILON = 1e-9
+
+
+def pair(value, label, positive=False):
+    if (not isinstance(value, (tuple, list)) or len(value) != 2
+            or any(type(v) not in (int, float) or not math.isfinite(v) for v in value)
+            or (positive and any(v <= 0 for v in value))):
+        raise ValueError(label + " must be a finite pair" + (" of positive numbers" if positive else ""))
+    return tuple(value)
+
+
+@dataclass(frozen=True)
+class BackgroundFit:
+    image_size: tuple
+    viewport_size: tuple
+
+    def __post_init__(self):
+        object.__setattr__(self, "image_size", pair(self.image_size, "image size", True))
+        object.__setattr__(self, "viewport_size", pair(self.viewport_size, "viewport size", True))
+
+    @property
+    def scale(self):
+        return min(v / i for v, i in zip(self.viewport_size, self.image_size))
+
+    @property
+    def offset(self):
+        return tuple((v - i * self.scale) / 2 for v, i in zip(self.viewport_size, self.image_size))
+
+    def to_screen(self, point):
+        return tuple(v * self.scale + d for v, d in zip(point, self.offset))
+
+    def to_image(self, point):
+        return tuple((v - d) / self.scale for v, d in zip(point, self.offset))
+
+
+def inverse(matrix):
+    a, b, c, d, e, f, g, h, i = matrix
+    adj = (e*i-f*h, c*h-b*i, b*f-c*e, f*g-d*i, a*i-c*g, c*d-a*f,
+           d*h-e*g, b*g-a*h, a*e-b*d)
+    determinant = a*adj[0] + b*adj[3] + c*adj[6]
+    if abs(determinant) < EPSILON:
+        raise ValueError("board corners produce a singular homography")
+    return tuple(v / determinant for v in adj)
+
+
+def transform(matrix, point):
+    x, y = point
+    denominator = matrix[6]*x + matrix[7]*y + matrix[8]
+    if not math.isfinite(denominator) or abs(denominator) < EPSILON:
+        raise ValueError("point is on the projection horizon")
+    result = ((matrix[0]*x + matrix[1]*y + matrix[2])/denominator,
+              (matrix[3]*x + matrix[4]*y + matrix[5])/denominator)
+    if not all(math.isfinite(v) for v in result):
+        raise ValueError("non-finite projection")
+    return result
+
+
+@dataclass(frozen=True)
+class PerspectiveBoardGeometry:
+    cols: int
+    rows: int
+    corners: tuple
+    reference_size: tuple
+    viewport_size: tuple = (1280, 720)
+    _matrix: tuple = field(init=False, repr=False)
+    _inverse: tuple = field(init=False, repr=False)
+    _polygons: tuple = field(init=False, repr=False)
+    _centers: tuple = field(init=False, repr=False)
+    _anchors: tuple = field(init=False, repr=False)
+    _scales: tuple = field(init=False, repr=False)
+    fit: BackgroundFit = field(init=False)
+
+    def __post_init__(self):
+        if any(type(v) is not int or v <= 0 for v in (self.cols, self.rows)):
+            raise ValueError("board dimensions must be positive integers")
+        fit = BackgroundFit(self.reference_size, self.viewport_size)
+        object.__setattr__(self, "reference_size", fit.image_size)
+        object.__setattr__(self, "viewport_size", fit.viewport_size)
+        object.__setattr__(self, "fit", fit)
+        if not isinstance(self.corners, (tuple, list)) or len(self.corners) != 4:
+            raise ValueError("board requires p00, p10, p11, p01 corners")
+        corners = tuple(pair(p, "board corner") for p in self.corners)
+        w, height = self.reference_size
+        if any(not (0 <= x <= w and 0 <= y <= height) for x, y in corners):
+            raise ValueError("board corners must be inside the reference image")
+        points = tuple((x/w, y/height) for x, y in corners)
+        for index in range(4):
+            a, b, c = (points[(index+k) % 4] for k in range(3))
+            if (b[0]-a[0])*(c[1]-b[1]) - (b[1]-a[1])*(c[0]-b[0]) <= EPSILON:
+                raise ValueError("board corners must form a strictly convex clockwise screen polygon")
+        object.__setattr__(self, "corners", corners)
+        (x0,y0), (x1,y1), (x2,y2), (x3,y3) = points
+        dx1, dx2, dx3 = x1-x2, x3-x2, x0-x1+x2-x3
+        dy1, dy2, dy3 = y1-y2, y3-y2, y0-y1+y2-y3
+        if abs(dx3) + abs(dy3) < EPSILON:
+            g = h = 0.0
+        else:
+            denominator = dx1*dy2-dx2*dy1
+            if abs(denominator) < EPSILON:
+                raise ValueError("board corners produce a degenerate projection")
+            g = (dx3*dy2-dx2*dy3)/denominator
+            h = (dx1*dy3-dx3*dy1)/denominator
+        matrix = (x1-x0+g*x1, x3-x0+h*x3, x0,
+                  y1-y0+g*y1, y3-y0+h*y3, y0, g, h, 1.0)
+        object.__setattr__(self, "_matrix", matrix)
+        object.__setattr__(self, "_inverse", inverse(matrix))
+        polygons, centers, anchors, scales = [], [], [], []
+        for row in range(self.rows):
+            for col in range(self.cols):
+                polygon = tuple(self.project(p) for p in ((col,row),(col+1,row),(col+1,row+1),(col,row+1)))
+                polygons.append(polygon)
+                centers.append(self.project((col+.5, row+.5)))
+                anchors.append(self.project((col+.5, row+.82)))
+                # Quantize to a small, bounded set of preloaded sprite scales.
+                edge = math.dist(polygon[0], polygon[1]) + math.dist(polygon[1], polygon[2])
+                scales.append(round(max(.5, min(1.5, edge / 2 / 64)) * 8) / 8)
+        for name, value in (("_polygons",polygons),("_centers",centers),("_anchors",anchors),("_scales",scales)):
+            object.__setattr__(self, name, tuple(value))
+
+    @property
+    def bounds(self):
+        return (0, 0, *self.viewport_size)
+
+    def _index(self, cell):
+        if (not isinstance(cell, (tuple, list)) or len(cell) != 2
+                or any(type(v) is not int for v in cell)
+                or not (0 <= cell[0] < self.cols and 0 <= cell[1] < self.rows)):
+            raise ValueError("cell outside perspective board: {}".format(cell))
+        return cell[1]*self.cols + cell[0]
+
+    def project(self, logical_point):
+        point = pair(logical_point, "logical point")
+        x, y = transform(self._matrix, (point[0]/self.cols, point[1]/self.rows))
+        return self.fit.to_screen((x*self.reference_size[0], y*self.reference_size[1]))
+
+    def cell_at(self, position):
+        try:
+            x, y = self.fit.to_image(pair(position, "screen point"))
+            if not (0 <= x < self.reference_size[0] and 0 <= y < self.reference_size[1]):
+                return None
+            u, v = transform(self._inverse, (x/self.reference_size[0], y/self.reference_size[1]))
+            u, v = u*self.cols, v*self.rows
+            # Snap roundoff on exact shared edges; ownership remains [left, right).
+            u = round(u) if abs(u-round(u)) < EPSILON else u
+            v = round(v) if abs(v-round(v)) < EPSILON else v
+            if 0 <= u < self.cols and 0 <= v < self.rows:
+                return math.floor(u), math.floor(v)
+        except (ValueError, TypeError, OverflowError):
+            pass
+        return None
+
+    def cell_polygon(self, cell):
+        return self._polygons[self._index(cell)]
+
+    def cell_center(self, cell):
+        return self._centers[self._index(cell)]
+
+    def cell_anchor(self, cell):
+        return self._anchors[self._index(cell)]
+
+    def cell_scale(self, cell):
+        return self._scales[self._index(cell)]
+
+    def depth_at(self, cell):
+        return self.cell_anchor(cell)[1]
+
+    def body_rect(self, cell):
+        # Geometric placeholders remain centered on their actual pickable cell.
+        # PNG bodies use cell_anchor separately, so their bottom pivot stays intact.
+        x, y = self.cell_center(cell)
+        size = round(64*self.cell_scale(cell))
+        return round(x-size/2), round(y-size/2), size, size
+
+    @property
+    def scales(self):
+        return tuple(sorted(set(self._scales)))
+```
+
+## tactics/presentation_layout.py
+
+```python
+"""Strict, graphics-independent presentation configuration rooted in the project."""
+
+from dataclasses import dataclass
+from pathlib import Path
+
+from .data_files import DataError, PROJECT_ROOT, fields, number, read_json, rooted_path, text, version
+from .perspective_geometry import PerspectiveBoardGeometry
+
+
+@dataclass(frozen=True)
+class PresentationLayout:
+    presentation_id: str
+    scenario_file: str
+    asset_root: Path
+    geometry: PerspectiveBoardGeometry
+    safe_margin: int
+    debug: tuple
+
+
+def size_pair(value, label):
+    if not isinstance(value, list) or len(value) != 2:
+        raise DataError(label + ": expected integer size pair")
+    return tuple(number(v, label, minimum=1, integer=True) for v in value)
+
+
+def load_presentation(filename, root=None):
+    root = PROJECT_ROOT if root is None else Path(root)
+    path = rooted_path(root, filename, "presentation path")
+    label = str(path)
+    data = read_json(path)
+    fields(data, ("schema_version","id","mode","scenario_file","asset_root","viewport","board","hud","debug"), (), label)
+    version(data, label)
+    if data["mode"] != "perspective":
+        raise DataError(label + ": mode must be perspective")
+    scenario_file = text(data["scenario_file"], label + ".scenario_file")
+    rooted_path(root / "content", scenario_file, label + ".scenario_file")
+    asset_root = rooted_path(root, data["asset_root"], label + ".asset_root")
+    viewport, board, hud, debug = (data[k] for k in ("viewport","board","hud","debug"))
+    fields(viewport, ("reference_size","background_fit"), (), label + ".viewport")
+    if viewport["background_fit"] != "contain":
+        raise DataError(label + ": background_fit must be contain")
+    viewport_size = size_pair(viewport["reference_size"], label + ".viewport.reference_size")
+    fields(board, ("cols","rows","reference_image_size","corners"), (), label + ".board")
+    cols = number(board["cols"], label + ".board.cols", minimum=1, integer=True)
+    rows = number(board["rows"], label + ".board.rows", minimum=1, integer=True)
+    image_size = size_pair(board["reference_image_size"], label + ".board.reference_image_size")
+    fields(board["corners"], ("p00","p10","p11","p01"), (), label + ".board.corners")
+    try:
+        geometry = PerspectiveBoardGeometry(cols, rows, tuple(board["corners"][k] for k in ("p00","p10","p11","p01")),
+                                            image_size, viewport_size)
+    except ValueError as error:
+        raise DataError(label + ".board.corners: " + str(error)) from error
+    fields(hud, ("layout","safe_margin"), (), label + ".hud")
+    margin = number(hud["safe_margin"], label + ".hud.safe_margin", minimum=0, integer=True)
+    if (hud["layout"] != "overlay" or viewport_size[0] < 960 or viewport_size[1] < 600
+            or 2*margin+860 > viewport_size[0] or 2*margin+254 > viewport_size[1]):
+        raise DataError(label + ": overlay HUD needs viewport >= 960x600 and both cards inside safe margins")
+    fields(debug, ("show_grid","show_cell_centers","show_coordinates"), (), label + ".debug")
+    if any(type(v) is not bool for v in debug.values()):
+        raise DataError(label + ".debug: expected booleans")
+    return PresentationLayout(text(data["id"], label + ".id"), scenario_file, asset_root, geometry, margin,
+                              tuple(debug.items()))
+```
+
 ## tactics/scenario.py
 
 ```python
@@ -3964,6 +5090,90 @@ def default_scenario():
     # Local import keeps the public factory while content imports these data types.
     from .content import load_content
     return load_content().scenario
+```
+
+## tactics/scene_hud.py
+
+```python
+"""Overlay-only UI; hit testing returns intent without touching combat state."""
+
+import pygame
+
+from .actions import UIAction
+from .panel import load_fonts
+
+
+class SceneHUD:
+    def __init__(self, viewport_size, margin=24):
+        fonts, self.chinese = load_fonts()
+        self.title_font, self.font, self.small_font = fonts
+        self.card = pygame.Rect(margin,margin,350,254)
+        self.history = pygame.Rect(margin+370,margin,490,112)
+        x,y = self.card.topleft
+        self._buttons = {UIAction.UNDO:pygame.Rect(x+12,y+210,100,32),
+                         UIAction.SKIP_PHASE:pygame.Rect(x+122,y+210,104,32),
+                         UIAction.END_TURN:pygame.Rect(x+236,y+210,102,32)}
+        self._cards = []
+        for rect in (self.card,self.history):
+            layer = pygame.Surface(rect.size,pygame.SRCALPHA)
+            layer.fill((20,26,31,205))
+            pygame.draw.rect(layer,(143,139,113,180),layer.get_rect(),1,border_radius=8)
+            self._cards.append((rect,layer))
+
+    def contains(self, position):
+        """Consume the full HUD surface, including labels and gaps between buttons."""
+        return self.card.collidepoint(position) or self.history.collidepoint(position)
+
+    def hit_test(self, position):
+        return next((action for action,rect in self._buttons.items() if rect.collidepoint(position)),None)
+
+    def _text(self,surface,value,position,width,font=None,color=(226,226,211)):
+        font = self.small_font if font is None else font
+        while value and font.size(value)[0] > width:
+            value = value[:-1]
+        surface.blit(font.render(value,True,color),position)
+
+    def draw(self,surface,view):
+        for rect,layer in self._cards:
+            surface.blit(layer,rect)
+        x,y = self.card.x+14,self.card.y+10
+        cn = self.chinese
+        actor = view.active
+        title = ("第 {} 回合" if cn else "ROUND {}").format(view.round_number)
+        self._text(surface,title,(x,y),320,self.title_font,(240,211,148))
+        if view.finished:
+            winner = {"ally":"蓝方获胜","enemy":"红方获胜","draw":"平局"}.get(view.winner,view.winner)
+            state = "战斗结束 · " + winner if cn else "FINISHED / {} wins".format(view.winner)
+        else:
+            name = actor.name if cn else actor.uid
+            phase = {"move":"移动","attack":"攻击","resolving":"结算中"}[view.phase] if cn else view.phase
+            state = ("行动：{} [{}] · {}" if cn else "Active: {} [{}] / {}").format(name,actor.uid,phase)
+        self._text(surface,state,(x,y+36),320,self.font)
+        unit = view.selected
+        if unit:
+            name = unit.name if cn else unit.uid
+            self._text(surface,("查看：{} [{}]" if cn else "Inspect: {} [{}]").format(name,unit.uid),(x,y+68),320,self.font)
+            stats = (("生命" if cn else "HP","{}/{}".format(unit.health,unit.max_health)),
+                     ("攻击" if cn else "ATK",unit.attack),("防御" if cn else "DEF",unit.defense),
+                     ("速度" if cn else "SPD",unit.speed),("移动" if cn else "MOVE",unit.movement),
+                     ("范围" if cn else "RANGE",1))
+            for index,(label,value) in enumerate(stats):
+                self._text(surface,"{}: {}".format(label,value),(x+(index%2)*170,y+100+(index//2)*25),160,self.font)
+        hint = "结算中，请稍候" if cn and view.input_locked else "鼠标选择/行动 · F3 网格" if cn else "Click to inspect/act / F3 grid"
+        self._text(surface,hint,(x,y+178),320,color=(163,194,183))
+        enabled = {UIAction.UNDO:view.can_undo,UIAction.SKIP_PHASE:view.can_skip,UIAction.END_TURN:view.can_end_turn}
+        labels = {UIAction.UNDO:"回溯 [退格]" if cn else "Undo [Bksp]",
+                  UIAction.SKIP_PHASE:"跳过 [空格]" if cn else "Skip [Space]",
+                  UIAction.END_TURN:"结束 [回车]" if cn else "End [Enter]"}
+        for action,rect in self._buttons.items():
+            pygame.draw.rect(surface,(65,77,75) if enabled[action] else (40,44,45),rect,border_radius=4)
+            label = self.small_font.render(labels[action],True,(241,224,188) if enabled[action] else (110,117,116))
+            surface.blit(label,label.get_rect(center=rect.center))
+        hx,hy = self.history.x+12,self.history.y+10
+        order = " → ".join("{}({})".format(u.uid,u.speed) for u in view.order)
+        self._text(surface,("顺序：" if cn else "Order: ")+order,(hx,hy),466,color=(233,202,144))
+        for index,message in enumerate(view.log[-3:]):
+            self._text(surface,message[0 if cn else 1],(hx,hy+27+index*22),466)
 ```
 
 ## tactics/settings.py
@@ -5753,6 +6963,398 @@ runpy.run_path(sys.argv[0], run_name='__main__')
                                     env=env, capture_output=True, text=True, timeout=45)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("CLI_WINDOW_QUIT_OK", result.stdout)
+```
+
+## tests/test_perspective_geometry.py
+
+```python
+"""Pure homography acceptance, including ownership of shared boundaries."""
+
+from dataclasses import replace
+import math
+import unittest
+
+from tactics.perspective_geometry import BackgroundFit, PerspectiveBoardGeometry, transform
+
+
+class PerspectiveGeometryChecks(unittest.TestCase):
+    def setUp(self):
+        self.geometry = PerspectiveBoardGeometry(8, 8, ((600,100),(950,350),(550,650),(150,400)), (1100,700))
+
+    def test_four_logical_outer_corners(self):
+        for point, corner in zip(((0,0),(8,0),(8,8),(0,8)), self.geometry.corners):
+            actual = self.geometry.project(point)
+            expected = self.geometry.fit.to_screen(corner)
+            for a, b in zip(actual, expected):
+                self.assertAlmostEqual(a, b)
+
+    def test_all_centers_and_interior_points_pick_their_own_cell(self):
+        for row in range(8):
+            for col in range(8):
+                cell = (col,row)
+                self.assertEqual(self.geometry.cell_at(self.geometry.cell_center(cell)), cell)
+                for dx,dy in ((.05,.05),(.95,.95),(.1,.9),(.9,.1)):
+                    self.assertEqual(self.geometry.cell_at(self.geometry.project((col+dx,row+dy))), cell)
+                self.assertEqual(self.geometry.cell_at(self.geometry.cell_anchor(cell)), cell)
+                x,y,w,h = self.geometry.body_rect(cell)
+                self.assertEqual(self.geometry.cell_at((x+w/2,y+h/2)),cell)
+                self.assertEqual(self.geometry.depth_at(cell), self.geometry.cell_anchor(cell)[1])
+
+    def test_polygons_share_exact_edges_and_consistent_winding(self):
+        for row in range(8):
+            for col in range(8):
+                a,b,c,d = self.geometry.cell_polygon((col,row))
+                self.assertGreater((b[0]-a[0])*(c[1]-b[1])-(b[1]-a[1])*(c[0]-b[0]),0)
+                if col < 7:
+                    adjacent = self.geometry.cell_polygon((col+1,row))
+                    self.assertEqual((b,c),(adjacent[0],adjacent[3]))
+                if row < 7:
+                    adjacent = self.geometry.cell_polygon((col,row+1))
+                    self.assertEqual((d,c),(adjacent[0],adjacent[1]))
+
+    def test_half_open_shared_edges_and_outer_boundaries(self):
+        for index in range(1,8):
+            self.assertEqual(self.geometry.cell_at(self.geometry.project((index,2.5))), (index,2))
+            self.assertEqual(self.geometry.cell_at(self.geometry.project((2.5,index))), (2,index))
+        self.assertEqual(self.geometry.cell_at(self.geometry.project((0,0))), (0,0))
+        for point in ((8,2),(2,8),(-.001,2),(2,-.001),(8,8)):
+            self.assertIsNone(self.geometry.cell_at(self.geometry.project(point)))
+
+    def test_contain_letterbox_and_nonfinite_input(self):
+        geometry = replace(self.geometry, viewport_size=(1600,700))
+        self.assertIsNone(geometry.cell_at((10,350)))
+        for cell in ((0,0),(3,6),(7,7)):
+            self.assertEqual(geometry.cell_at(geometry.cell_center(cell)),cell)
+        for position in ((math.nan,0),(0,math.inf),None,(0,),('x',1)):
+            self.assertIsNone(geometry.cell_at(position))
+        with self.assertRaisesRegex(ValueError,'horizon'):
+            transform((1,0,0,0,1,0,1,0,-1),(1,0))
+
+    def test_degenerate_crossed_reversed_and_invalid_configurations(self):
+        for corners in (((0,0),)*4, ((0,0),(100,0),(200,0),(0,100)),
+                        ((0,0),(100,100),(100,0),(0,100)), tuple(reversed(self.geometry.corners)),
+                        ((math.nan,0),(100,0),(100,100),(0,100))):
+            with self.subTest(corners=corners), self.assertRaises(ValueError):
+                replace(self.geometry,corners=corners)
+        for cell in ((8,0),(-1,0),(True,0),(1.0,2)):
+            with self.assertRaises(ValueError):
+                self.geometry.cell_polygon(cell)
+        with self.assertRaises(ValueError):
+            BackgroundFit((0,10),(100,100))
+
+    def test_affine_rectangle_and_axis_orientation(self):
+        geometry = PerspectiveBoardGeometry(8,8,((0,0),(800,0),(800,800),(0,800)),(800,800),(800,800))
+        self.assertEqual(geometry.cell_center((2,5)),(250.0,550.0))
+        self.assertEqual(geometry.cell_at((350,250)),(3,2))
+```
+
+## tests/test_perspective_rendering.py
+
+```python
+"""Public-input acceptance for projected combat, UI, resources and real CLI."""
+
+from dataclasses import replace
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+from unittest.mock import patch
+
+import pygame
+
+from tactics.actions import UIAction
+from tactics.assets import Sprite
+from tactics.content import load_content
+from tactics.data_files import DataError
+from tactics.game import Game
+from tactics.presentation_layout import load_presentation
+
+ROOT = Path(__file__).resolve().parents[1]
+PRESENTATION = "presentations/war_torn_8x8.json"
+
+
+def combat_trace(check, game, capture=None):
+    trace = []
+
+    def observe(name):
+        game.draw()
+        trace.append(game.controller.get_view_state())
+        if capture: capture(name,game)
+        return trace[-1]
+
+    def click(cell):
+        game.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN,button=1,pos=game.geometry.cell_center(cell)))
+
+    def key(value):
+        game.handle_event(pygame.event.Event(pygame.KEYDOWN,key=value))
+
+    initial = observe('initial')
+    # Inspection and reselection use reverse picking, including near/far cells.
+    for uid in ('D2','A1','A2'):
+        unit = next(u for u in initial.units if u.uid==uid)
+        click(unit.cell)
+        check.assertEqual(game.controller.get_view_state().selected.uid,uid)
+    token = None
+    for index,(move,target) in enumerate((((4,3),(5,3)),((5,2),(6,2)),((6,4),(6,5)))):
+        click(move)
+        check.assertEqual(observe('move'+str(index)).active.cell,move)
+        click(target)
+        resolving = observe('attack'+str(index))
+        check.assertEqual(resolving.phase,'resolving')
+        if token is None: token = resolving.pending_resolution
+        for value in (pygame.K_BACKSPACE,pygame.K_RETURN,pygame.K_SPACE): key(value)
+        check.assertEqual(game.controller.get_view_state(),resolving)
+        game.update(.2)
+        observe('death'+str(index))
+        game.update(1)
+        state = observe('handoff'+str(index))
+        check.assertFalse(game.effects.busy)
+        if index < 2:
+            while state.active.uid!='A2':
+                key(pygame.K_RETURN)
+                state=observe('skip')
+            check.assertEqual(state.round_number,index+2)
+    check.assertEqual((state.phase,state.winner),('finished','ally'))
+    observe('finished')
+    while game.controller.get_view_state().can_undo:
+        key(pygame.K_BACKSPACE)
+        observe('undo')
+    restored = observe('revived')
+    check.assertEqual(restored.units,initial.units)
+    check.assertEqual(restored.board,initial.board)
+    check.assertFalse(game.controller.complete_presentation(token))
+    check.assertEqual(game.controller.get_view_state(),restored)
+    return tuple(trace)
+
+
+class PerspectiveRenderingChecks(unittest.TestCase):
+    def tearDown(self):
+        pygame.quit()
+
+    def test_same_full_combat_trace_as_rectangular_mode(self):
+        original=load_content(scenario_file='scenarios/war_torn.json').scenario
+        scenario=replace(original,units=tuple(replace(u,health=5) if u.team=='enemy' else u for u in original.units))
+        rectangle=Game(scenario,geometric=True)
+        expected=combat_trace(self,rectangle)
+        pygame.quit()
+        perspective=Game(scenario,presentation_file=PRESENTATION)
+        actual=combat_trace(self,perspective)
+        self.assertEqual(actual,expected)
+
+    def test_hud_consumes_cards_and_buttons_use_controller_actions(self):
+        game=Game(presentation_file=PRESENTATION)
+        initial=game.controller.get_view_state()
+        for unit in initial.units:
+            rect=pygame.Rect(game.geometry.body_rect(unit.cell))
+            self.assertEqual(game.geometry.cell_at(rect.center),unit.cell)
+        for position in ((30,30),(40,180),(410,60)):
+            self.assertTrue(game.panel.contains(position))
+            game.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN,button=1,pos=position))
+            self.assertEqual(game.controller.get_view_state(),initial)
+        skip=(200,250)
+        self.assertIs(game.panel.hit_test(skip),UIAction.SKIP_PHASE)
+        game.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN,button=1,pos=skip))
+        self.assertEqual(game.controller.get_view_state().phase,'attack')
+        self.assertTrue(game.controller.handle_action(UIAction.END_TURN))
+        game.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN,button=1,pos=(65,250)))
+        self.assertEqual(game.controller.get_view_state().units,initial.units)
+        self.assertEqual(game.controller.get_view_state().active,initial.active)
+
+    def test_background_and_debug_are_cached_and_translucent(self):
+        game=Game(presentation_file=PRESENTATION,debug_grid=True)
+        before=game.controller.get_view_state()
+        with patch('pygame.image.load',side_effect=AssertionError('frame disk IO')), \
+             patch('pygame.transform.smoothscale',side_effect=AssertionError('frame scaling')):
+            for _ in range(3):
+                game.update(.02)
+                game.draw()
+            game.handle_event(pygame.event.Event(pygame.KEYDOWN,key=pygame.K_F3))
+            game.draw()
+        self.assertFalse(any(game.renderer.debug.values()))
+        self.assertEqual(game.controller.get_view_state(),before)
+        # Uncovered sky is the original contain-fitted background, not repeated floor tiles.
+        expected=pygame.Surface(game.screen.get_size())
+        expected.fill((21,30,42))
+        game.renderer.background.blit(expected,game.geometry.fit.offset)
+        self.assertEqual(game.screen.get_at((1100,140)),expected.get_at((1100,140)))
+        center=tuple(round(v) for v in game.geometry.cell_center((2,4)))
+        pixel=game.screen.get_at(center)
+        self.assertNotEqual(pixel[:3],(76,139,137))  # Range fill preserves image texture via alpha.
+
+    def test_missing_corrupt_and_wrong_sized_background_fail_cleanly(self):
+        layout=load_presentation(PRESENTATION)
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            (root/'backgrounds').mkdir()
+            shutil.copyfile(ROOT/'assets/skins/war_torn/manifest.json',root/'manifest.json')
+            for kind in ('missing','corrupt','size'):
+                with self.subTest(kind=kind):
+                    image=root/'backgrounds/battlefield.png'
+                    if kind=='corrupt': image.write_bytes(b'not a PNG')
+                    elif kind=='size': pygame.image.save(pygame.Surface((20,20)),str(image))
+                    with patch('tactics.game.load_presentation',return_value=replace(layout,asset_root=root)):
+                        with self.assertRaisesRegex(DataError,'background|battlefield'):
+                            Game(presentation_file=PRESENTATION)
+                    self.assertFalse(pygame.display.get_init())
+
+    def test_existing_sprite_clips_depth_order_and_no_frame_rescaling(self):
+        layout=load_presentation(PRESENTATION)
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)/'skin'
+            shutil.copytree(ROOT/'assets/skins/dusk',root)
+            (root/'backgrounds').mkdir()
+            shutil.copyfile(ROOT/'assets/skins/war_torn/backgrounds/battlefield.png',root/'backgrounds/battlefield.png')
+            data=json.loads((root/'manifest.json').read_text(encoding='utf-8'))
+            data['images']['battlefield']={'path':'backgrounds/battlefield.png','display_size':[1672,941],'pivot':[0,0],'optional':False}
+            data['board']['background']='battlefield'
+            (root/'manifest.json').write_text(json.dumps(data),encoding='utf-8')
+            with patch('tactics.game.load_presentation',return_value=replace(layout,asset_root=root)):
+                game=Game(presentation_file=PRESENTATION)
+            calls=[]
+            original=Sprite.blit
+            def record(sprite,target,anchor):
+                if sprite is not game.renderer.background: calls.append(anchor)
+                return original(sprite,target,anchor)
+            with patch.object(Sprite,'blit',record), \
+                 patch('pygame.image.load',side_effect=AssertionError('frame disk IO')), \
+                 patch('pygame.transform.smoothscale',side_effect=AssertionError('frame scaling')):
+                game.draw()
+                self.assertEqual([p[1] for p in calls],sorted(p[1] for p in calls))
+                self.assertTrue(game.controller.move_to((4,3)))
+                self.assertTrue(game.controller.attack('D1'))
+                self.assertTrue(game.effects.body_views())
+                self.assertFalse(game.effects.deaths)  # The target uses the cached PNG death clip.
+                game.update(.2)
+                game.draw()
+                game.update(1)
+                self.assertTrue(game.controller.undo())
+                self.assertFalse(game.effects.body_views())
+                game.draw()
+
+    def test_mixed_flags_dimensions_and_font_fallback(self):
+        for kwargs in ({'geometric':True},{'scenario_file':'scenarios/training_ground.json'},
+                       {'asset_root':ROOT/'assets'},{'content_root':ROOT/'content'}):
+            with self.subTest(kwargs=kwargs),self.assertRaisesRegex(DataError,'cannot be combined'):
+                Game(presentation_file=PRESENTATION,**kwargs)
+        with self.assertRaisesRegex(DataError,'needs --presentation'): Game(debug_grid=True)
+        with self.assertRaisesRegex(DataError,'dimensions'):
+            Game(load_content(scenario_file='scenarios/river_crossing.json').scenario,presentation_file=PRESENTATION)
+        with patch('tactics.panel.Path.is_file',return_value=False), \
+             patch('tactics.panel.pygame.font.match_font',side_effect=TypeError('bad registry')):
+            game=Game(presentation_file=PRESENTATION)
+        self.assertFalse(game.panel.chinese)
+        self.assertTrue(game.controller.move_to((4,3)))
+        self.assertTrue(game.controller.attack('D1'))
+        game.draw()
+        pygame.event.post(pygame.event.Event(pygame.QUIT))
+        game.run()
+        self.assertFalse(pygame.display.get_init())
+
+    def test_real_cli_and_relative_presentation_from_foreign_cwd(self):
+        script="""
+import runpy,sys,pygame
+from tactics.game import Game
+original=Game.run
+def run(self):
+    assert self.screen.get_size()==(1280,720)
+    assert all(self.renderer.debug.values())
+    self.draw()
+    pygame.event.post(pygame.event.Event(pygame.QUIT))
+    original(self)
+    assert not pygame.display.get_init()
+    print('PERSPECTIVE_CLI_QUIT_OK')
+Game.run=run
+sys.argv=[sys.argv[1], '--presentation','presentations/war_torn_8x8.json','--debug-grid']
+runpy.run_path(sys.argv[0],run_name='__main__')
+"""
+        env=dict(os.environ,PYTHONPATH=str(ROOT),PYGAME_HIDE_SUPPORT_PROMPT='1')
+        with tempfile.TemporaryDirectory() as folder:
+            result=subprocess.run([sys.executable,'-c',script,str(ROOT/'main.py')],env=env,cwd=folder,
+                                  text=True,capture_output=True,timeout=45)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertIn('PERSPECTIVE_CLI_QUIT_OK',result.stdout)
+```
+
+## tests/test_presentation_layout.py
+
+```python
+"""Pure, strict presentation and background manifest checks."""
+
+import json
+from pathlib import Path
+import tempfile
+import unittest
+
+from tactics.asset_manifest import load_manifest
+from tactics.data_files import DataError
+from tactics.presentation_layout import load_presentation
+
+ROOT = Path(__file__).resolve().parents[1]
+CONFIG = "presentations/war_torn_8x8.json"
+
+
+class PresentationLayoutChecks(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        (self.root/'presentations').mkdir()
+        self.data = json.loads((ROOT/CONFIG).read_text(encoding='utf-8'))
+
+    def load(self):
+        (self.root/CONFIG).write_text(json.dumps(self.data),encoding='utf-8')
+        return load_presentation(CONFIG,self.root)
+
+    def test_shipped_layout_and_compatible_manifests(self):
+        layout = load_presentation(CONFIG)
+        self.assertEqual(layout.geometry.reference_size,(1672,941))
+        for folder in ('assets','assets/skins/dusk','assets/skins/war_torn'):
+            self.assertTrue(load_manifest(ROOT/folder).visuals)
+        self.assertEqual(layout.geometry.cell_at(layout.geometry.cell_center((7,7))),(7,7))
+
+    def test_unknown_fields_versions_modes_and_placeholder_corners(self):
+        for key,value in (('schema_version',2),('mode','unknown'),('unexpected',1)):
+            with self.subTest(key=key):
+                original = dict(self.data)
+                self.data[key]=value
+                with self.assertRaises(DataError): self.load()
+                self.data=original
+        self.data['board']['corners']={k:[0,0] for k in ('p00','p10','p11','p01')}
+        with self.assertRaisesRegex(DataError,'corners'): self.load()
+
+    def test_paths_must_stay_in_project_or_content_root(self):
+        for key in ('scenario_file','asset_root'):
+            for value in ('../../escape','C:/absolute','/absolute','..\\escape'):
+                with self.subTest(key=key,value=value):
+                    original=self.data[key]
+                    self.data[key]=value
+                    with self.assertRaises(DataError): self.load()
+                    self.data[key]=original
+        with self.assertRaises(DataError): load_presentation('../escape',self.root)
+
+    def test_invalid_viewport_hud_and_debug_are_rejected(self):
+        for section,key,value in (('viewport','background_fit','stretch'),('viewport','reference_size',[0,720]),
+                                  ('hud','safe_margin',999),('hud','layout','sidebar'),
+                                  ('debug','show_grid',1),('board','cols',True)):
+            with self.subTest(section=section,key=key):
+                original=self.data[section][key]
+                self.data[section][key]=value
+                with self.assertRaises(DataError): self.load()
+                self.data[section][key]=original
+
+    def test_background_reference_and_required_flag_are_validated(self):
+        data=json.loads((ROOT/'assets/skins/war_torn/manifest.json').read_text(encoding='utf-8'))
+        for bad in ('unknown','optional'):
+            if bad=='unknown': data['board']['background']='missing'
+            else:
+                data['board']['background']='battlefield'
+                data['images']['battlefield']['optional']=True
+            (self.root/'manifest.json').write_text(json.dumps(data),encoding='utf-8')
+            with self.assertRaisesRegex(DataError,'background|unknown image'): load_manifest(self.root)
 ```
 
 ## tests/test_release.py

@@ -2,13 +2,15 @@
 
 仓库名称：`chrono-tactics-pygame`，阶段版本：`0.2.0`；M0–M5 已实施。发布状态以仓库 tag / Release 为准。
 
+当前开发代码另已接入用户原图的 **8×8 透视战场**：完整背景、透视点击/高亮、深度排序、独立叠加 HUD 与调试网格。该扩展尚未单独发布；角色暂用几何回退，原画砖缝与均匀单应网格存在局部偏差，见 [实施与校准记录](docs/PERSPECTIVE_BATTLEFIELD.md)。
+
 项目仓库：[zyb-sjtu/chrono-tactics-pygame](https://github.com/zyb-sjtu/chrono-tactics-pygame)。这是私有仓库，需要登录有权限的 GitHub 账号访问。
 
 使用 Python 和 Pygame 绘制，运行时不访问网络，不需要另行下载美术。默认显示随项目提供的演示地砖与斥候 PNG，也可用 --geometry 回到几何模式。默认棋盘 8×8，每格 64×64，侧栏 384 像素，窗口 896×512；渡口场景为 6×5，窗口 768×512。
 
 ## 整体规划与后续开发
 
-已完成评审和 M1–M5：规则与表现分离、纯数据回溯、结算确认、JSON 内容/资源清单、PNG 缓存和实际素材动画。M5 增加 6×5 渡口场景及 `dusk` 外观，复用全部游戏代码；三种显示模式的相同操作产生一致战斗状态。当前美术仍为程序生成的演示素材。
+已完成评审和 M1–M5：规则与表现分离、纯数据回溯、结算确认、JSON 内容/资源清单、PNG 缓存和实际素材动画。M5 增加 6×5 渡口场景及 `dusk` 外观；透视扩展继续复用战斗与回溯，仅增加表现与输入映射。经典/dusk 为程序生成素材，war_torn 背景为用户提供的原图。
 
 | 文档 | 内容 |
 | --- | --- |
@@ -25,6 +27,7 @@
 | [扩展演练](docs/EXTENSION_EXERCISE.md) | 渡口试玩与仅通过 JSON/PNG 扩展的具体步骤 |
 | [功能模板](docs/templates/FEATURE_TEMPLATE.md) | 可复制的规则、数据、回溯、表现与验收模板 |
 | [源码发布](docs/RELEASE.md) | 提交树打包、SHA256 与解压验收 |
+| [透视战场](docs/PERSPECTIVE_BATTLEFIELD.md) | 原图、配置、四角/边界、独立 HUD、152 项检查与校准限制 |
 
 架构整改 M0–M5 已落实，后续按实际功能需求继续开发；新增状态必须能回溯，新增美术通过资源与渲染入口接入。约束同时写入 [AGENTS.md](AGENTS.md)，实现进度见 [TASKS.md](TASKS.md)。
 
@@ -45,9 +48,13 @@ cd E:\gamedesign
 .\.venv\Scripts\python.exe main.py --geometry
 .\.venv\Scripts\python.exe main.py --scenario scenarios/training_ground.json --assets assets
 .\.venv\Scripts\python.exe main.py --scenario scenarios/river_crossing.json --assets assets/skins/dusk
+.\.venv\Scripts\python.exe main.py --presentation presentations/war_torn_8x8.json
+.\.venv\Scripts\python.exe main.py --presentation presentations/war_torn_8x8.json --debug-grid
 ```
 
 默认内容/资源路径相对项目位置解析，与工作目录无关。--scenario 相对 content 根；显式传入 --content-root 或 --assets 时，目录相对当前工作目录或使用绝对路径。更换单位、地砖和动画只改 JSON/PNG，步骤见 [M4 记录](docs/M4_IMPLEMENTATION.md) 和 [资源来源](assets/README.md)。
+
+透视入口固定 1280×720，F3 切换调试网格。`--presentation` 的路径相对项目根；它与 `--scenario`、`--assets`、`--content-root`、`--geometry` 互斥，冲突会报错退出，不隐含覆盖。`--debug-grid` 需要透视入口。快速体验：移动 A2 到内部坐标 `(4,3)`，再攻击 D1 `(5,3)`，击杀后退格恢复；坐标可用调试网格查看。
 
 在新机器安装（Python 3.9 或以上、可用的桌面环境）：
 
@@ -122,6 +129,7 @@ E:\gamedesign\
 │   ├── M5_IMPLEMENTATION.md # M5 扩展与阶段交付记录
 │   ├── EXTENSION_EXERCISE.md # 第二场景与外观演练
 │   ├── RELEASE.md          # 提交树打包与解压验收
+│   ├── PERSPECTIVE_BATTLEFIELD.md # 透视模式与校准记录
 │   ├── templates/FEATURE_TEMPLATE.md # 可复制开发模板
 │   ├── ROADMAP.md           # 阶段、前置与验收
 │   ├── ASSET_GUIDE.md       # 美术资源与动画规范
@@ -138,10 +146,14 @@ E:\gamedesign\
 │   ├── assets.py            # PNG/缩放缓存、锚点与帧列表
 │   ├── board.py             # 纯逻辑地图、空间查询与 BFS
 │   ├── geometry.py          # 不依赖 Pygame 的坐标转换
+│   ├── perspective_geometry.py # 纯单应投影/逆变换与缓存
+│   ├── presentation_layout.py # 严格视觉布局配置
 │   ├── actions.py           # UIAction 与操作结果
 │   ├── controller.py        # 统一操作、选中 UID、代次与结算确认
 │   ├── view_models.py       # 完整只读视图与独立表现数据
 │   ├── board_renderer.py    # 只读视图驱动的棋盘绘制
+│   ├── perspective_board_renderer.py # 整张背景与透视绘制
+│   ├── scene_hud.py         # 独立叠加 UI 与动作命中
 │   ├── battle.py            # 规则、结算编号、纯数据快照与回溯
 │   ├── effects.py           # 伤害/击杀动画、逐帧更新与完成通知
 │   ├── panel.py             # 字体回退、只读侧栏与动作命中
@@ -153,14 +165,18 @@ E:\gamedesign\
 │   ├── test_assets.py       # 16 项 PNG、缓存、渲染和动画检查
 │   ├── test_milestone.py    # 6 项跨场景/外观集成验收
 │   ├── test_release.py      # 4 项发布包损坏/来源/路径检查
+│   ├── test_perspective_geometry.py # 7 项纯透视几何检查
+│   ├── test_presentation_layout.py # 5 项纯配置/背景检查
+│   ├── test_perspective_rendering.py # 7 项显示/输入/战斗集成
 │   ├── test_content.py      # 13 项无第三方包的内容/清单检查
 │   ├── test_core.py         # 12 项无第三方包的 M1 核心检查
 │   ├── test_controller.py   # 16 项无第三方包的协调与数据边界检查
 │   ├── test_resolution.py   # 16 项无第三方包的快照和结算协议检查
 │   ├── test_rendering.py    # 6 项只读视图、渲染、按钮和场景注入检查
 │   └── test_rewind.py       # 12 项回溯、击杀及行动顺序检查
-├── content/                 # units.json、训练场与渡口两个场景
-├── assets/                  # 默认 9 张 PNG；skins/dusk 自包含清单与 17 张 PNG
+├── content/                 # units.json、训练场/渡口/war_torn 三个场景
+├── presentations/war_torn_8x8.json # 透视角点、视口、HUD、调试
+├── assets/                  # 默认/dusk 共 26 张 PNG；war_torn 原始背景与独立清单
 ├── scripts/generate_demo_assets.py # 重建演示 PNG，不下载外部资源
 ├── scripts/generate_dusk_assets.py # 重建第二套演示 PNG
 ├── scripts/build_release.py # 从确切提交构建源码 ZIP 与 SHA256
@@ -206,6 +222,8 @@ $releaseCommit = git rev-parse HEAD
 
 ## 验证记录
 
+当前透视扩展共 **152 项：本机 151 通过、1 项符号链接权限跳过**，dummy 与 windows 实际窗口分别执行；六组纯检查 69 项，另 4 项包完整性检查可用 `-S`。矩形/透视完整战斗状态一致；旧几何 13 帧逐像素不变。实际截图、自动事件验证与待人工认可的接缝校准分开记录，见 [透视实施记录](docs/PERSPECTIVE_BATTLEFIELD.md)。
+
 M5 共 **133 项测试**，本机 **132 通过、1 项跳过**（Windows 无创建符号链接权限，其他路径检查通过）。四组核心/内容检查共 **57 项无需第三方包**，另 4 项发布完整性检查也可用 `-S`。dummy 与 Windows 实际窗口分别回归；两场景 × 三模式的完整状态一致，覆盖击杀、跨轮、战斗结束、连续回溯、旧通知、字体异常及异地 CLI/QUIT。真实窗口使用自动投递事件，非人工逐次点击。详见 [M5 记录](docs/M5_IMPLEMENTATION.md)。M4 的 123 项基线及 13 帧几何像素对照记录保留。
 
 ```powershell
@@ -213,6 +231,8 @@ M5 共 **133 项测试**，本机 **132 通过、1 项跳过**（Windows 无创�
 .\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_controller.py -v
 .\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_resolution.py -v
 .\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_content.py -v
+.\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_perspective_geometry.py -v
+.\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_presentation_layout.py -v
 .\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_release.py -v
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```

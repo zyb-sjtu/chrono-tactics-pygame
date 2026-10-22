@@ -55,13 +55,12 @@ class CombatEffects:
         self.clear()
         self._pending_token = event.token
         result = event.result
-        scale = self.geometry.cell_size / 64
-        attack = self.assets.visual(result.actor_definition_id, "attack", scale) if self.assets else None
+        attack = self.assets.visual(result.actor_definition_id, "attack", self.geometry.cell_scale(result.actor_cell)) if self.assets else None
         if attack is not None:
             self.sprites.append(SpriteEffect(result.actor_uid, result.actor_cell, attack))
         self.damage_texts.append(DamageText(result.target_cell, result.damage))
         if result.killed:
-            death = self.assets.visual(result.target_definition_id, "death", scale) if self.assets else None
+            death = self.assets.visual(result.target_definition_id, "death", self.geometry.cell_scale(result.target_cell)) if self.assets else None
             if death is not None:
                 self.sprites.append(SpriteEffect(result.target_uid, result.target_cell, death))
             else:
@@ -91,9 +90,10 @@ class CombatEffects:
     def draw(self, surface):
         old_clip = surface.get_clip()
         surface.set_clip(old_clip.clip(pygame.Rect(self.geometry.bounds)))
-        cell_size = self.geometry.cell_size
-        scale = cell_size / 64
         for effect in self.deaths:
+            body_rect = self.geometry.body_rect(effect.cell)
+            cell_size = body_rect[2]
+            scale = self.geometry.cell_scale(effect.cell)
             progress = effect.age / DEATH_DURATION
             layer = pygame.Surface((cell_size, cell_size), pygame.SRCALPHA)
             size = max(1, round(max(4, 42 * (1 - progress * 0.6)) * scale))
@@ -116,7 +116,7 @@ class CombatEffects:
                          round(center[1] + math.sin(angle) * radius))
                 pygame.draw.circle(layer, (255, 192, 132), point, max(1, round(3 * (1 - progress) * scale)))
             layer.set_alpha(round(255 * (1 - progress)))
-            surface.blit(layer, self.geometry.cell_rect(effect.cell)[:2])
+            surface.blit(layer, body_rect[:2])
 
         for effect in self.damage_texts:
             progress = effect.age / DAMAGE_DURATION
@@ -126,9 +126,9 @@ class CombatEffects:
             alpha = round(255 * min(1, (1 - progress) * 3))
             label.set_alpha(alpha)
             shadow.set_alpha(alpha)
-            _, cell_y, _, _ = self.geometry.cell_rect(effect.cell)
-            x = self.geometry.cell_center(effect.cell)[0]
-            y = max(self.geometry.origin[1] + 5, cell_y + 8 - round(progress * 30))
+            _, cell_y, _, _ = self.geometry.body_rect(effect.cell)
+            x = self.geometry.cell_anchor(effect.cell)[0]
+            y = max(self.geometry.bounds[1] + 5, cell_y + 8 - round(progress * 30))
             rect = label.get_rect(midtop=(x, y))
             surface.blit(shadow, rect.move(2, 2))
             surface.blit(label, rect)

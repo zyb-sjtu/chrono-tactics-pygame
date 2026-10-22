@@ -15,7 +15,7 @@ Get-FileHash dist/chrono-tactics-pygame-0.2.0-source.zip -Algorithm SHA256
 
 产物：`dist/chrono-tactics-pygame-0.2.0-source.zip` 和 `.zip.sha256`。构建使用 git archive；ZIP comment 保存格式、版本、完整提交 SHA，不把生成元数据混入 SOURCE 扫描。相同提交重复构建字节一致；未提交文件、`.git`、`.venv`、缓存、`.delivery` 和旧包不进入交付。
 
-校验器检查 SHA256、ZIP CRC、路径、版本与指定提交，然后在临时目录解压，使用调用者已有 Python/Pygame 离线执行 SOURCE 一致性、`main.py --help` 和六项 M5 集成验收。通过不代表安装了独立运行时，也不代表人工点击验收；完整回归在打包前执行。
+校验器检查 SHA256、ZIP CRC、路径、版本与指定提交，然后在临时目录解压，使用调用者已有 Python/Pygame 离线执行 SOURCE 一致性、`main.py --help`、六项 M5 与七项透视集成验收。通过不代表安装了独立运行时，也不代表人工点击验收；完整回归在打包前执行。已发布 v0.2.0 保留其原始六项验收脚本；未发布透视扩展在当前提交中另纳入新验收，不覆盖已发布附件。
 
 显式校验其他位置的文件：
 
