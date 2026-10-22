@@ -12,8 +12,14 @@ class RewindAndDefeatChecks(unittest.TestCase):
     def setUp(self):
         self.board = Board(default_scenario())
         self.battle = Battle(self.board)
-        self.actor = self.battle.active_unit
-        self.target = self.board.enemies[1]
+
+    @property
+    def actor(self):
+        return next(unit for unit in self.board.units if unit.uid == "A2")
+
+    @property
+    def target(self):
+        return next(unit for unit in self.board.units if unit.uid == "D2")
 
     def test_first_turn_has_no_previous_turn_even_after_moving(self):
         self.assertFalse(self.battle.can_undo)
@@ -27,7 +33,7 @@ class RewindAndDefeatChecks(unittest.TestCase):
         log = list(self.battle.log)
         self.battle.move((4, 4))
         self.battle.attack(self.target)
-        self.battle.finish_attack()
+        self.battle.finish_attack(self.battle.pending_attack.resolution_id)
         self.assertTrue(self.battle.move((0, 1)))
         self.assertTrue(self.battle.undo())
         self.assertEqual([asdict(unit) for unit in self.board.units], before)
@@ -98,7 +104,7 @@ class RewindAndDefeatChecks(unittest.TestCase):
         self.assertEqual(self.battle.active_unit.uid, "D1")
         self.battle.skip_phase()
         self.battle.attack(ally)
-        self.battle.finish_attack()
+        self.battle.finish_attack(self.battle.pending_attack.resolution_id)
         self.assertEqual(self.battle.active_unit.uid, "A3")
 
     def test_killing_next_actor_skips_the_dead_slot(self):
@@ -108,7 +114,7 @@ class RewindAndDefeatChecks(unittest.TestCase):
         self.battle.end_turn()
         self.battle.skip_phase()
         self.battle.attack(enemy)
-        self.battle.finish_attack()
+        self.battle.finish_attack(self.battle.pending_attack.resolution_id)
         self.assertEqual(self.battle.active_unit.uid, "A3")
 
     def test_round_wrap_can_skip_a_dead_first_slot(self):
@@ -119,7 +125,7 @@ class RewindAndDefeatChecks(unittest.TestCase):
         self.assertEqual(self.battle.active_unit.uid, "D3")
         self.battle.skip_phase()
         self.battle.attack(self.actor)
-        self.battle.finish_attack()
+        self.battle.finish_attack(self.battle.pending_attack.resolution_id)
         self.assertEqual(self.battle.active_unit.uid, "A1")
         self.assertEqual(self.battle.round_number, 2)
 
@@ -130,7 +136,7 @@ class RewindAndDefeatChecks(unittest.TestCase):
         battle.move((4, 4))
         battle.attack(self.target)
         self.assertFalse(battle.finished)
-        battle.finish_attack()
+        battle.finish_attack(battle.pending_attack.resolution_id)
         self.assertEqual(battle.winner, "ally")
         self.assertIsNone(battle.active_unit)
         self.assertFalse(battle.end_turn())
@@ -146,17 +152,17 @@ class RewindAndDefeatChecks(unittest.TestCase):
         self.actor.max_health = 1000
         self.actor.health = 800
         battle = Battle(self.board)
-        original_order = battle.order
+        original_order = tuple(unit.uid for unit in battle.order)
         for _ in range(2):
             self.assertTrue(battle.move((4, 4)))
             self.assertTrue(battle.attack(self.target))
-            battle.finish_attack()
+            battle.finish_attack(battle.pending_attack.resolution_id)
             self.assertFalse(self.target.alive)
             self.assertTrue(battle.undo())
             self.assertTrue(self.target.alive)
             self.assertEqual(self.target.health, self.target.max_health)
             self.assertEqual((self.actor.health, self.actor.max_health), (800, 1000))
-            self.assertEqual(battle.order, original_order)
+            self.assertEqual(tuple(unit.uid for unit in battle.order), original_order)
             self.assertEqual(self.actor.cell, (1, 3))
 
 

@@ -32,6 +32,7 @@ class CombatEffects:
         self.geometry = geometry
         self.damage_texts = []
         self.deaths = []
+        self._pending_token = None
         self.damage_font = pygame.font.Font(None, 32)
         self.label_font = pygame.font.Font(None, 20)
 
@@ -39,7 +40,10 @@ class CombatEffects:
     def busy(self):
         return bool(self.damage_texts or self.deaths)
 
-    def play_attack(self, result: AttackPresentation):
+    def play_attack(self, event: AttackPresentation):
+        self.clear()
+        self._pending_token = event.token
+        result = event.result
         self.damage_texts.append(DamageText(result.target_cell, result.damage))
         if result.killed:
             self.deaths.append(DeathEffect(result.target_cell, result.target_team, result.target_uid))
@@ -47,12 +51,17 @@ class CombatEffects:
     def clear(self):
         self.damage_texts.clear()
         self.deaths.clear()
+        self._pending_token = None
 
     def update(self, elapsed):
         for effect in self.damage_texts + self.deaths:
             effect.age += max(0, elapsed)
         self.damage_texts = [effect for effect in self.damage_texts if effect.age < DAMAGE_DURATION]
         self.deaths = [effect for effect in self.deaths if effect.age < DEATH_DURATION]
+        if self._pending_token is not None and not self.busy:
+            token, self._pending_token = self._pending_token, None
+            return (token,)
+        return ()
 
     def draw(self, surface):
         old_clip = surface.get_clip()

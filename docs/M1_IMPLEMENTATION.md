@@ -2,7 +2,7 @@
 
 状态：代码和本机验收完成。评审前基线为 `b072548`；实施分支为 `refactor/m1-rule-render-separation`。远程结果以对应 PR / Actions 为准，任务状态见 [TASKS](../TASKS.md)。
 
-本文件保留 M1 完成时的接口与验收记录。后续 Controller、完整视图与 UIAction 已在 M2 实施，当前调用方式见 [M2 记录](M2_IMPLEMENTATION.md)；下文的“留给 M2”描述属于当时阶段边界。
+本文件保留 M1 完成时的接口与验收记录。后续 Controller、完整视图与 UIAction 已在 M2 实施，快照与结算确认已在 M3 实施，当前调用方式见 [M2](M2_IMPLEMENTATION.md) 和 [M3 记录](M3_IMPLEMENTATION.md)；下文的“留给 M2/M3”属于当时阶段边界。
 
 ## 范围和结果
 
@@ -114,6 +114,6 @@ CI 在安装 requirements 之前执行上述 `-S` 核心检查，再安装 Pygam
 ## M1 完成时留给后续的内容
 
 - M2：Controller、完整 UI 视图、UIAction 命中封装（现已完成，见 M2 记录）。
-- M3：ID 化结算结果、纯数据快照和结算/表现代次协议。
+- M3：ID 化结算结果、纯数据快照和结算/表现代次协议（现已完成，见 M3 记录）。
 - M4：外部 JSON 内容、AssetManager、图片/动画素材加载。
 - M5：完整的后续扩展与资源交付演练。

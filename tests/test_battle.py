@@ -98,11 +98,12 @@ class BattleChecks(unittest.TestCase):
         self.assertEqual(self.battle.phase, "resolving")
         self.assertIs(self.battle.active_unit, self.actor)
         self.assertEqual(self.battle.pending_attack.damage, 37)
-        self.assertTrue(self.battle.finish_attack())
+        resolution_id = self.battle.pending_attack.resolution_id
+        self.assertTrue(self.battle.finish_attack(resolution_id))
         self.assertIs(self.battle.active_unit, self.board.allies[0])
         self.assertEqual(self.battle.phase, "move")
         self.assertFalse(self.battle.attack(target))
-        self.assertFalse(self.battle.finish_attack())
+        self.assertFalse(self.battle.finish_attack(resolution_id))
 
     def test_skips_and_round_reset(self):
         self.battle.skip_phase()
@@ -128,7 +129,7 @@ class BattleChecks(unittest.TestCase):
         health = target.health
         self.assertTrue(self.battle.attack(target))
         self.assertEqual(target.health, health - enemy.attack)
-        self.battle.finish_attack()
+        self.battle.finish_attack(self.battle.pending_attack.resolution_id)
         self.assertEqual(self.battle.index, 3)
 
 
