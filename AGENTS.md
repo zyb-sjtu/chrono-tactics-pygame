@@ -3,7 +3,7 @@
 ## 先确认实际状态
 
 - 阶段版本是 v0.2.0，M1–M5 已实施：规则/表现分离、纯数据回溯与结算确认、JSON/PNG 链路、第二场景/外观与开发模板。发布状态以 tag/Release 为准；以 `TASKS.md` 区分现有能力和规划。
-- 当前开发代码另有透视战场模式，阅读 `docs/PERSPECTIVE_BATTLEFIELD.md`；原图已接入，角色是明确几何回退，原画局部砖缝的最终校准仍待美术确认。
+- 当前开发代码另有透视战场模式，阅读 `docs/PERSPECTIVE_BATTLEFIELD.md`；原图已接入，角色是明确几何回退，完整整砖校准未完成。
 - 地砖对齐不是仅待美术认可：旧选区未对应8×8整砖边界，完整校准尚未通过，先读 `docs/WAR_TORN_CALIBRATION.md`。仅2×6实测样带的局部误差合格，不能当作完整8×8结果，也不能把外推/插值坐标当成真实控制点。
 - 修改玩法、结构或资源入口前，阅读 [整体架构](docs/ARCHITECTURE.md)、[实施路线](docs/ROADMAP.md) 与 [功能开发规范](docs/FEATURE_DEVELOPMENT.md)。接入美术时同时遵守 [资源规范](docs/ASSET_GUIDE.md)。用户提供的原始报告是评审材料，当前开发决策以这些评审后文档为准。
 
