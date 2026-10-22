@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pygame
 
-from .settings import BOARD_HEIGHT, BOARD_WIDTH, PANEL_WIDTH
+from .settings import MIN_WINDOW_HEIGHT, PANEL_WIDTH
 
 
 def load_fonts():
@@ -31,16 +31,18 @@ def load_fonts():
 
 
 class InfoPanel:
-    def __init__(self):
+    def __init__(self, board_width=512, height=MIN_WINDOW_HEIGHT):
+        self.board_width = board_width
+        self.height = height
         fonts, self.chinese = load_fonts()
         self.title_font, self.font, self.small_font = fonts
-        self.skip_button = pygame.Rect(BOARD_WIDTH + 24, 284, 162, 38)
-        self.end_button = pygame.Rect(BOARD_WIDTH + 198, 284, 162, 38)
-        self.undo_button = pygame.Rect(BOARD_WIDTH + 208, 14, 152, 32)
+        self.skip_button = pygame.Rect(self.board_width + 24, 284, 162, 38)
+        self.end_button = pygame.Rect(self.board_width + 198, 284, 162, 38)
+        self.undo_button = pygame.Rect(self.board_width + 208, 14, 152, 32)
 
     def text(self, surface, value, y, color=(220, 230, 241), small=False, title=False, x=None, width=None):
         font = self.title_font if title else self.small_font if small else self.font
-        x = BOARD_WIDTH + 24 if x is None else x
+        x = self.board_width + 24 if x is None else x
         width = PANEL_WIDTH - 48 if width is None else width
         if font.size(value)[0] > width:
             while value and font.size(value + "...")[0] > width:
@@ -55,7 +57,7 @@ class InfoPanel:
         surface.blit(text, text.get_rect(center=rect.center))
 
     def draw(self, surface, selected, battle):
-        pygame.draw.rect(surface, (21, 30, 42), (BOARD_WIDTH, 0, PANEL_WIDTH, BOARD_HEIGHT))
+        pygame.draw.rect(surface, (21, 30, 42), (self.board_width, 0, PANEL_WIDTH, self.height))
         cn = self.chinese
         actor = battle.active_unit
         name = (actor.name if cn else actor.uid) if actor is not None else ""
@@ -79,7 +81,7 @@ class InfoPanel:
             status = "{} / {} / Move {} / Attack {}".format(actor.team.upper(), battle.phase.upper(),
                                                            int(moving), int(battle.phase != "resolving"))
         self.text(surface, status, 86, (132, 159, 185), small=True)
-        pygame.draw.line(surface, (60, 77, 96), (BOARD_WIDTH + 24, 116), (BOARD_WIDTH + PANEL_WIDTH - 24, 116))
+        pygame.draw.line(surface, (60, 77, 96), (self.board_width + 24, 116), (self.board_width + PANEL_WIDTH - 24, 116))
         if selected is None:
             self.text(surface, "点击单位查看属性" if cn else "Click a unit to inspect.", 134)
         else:
@@ -93,7 +95,7 @@ class InfoPanel:
                      ("防御", "DEF", selected.defense), ("速度", "SPD", selected.speed),
                      ("移动力", "MOVE", selected.movement), ("攻击范围", "RANGE", 1))
             for index, (chinese, english, value) in enumerate(stats):
-                x = BOARD_WIDTH + 24 + (index % 2) * 174
+                x = self.board_width + 24 + (index % 2) * 174
                 self.text(surface, "{}: {}".format(chinese if cn else english, value),
                           192 + (index // 2) * 27, x=x, width=162)
 
@@ -125,4 +127,4 @@ class InfoPanel:
             color = (255, 219, 116) if unit is actor else (161, 178, 196)
             label = "{}.{}({})".format(index + 1, name, unit.speed)
             self.text(surface, label, 459 + (index // 3) * 25, color, small=True,
-                      x=BOARD_WIDTH + 24 + (index % 3) * 114, width=108)
+                      x=self.board_width + 24 + (index % 3) * 114, width=108)

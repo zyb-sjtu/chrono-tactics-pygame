@@ -5,11 +5,12 @@ import unittest
 
 from tactics.battle import Battle
 from tactics.board import Board
+from tactics.scenario import default_scenario
 
 
 class RewindAndDefeatChecks(unittest.TestCase):
     def setUp(self):
-        self.board = Board()
+        self.board = Board(default_scenario())
         self.battle = Battle(self.board)
         self.actor = self.battle.active_unit
         self.target = self.board.enemies[1]

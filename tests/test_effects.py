@@ -26,8 +26,8 @@ class CombatInteractionChecks(unittest.TestCase):
             self.target.health = 5
             self.game.battle = Battle(self.game.board)
             self.game.selected = self.game.battle.active_unit
-        self.click(self.game.board.rect((4, 4)).center)
-        self.click(self.game.board.rect(self.target.cell).center)
+        self.click(self.game.geometry.cell_center((4, 4)))
+        self.click(self.game.geometry.cell_center(self.target.cell))
 
     def test_damage_popup_and_controls_are_locked_until_effect_finishes(self):
         self.start_attack()
@@ -39,7 +39,7 @@ class CombatInteractionChecks(unittest.TestCase):
             self.game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=key))
         for rect in (self.game.panel.skip_button, self.game.panel.end_button, self.game.panel.undo_button):
             self.click(rect.center)
-        self.click(self.game.board.rect(self.target.cell).center)
+        self.click(self.game.geometry.cell_center(self.target.cell))
         self.assertEqual(self.target.health, self.target.max_health - self.actor.attack)
         self.assertIs(self.game.battle.active_unit, self.actor)
         self.assertEqual(self.game.battle.phase, "resolving")
@@ -53,7 +53,7 @@ class CombatInteractionChecks(unittest.TestCase):
         self.assertEqual(len(self.game.effects.deaths), 1)
         self.assertFalse(self.target.alive)
         self.game.draw()
-        center = self.game.board.rect(self.target.cell).center
+        center = self.game.geometry.cell_center(self.target.cell)
         background = (42, 55, 70)
         self.assertNotEqual(tuple(self.game.screen.get_at(center))[:3], background)
         self.game.update(0.4)
@@ -82,7 +82,7 @@ class CombatInteractionChecks(unittest.TestCase):
     def test_backspace_rewinds_previous_turn_and_discards_partial_current_move(self):
         self.start_attack()
         self.game.update(1.0)
-        self.click(self.game.board.rect((0, 1)).center)
+        self.click(self.game.geometry.cell_center((0, 1)))
         self.game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_BACKSPACE))
         self.assertEqual(self.game.battle.active_unit.uid, "A2")
         self.assertEqual(self.target.health, self.target.max_health)

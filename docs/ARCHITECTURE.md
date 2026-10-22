@@ -1,12 +1,12 @@
 # 整体架构与扩展边界
 
-状态：目标架构与开发决策。除现有 v0.1.0 功能外，本文描述的拆分尚未实施；进度以 [TASKS.md](../TASKS.md) 为准。
+状态：M1 已实施；M2–M5 仍为目标架构。M1 增加 Scenario、Geometry、BoardRenderer 和最小 BoardView，核心已不依赖 Pygame。完整进度以 [TASKS.md](../TASKS.md) 为准，实现细节见 [M1 验收记录](M1_IMPLEMENTATION.md)。
 
 最简单的划分：规则决定“能做什么、结果是什么”；协调层决定“接收哪次操作、何时继续”；表现层负责“输入来自哪里、画面怎样显示”。替换图片不应影响伤害，增加技能不应要求改写主循环。
 
 ## 现状与目标
 
-现状：`models` 存放属性和默认阵容；`Board` 管理地图并绘制；`Battle` 管理战斗与回溯；`Game` 同时协调输入、规则和动画；`panel/effects` 直接读取运行对象。
+现状：`models` 只存放运行单位状态；`scenario` 定义并验证初始阵容和障碍；`Board` 只管理逻辑地图；`Geometry` 转换坐标；`BoardRenderer` 读取独立的 BoardView 绘制。`Battle` 仍管理战斗与内存回溯；`Game` 仍协调输入与动画，Panel 仍读取运行对象，这些留给 M2/M3。
 
 目标仍使用 Python/Pygame，先维持当前平铺模块结构。模块职责稳定后才考虑按包分组，避免为目录美观改动所有导入。
 
@@ -26,7 +26,7 @@ tactics/
   game.py            初始化、组装、事件循环与退出
 ```
 
-这是规划目录，不要求提前创建空模块。
+这是分阶段职责图。scenario、geometry、board_renderer 及 view_models 中的棋盘子集已在 M1 落地；controller、完整 UI 视图与 assets 尚未实现，不提前创建空模块。
 
 ## 依赖方向
 
@@ -56,7 +56,7 @@ flowchart TD
 | renderer / panel / effects / assets | Pygame、只读视图、资源与布局 | 改写 Unit/Battle、自己计算第二套移动或攻击规则 |
 | game | 组装上述模块、适配操作系统输入 | 重复实现指令校验、伤害或回溯 |
 
-这些是迁移后的边界。M1 起按迁移范围加入自动检查，不把当前尚未迁移的代码声称为符合要求。
+M1 的规则、场景、几何与棋盘渲染边界已有测试。其余是后续迁移目标，不把尚未迁移的 Panel、Game 和动画结果声称为完全解耦。
 
 ## 数据模型
 

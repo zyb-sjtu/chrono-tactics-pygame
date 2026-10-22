@@ -3,24 +3,31 @@
 import pygame
 
 from .board import Board
+from .board_renderer import BoardRenderer
 from .battle import Battle
 from .effects import CombatEffects
+from .geometry import BoardGeometry
 from .panel import InfoPanel
-from .settings import FPS, WINDOW_SIZE
+from .scenario import default_scenario
+from .settings import CELL_SIZE, FPS, MIN_WINDOW_HEIGHT, PANEL_WIDTH
+from .view_models import build_board_view
 
 
 class Game:
-    def __init__(self):
+    def __init__(self, scenario=None):
+        self.board = Board(default_scenario() if scenario is None else scenario)
+        self.geometry = BoardGeometry(self.board.cols, self.board.rows, CELL_SIZE)
+        window_size = (self.geometry.width + PANEL_WIDTH, max(MIN_WINDOW_HEIGHT, self.geometry.height))
         # The prototype needs only display and fonts, so do not initialize audio.
         pygame.display.init()
         pygame.font.init()
-        self.screen = pygame.display.set_mode(WINDOW_SIZE)
+        self.screen = pygame.display.set_mode(window_size)
         pygame.display.set_caption("Grid Tactics - Battle Prototype")
         self.clock = pygame.time.Clock()
-        self.board = Board()
+        self.renderer = BoardRenderer(self.geometry)
         self.battle = Battle(self.board)
-        self.panel = InfoPanel()
-        self.effects = CombatEffects()
+        self.panel = InfoPanel(self.geometry.width, window_size[1])
+        self.effects = CombatEffects(self.geometry)
         self.selected = self.battle.active_unit
         self.running = True
 
@@ -53,7 +60,7 @@ class Game:
     def board_click(self, position):
         if self.battle.phase == "resolving":
             return
-        cell = self.board.cell_at(position)
+        cell = self.geometry.cell_at(position)
         if cell is None:
             return
         unit = self.board.unit_at(cell)
@@ -80,7 +87,8 @@ class Game:
             self.selected = self.battle.active_unit
 
     def draw(self):
-        self.board.draw(self.screen, self.selected, self.battle)
+        self.screen.fill((21, 30, 42))
+        self.renderer.draw(self.screen, build_board_view(self.board, self.battle, self.selected))
         self.effects.draw(self.screen)
         self.panel.draw(self.screen, self.selected, self.battle)
         pygame.display.flip()
