@@ -12,7 +12,7 @@ def source_files():
     files = {path for path in ROOT.iterdir()
              if path.is_file() and (path.suffix in SUFFIXES or path.name in (".gitignore", ".gitattributes"))
              and path != OUTPUT}
-    for folder in ("tactics", "tests", "scripts", ".github"):
+    for folder in ("tactics", "tests", "scripts", ".github", "docs"):
         files.update(path for path in (ROOT / folder).rglob("*")
                      if path.is_file() and path.suffix in SUFFIXES)
     return sorted(files, key=lambda path: path.relative_to(ROOT).as_posix())

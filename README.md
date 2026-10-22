@@ -6,6 +6,20 @@
 
 使用 Python 和 Pygame 绘制，运行时不访问网络，不需要外部美术资源。棋盘保持 8×8，每格 64×64 像素；为展示属性和回合信息，侧栏扩为 384 像素，窗口为 896×512。
 
+## 整体规划与后续开发
+
+已对用户的架构整改意见进行源码核对，并建立后续开发约束。当前只完成评审与规划，运行架构仍为 v0.1.0；场景、控制器、只读视图和资源管理等拆分按下表文档逐步实施，不宣称已经具备。
+
+| 文档 | 内容 |
+| --- | --- |
+| [意见评审](docs/ARCHITECTURE_REVIEW.md) | 哪些建议采纳、哪些调整，以及源码证据和原报告遗漏 |
+| [整体架构](docs/ARCHITECTURE.md) | 模块职责、依赖、指令与视图、快照、动画和扩展入口 |
+| [实施路线](docs/ROADMAP.md) | M0–M5、前置能力、小批次提交与验收标准 |
+| [美术资源规范](docs/ASSET_GUIDE.md) | 路径、清单、缓存、透明图片、锚点、图层和动画 |
+| [功能开发规范](docs/FEATURE_DEVELOPMENT.md) | 新功能的数据归属、回溯方案、扩展边界与完成条件 |
+
+开发从 **ARCH-01 / M1** 开始。后续功能需要先具备对应的最小架构边界；新增状态必须能回溯，新增美术通过资源与渲染入口接入。约束同时写入 [AGENTS.md](AGENTS.md)，实现进度见 [TASKS.md](TASKS.md)。
+
 ## 运行
 
 当前机器已经配置好独立环境，无需激活或重新安装：
@@ -80,6 +94,13 @@ E:\gamedesign\
 ├── SOURCE.md                # 各文本文件完整代码汇总
 ├── .github/workflows/ci.yml  # Windows/Linux × Python 3.9/3.12
 ├── scripts/export_source.py # 源码汇总生成与一致性检查
+├── docs/
+│   ├── ARCHITECTURE_REVIEW.md # 对原整改报告的源码核对与评审
+│   ├── ARCHITECTURE.md      # 目标架构，尚未实施
+│   ├── ROADMAP.md           # 阶段、前置与验收
+│   ├── ASSET_GUIDE.md       # 美术资源与动画规范
+│   ├── FEATURE_DEVELOPMENT.md # 后续开发约束
+│   └── references/architecture_proposal.md # 用户原始意见
 ├── tactics\
 │   ├── __init__.py
 │   ├── settings.py          # 棋盘和窗口尺寸
