@@ -104,7 +104,7 @@ class ContentChecks(unittest.TestCase):
                       "\\\\server\\file.png", "units\\file.png"):
             with self.subTest(value=value), self.assertRaises(DataError):
                 rooted_path(self.root, value, "asset")
-        self.assertEqual(rooted_path(self.root, "units/../ok.png", "asset"), self.root / "ok.png")
+        self.assertEqual(rooted_path(self.root, "units/../ok.png", "asset"), (self.root / "ok.png").resolve())
 
     def test_symlink_escape_is_rejected_when_os_permits_symlinks(self):
         with tempfile.TemporaryDirectory() as outside:

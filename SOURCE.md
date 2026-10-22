@@ -139,6 +139,7 @@ htmlcov/
 - 素材动画沿用 M3 token 完成确认；等待当前阻塞任务，不等待循环待机。缺失帧按几何效果回退，回溯/重开清理旧形体及通知。
 - 新增 --geometry、--scenario、--content-root、--assets 启动参数；默认路径不依赖工作目录。显式几何模式无需资源清单，错误配置清晰退出。
 - 新增 13 项纯内容/清单与 16 项实际 PNG/渲染检查，共 123 项；本机 122 通过，1 项 Windows 符号链接权限跳过。57 项可在无第三方包环境执行（含该跳过项）。
+- 路径断言比较规范化结果，兼容 Windows CI 临时目录的 8.3 短路径别名；根目录边界与符号链接逃逸校验保持启用。
 - 无窗口与 Windows 实际窗口回归完成；几何模式 13 帧与 M3 一致，素材模式验证透明度、缩放、图层、攻击/死亡、复活及异地目录入口，新增 4 张截图。
 - SOURCE 汇总纳入 content/assets 文本；演示 PNG 及来源/制作约定随源码交付。M5 扩展与发布演练仍未实施。
 
@@ -444,6 +445,8 @@ v0.1.0 基线记录：2026-10-22，本机 Python 3.9.1 / Pygame 2.6.1 / SDL 2.28
 | DELIVERY-01 | 已完成 | 运行文档、源码汇总生成脚本、忽略规则和自动测试配置 |
 
 CI 配置覆盖 Windows / Linux 与 Python 3.9 / 3.12。远程执行结果以 GitHub Actions 为准，配置存在不代表运行已通过。
+
+路径检查比较解析后的规范路径，兼容 Windows CI 临时目录的 8.3 短路径别名；不通过跳过或放宽根目录边界来解决平台差异。
 
 当前没有 AI、网络、存档或独立 EXE。数值仍为演示占位值，防御暂不参与伤害计算。
 
@@ -1423,6 +1426,8 @@ Renderer 单独推进循环待机，不影响 Controller/Battle。Effects 在合
 四组 `python -S` 共 57 项（含上述跳过项），验证内容、清单、核心和协调不依赖 Pygame；独立子进程还禁止导入 Pygame，并从其他工作目录读取默认文件和跑通战斗/回溯。CI 在安装依赖前运行四组，随后安装依赖、检查 SOURCE 并运行完整回归；平台继续覆盖 Windows/Linux × Python 3.9/3.12，结果以 Actions 实际结论为准。
 
 自动化覆盖多 ID 单次读盘、不同缩放缓存、负缓存/一次报告、显式重载、透明度与锚点、所有形体之后的血条、绘制裁剪、无素材像素回退、清单单独替换、规则结果一致、长死亡片段等待、恢复无残留、必需缺失/损坏/结构/引用错误等。符号链接项在支持的系统实际建链验证；Windows 跳过该项时，绝对路径、盘符、反斜杠和 .. 逃逸检查仍运行。
+
+路径断言统一比较 resolve 后的规范路径，兼容 Windows CI 将 RUNNER~1 等 8.3 别名解析为长目录名的行为；生产路径验证仍检查解析后的根目录边界。
 
 实际 Windows 额外检查默认素材、攻击、斥候死亡/消失、胜负、回溯复活与旧通知拒绝；main.py 的默认/几何两种入口从其他工作目录启动并在结算中 QUIT 正常释放。几何模式 13 帧与 M3 逐像素一致。检查了如下截图中的透明边缘、脚底位置、缩放、图层与侧栏；操作由程序调用和自动事件完成，并非人工逐次点击。
 
@@ -4124,7 +4129,7 @@ class ContentChecks(unittest.TestCase):
                       "\\\\server\\file.png", "units\\file.png"):
             with self.subTest(value=value), self.assertRaises(DataError):
                 rooted_path(self.root, value, "asset")
-        self.assertEqual(rooted_path(self.root, "units/../ok.png", "asset"), self.root / "ok.png")
+        self.assertEqual(rooted_path(self.root, "units/../ok.png", "asset"), (self.root / "ok.png").resolve())
 
     def test_symlink_escape_is_rejected_when_os_permits_symlinks(self):
         with tempfile.TemporaryDirectory() as outside:
