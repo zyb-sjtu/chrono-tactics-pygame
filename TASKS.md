@@ -1,6 +1,6 @@
 # 项目进度
 
-最近发布版本：`0.1.0`。开发代码已完成 M1（未发布）；已实现能力与后续规划分开记录。
+最近发布版本：`0.1.0`。开发代码已完成 M1、M2（未发布）；已实现能力与后续规划分开记录。
 
 ## 已实现能力
 
@@ -13,7 +13,7 @@
 | COMBAT-02 | 已完成 | 击杀动画、消失、死亡单位退出队列、一方全灭结束战斗 |
 | REWIND-01 | 已完成 | 回溯上一单位行动开始前、连续回溯、恢复死亡单位和战斗状态 |
 | FIX-01 | 已完成 | Windows 系统字体扫描异常回退，保留英文降级界面 |
-| QA-01 | 已完成 | 57 项回归检查，其中 12 项无第三方包；Windows 8 帧逐像素对照与第二场景实测 |
+| QA-01 | 已完成 | 75 项回归检查，其中 28 项无第三方包；M2 Windows 13 帧与 M1 逐像素一致，保留第二场景验收 |
 | DELIVERY-01 | 已完成 | 运行文档、源码汇总生成脚本、忽略规则和自动测试配置 |
 
 CI 配置覆盖 Windows / Linux 与 Python 3.9 / 3.12。远程执行结果以 GitHub Actions 为准，配置存在不代表运行已通过。
@@ -26,12 +26,12 @@ CI 配置覆盖 Windows / Linux 与 Python 3.9 / 3.12。远程执行结果以 Gi
 | --- | --- | --- | --- |
 | ARCH-00 | M0 | 已完成 | 评审用户意见、整体架构、资源与功能开发规范、分阶段路线；后续约束写入 AGENTS |
 | ARCH-01 | M1 | 已完成 | 场景注入、纯逻辑 Board、Geometry、BoardRenderer 与最小 BoardView；57 项检查及 8 帧一致性验收 |
-| ARCH-02 | M2 | 未开始 | Controller、只读 View、UIAction；输入适配与业务协调分开 |
+| ARCH-02 | M2 | 已完成 | Controller 统一操作与动画交接、完整只读 View、UIAction 命中；Game/表现不持有可变战斗对象，75 项检查及 13 帧一致性验收 |
 | ARCH-03 | M3 | 未开始 | 稳定 ID 结果、纯数据快照、结算编号与表现代次，可靠回溯和完成确认 |
 | ARCH-04 | M4 | 未开始 | 内容/资源清单与验证、加载缓存、图片/动画真实接入、无素材回退 |
 | ARCH-05 | M5 | 未开始 | 场景与外观扩展演练、完整回归、真实窗口与跨平台验收 |
 
-M1 实现与验证详见 [M1_IMPLEMENTATION](docs/M1_IMPLEMENTATION.md)。下一实施任务为 **ARCH-02 / M2**：Controller、完整 UI 只读视图及 UIAction。当前只有棋盘视图是独立数据；Panel 和战斗动画协调仍使用既有接口，不宣称已完成 M2/M3。
+实现与验证见 [M1_IMPLEMENTATION](docs/M1_IMPLEMENTATION.md) 和 [M2_IMPLEMENTATION](docs/M2_IMPLEMENTATION.md)。下一实施任务为 **ARCH-03 / M3**：规则内部结果 ID 化、纯数据快照、结算编号与表现代次。M2 已切断表现层的活动实体引用；不代表内部 AttackResult/TurnSnapshot 已完成 M3 迁移。
 
 阶段依赖、提交拆分和完成条件见 [ROADMAP](docs/ROADMAP.md)，技术边界见 [ARCHITECTURE](docs/ARCHITECTURE.md)。每个阶段同步增加所需边界测试，不等全部迁移后才测试。
 

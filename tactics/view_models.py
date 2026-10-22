@@ -1,4 +1,4 @@
-"""Detached board-render data; the complete application/UI view belongs to M2."""
+"""Detached, immutable values shared by the application and presentation layers."""
 
 from dataclasses import dataclass
 from typing import FrozenSet, Optional, Tuple
@@ -28,6 +28,58 @@ class BoardView:
     target_cells: FrozenSet[Cell]
 
 
+@dataclass(frozen=True)
+class UnitView:
+    uid: str
+    name: str
+    team: str
+    role: str
+    cell: Cell
+    health: int
+    max_health: int
+    attack: int
+    defense: int
+    speed: int
+    movement: int
+
+    @property
+    def alive(self):
+        return self.health > 0
+
+
+@dataclass(frozen=True)
+class BattleView:
+    board: BoardView
+    units: Tuple[UnitView, ...]
+    active: Optional[UnitView]
+    selected: Optional[UnitView]
+    phase: str
+    round_number: int
+    winner: Optional[str]
+    order: Tuple[UnitView, ...]
+    log: Tuple[Tuple[str, str], ...]
+    can_undo: bool
+    can_skip: bool
+    can_end_turn: bool
+    input_locked: bool
+
+    @property
+    def finished(self):
+        return self.winner is not None
+
+
+@dataclass(frozen=True)
+class AttackPresentation:
+    """Only values cross into effects; rule AttackResult stays internal until M3."""
+
+    actor_uid: str
+    target_uid: str
+    target_cell: Cell
+    target_team: str
+    damage: int
+    killed: bool
+
+
 def build_board_view(board, battle, selected):
     """Project existing legal queries into values; never expose live Unit objects."""
     active = battle.active_unit
@@ -45,4 +97,24 @@ def build_board_view(board, battle, selected):
         active.uid if active is not None else None,
         selected.uid if selected is not None else None,
         move_cells, attack_cells, target_cells,
+    )
+
+
+def build_battle_view(board, battle, selected):
+    """Build one consistent snapshot, including units that a later undo may revive."""
+    units = tuple(UnitView(
+        unit.uid, unit.name, unit.team, unit.role, tuple(unit.cell),
+        unit.health, unit.max_health, unit.attack, unit.defense, unit.speed, unit.movement,
+    ) for unit in board.units)
+    by_uid = {unit.uid: unit for unit in units}
+    actor = battle.active_unit
+    can_act = battle.phase in ("move", "attack")
+    return BattleView(
+        build_board_view(board, battle, selected), units,
+        by_uid[actor.uid] if actor is not None else None,
+        by_uid[selected.uid] if selected is not None else None,
+        battle.phase, battle.round_number, battle.winner,
+        tuple(by_uid[unit.uid] for unit in battle.order),
+        tuple(tuple(message) for message in battle.log),
+        battle.can_undo, can_act, can_act, battle.phase == "resolving",
     )

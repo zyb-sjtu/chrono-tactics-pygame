@@ -152,6 +152,8 @@ from tactics.battle import Battle
 from tactics.scenario import default_scenario
 from tactics.geometry import BoardGeometry
 from tactics.view_models import build_board_view
+from tactics.controller import Controller
+from tactics.actions import UIAction
 board = Board(default_scenario())
 battle = Battle(board)
 assert battle.move((4, 4))
@@ -162,6 +164,14 @@ assert battle.undo()
 assert board.enemies[1].health == 100
 assert build_board_view(board, battle, battle.active_unit).active_uid == 'A2'
 assert BoardGeometry(8, 8, 64).cell_at((511, 511)) == (7, 7)
+controller = Controller(default_scenario())
+assert controller.move_to((4, 4))
+assert controller.attack('D2')
+assert controller.get_view_state().input_locked
+controller.update(0)
+assert controller.get_view_state().active.uid == 'A1'
+assert controller.handle_action(UIAction.UNDO)
+assert controller.get_view_state().active.cell == (1, 3)
 assert 'pygame' not in sys.modules
 print('core-without-pygame: OK')
 """

@@ -1,4 +1,4 @@
-"""Run with: python -m unittest discover -s tests -v"""
+"""Window input adapters and retained font regression checks."""
 
 import os
 import unittest
@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import pygame
 
+from tactics.actions import UIAction
 from tactics.game import Game
 from tactics.panel import InfoPanel
 from tactics.settings import CELL_SIZE
@@ -19,87 +20,95 @@ class GameChecks(unittest.TestCase):
     def tearDown(self):
         pygame.quit()
 
+    @property
+    def view(self):
+        return self.game.controller.get_view_state()
+
+    def unit(self, uid):
+        return next(unit for unit in self.view.units if unit.uid == uid)
+
     def click(self, position, button=1):
         self.game.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=position, button=button))
 
     def test_layout_and_initial_scenario(self):
+        for name in ("board", "battle", "selected"):
+            self.assertFalse(hasattr(self.game, name), name)
         self.assertEqual(self.game.screen.get_size(), (896, 512))
         self.assertEqual(CELL_SIZE, 64)
         self.assertEqual((self.game.geometry.width, self.game.geometry.height), (512, 512))
-        cells = [unit.cell for unit in self.game.board.units] + list(self.game.board.obstacles)
-        self.assertEqual(len(self.game.board.allies), 3)
-        self.assertEqual(len(self.game.board.enemies), 3)
-        self.assertTrue(self.game.board.obstacles)
+        cells = [unit.cell for unit in self.view.units] + list(self.view.board.obstacles)
+        self.assertEqual(sum(unit.team == "ally" for unit in self.view.units), 3)
+        self.assertEqual(sum(unit.team == "enemy" for unit in self.view.units), 3)
+        self.assertTrue(self.view.board.obstacles)
         self.assertEqual(len(cells), len(set(cells)))
         self.assertTrue(all(0 <= col < 8 and 0 <= row < 8 for col, row in cells))
 
     def test_inspect_each_unit_without_changing_turn(self):
-        actor = self.game.battle.active_unit
-        for unit in self.game.board.units:
+        actor = self.view.active
+        for unit in self.view.units:
             self.click(self.game.geometry.cell_center(unit.cell))
-            self.assertIs(self.game.selected, unit)
-            self.assertIs(self.game.battle.active_unit, actor)
+            self.assertEqual(self.view.selected, unit)
+            self.assertEqual(self.view.active, actor)
             self.game.draw()
 
     def test_invalid_terrain_and_outside_clicks_do_not_consume_action(self):
-        actor = self.game.battle.active_unit
-        start = actor.cell
+        before = self.view
         positions = [(511, 511), (530, 20), (-1, 0), (0, 512)]
-        positions += [self.game.geometry.cell_center(cell) for cell in self.game.board.obstacles]
+        positions += [self.game.geometry.cell_center(cell) for cell in self.view.board.obstacles]
         for position in positions:
             self.click(position)
-            self.assertEqual(actor.cell, start)
-            self.assertEqual(self.game.battle.phase, "move")
+            self.assertEqual(self.view, before)
         self.assertEqual(self.game.geometry.cell_at((511, 511)), (7, 7))
 
     def test_right_click_does_not_change_selection_or_scenario(self):
-        before = tuple(unit.cell for unit in self.game.board.units)
-        selected = self.game.selected
+        before = self.view
         self.click(self.game.geometry.cell_center((4, 4)), button=3)
-        self.assertIs(self.game.selected, selected)
-        self.assertEqual(tuple(unit.cell for unit in self.game.board.units), before)
+        self.assertEqual(self.view, before)
 
     def test_mouse_move_attack_and_turn_handoff(self):
-        actor = self.game.battle.active_unit
-        target = self.game.board.enemies[1]
-        health = target.health
+        actor = self.view.active
+        target = self.unit("D2")
         self.click(self.game.geometry.cell_center((4, 4)))
-        self.assertEqual(actor.cell, (4, 4))
-        self.assertEqual(self.game.battle.phase, "attack")
+        self.assertEqual(self.view.active.cell, (4, 4))
+        self.assertEqual(self.view.phase, "attack")
         self.game.draw()
         self.click(self.game.geometry.cell_center(target.cell))
-        self.assertEqual(target.health, health - actor.attack)
-        self.assertEqual(self.game.battle.phase, "resolving")
+        self.assertEqual(self.unit("D2").health, target.health - actor.attack)
+        self.assertEqual(self.view.phase, "resolving")
         self.assertTrue(self.game.effects.busy)
         self.game.draw()
         self.game.update(1.0)
-        self.assertIs(self.game.selected, self.game.battle.active_unit)
-        self.assertIsNot(self.game.selected, actor)
+        self.assertEqual(self.view.selected, self.view.active)
+        self.assertNotEqual(self.view.selected.uid, actor.uid)
         self.game.draw()
 
     def test_inspection_cannot_move_a_unit_out_of_turn(self):
-        actor = self.game.battle.active_unit
-        start = actor.cell
-        other = self.game.board.allies[0]
+        actor = self.view.active
+        other = self.unit("A1")
         self.click(self.game.geometry.cell_center(other.cell))
         self.click(self.game.geometry.cell_center((4, 4)))
-        self.assertEqual(actor.cell, start)
-        self.assertEqual(other.cell, (1, 1))
+        self.assertEqual(self.view.active, actor)
+        self.assertEqual(self.unit("A1"), other)
         self.click(self.game.geometry.cell_center(actor.cell))
         self.click(self.game.geometry.cell_center((4, 4)))
-        self.assertEqual(actor.cell, (4, 4))
+        self.assertEqual(self.view.active.cell, (4, 4))
 
     def test_keyboard_and_sidebar_skip_controls(self):
         self.game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_SPACE))
-        self.assertEqual(self.game.battle.phase, "attack")
+        self.assertEqual(self.view.phase, "attack")
         self.game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
-        self.assertEqual(self.game.battle.index, 1)
-        self.click(self.game.panel.skip_button.center)
-        self.assertEqual(self.game.battle.phase, "attack")
-        self.click(self.game.panel.end_button.center)
-        self.assertEqual(self.game.battle.index, 2)
-        self.assertEqual(self.game.battle.active_unit.team, "enemy")
-        self.assertIs(self.game.selected, self.game.battle.active_unit)
+        self.assertEqual(self.view.active.uid, "A1")
+        # Exercise public input and semantic hit testing, without reading panel rectangles.
+        skip = (self.game.geometry.width + 105, 303)
+        end = (self.game.geometry.width + 279, 303)
+        self.assertIs(self.game.panel.hit_test(skip), UIAction.SKIP_PHASE)
+        self.assertIs(self.game.panel.hit_test(end), UIAction.END_TURN)
+        self.click(skip)
+        self.assertEqual(self.view.phase, "attack")
+        self.click(end)
+        self.assertEqual(self.view.active.uid, "D1")
+        self.assertEqual(self.view.active.team, "enemy")
+        self.assertEqual(self.view.selected, self.view.active)
         self.game.draw()
 
     def test_window_quit_event_exits_main_loop(self):
@@ -136,7 +145,7 @@ class FontChecks(unittest.TestCase):
                     game = Game()
                 self.assertFalse(game.panel.chinese)
                 game.draw()
-                game.selected = game.board.allies[0]
+                game.controller.select("A1")
                 game.draw()
                 pygame.event.post(pygame.event.Event(pygame.QUIT))
                 game.run()
