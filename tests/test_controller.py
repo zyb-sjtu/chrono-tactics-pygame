@@ -18,17 +18,24 @@ class HeldPresentation:
         self.results = []
         self.elapsed = []
         self.clears = 0
+        self.pending = None
 
     def play_attack(self, result):
         self.results.append(result)
+        self.pending = result.token
         self.busy = True
 
     def update(self, elapsed):
         self.elapsed.append(elapsed)
+        if not self.busy and self.pending is not None:
+            token, self.pending = self.pending, None
+            return (token,)
+        return ()
 
     def clear(self):
         self.clears += 1
         self.busy = False
+        self.pending = None
 
 
 def changed_scenario(**changes):
@@ -95,7 +102,7 @@ class ControllerChecks(unittest.TestCase):
         resolving = self.view
         self.finish()
         self.controller.undo()
-        self.assertEqual(self.view, before)
+        self.assertEqual(replace(self.view, presentation_generation=before.presentation_generation), before)
         self.assertEqual(before.active.cell, (1, 3))
         self.assertEqual(next(unit.health for unit in before.units if unit.uid == "D2"), 100)
         self.assertEqual(resolving.active.cell, (4, 4))
@@ -194,7 +201,7 @@ class ControllerChecks(unittest.TestCase):
         self.finish()
         self.controller.move_to((0, 1))
         self.assertTrue(self.controller.handle_action(UIAction.UNDO))
-        self.assertEqual(self.view, before)
+        self.assertEqual(replace(self.view, presentation_generation=before.presentation_generation), before)
         self.assertEqual(self.presentation.clears, 1)
         self.assertFalse(self.presentation.busy)
         self.assertFalse(self.controller.undo())
@@ -243,7 +250,7 @@ class ControllerChecks(unittest.TestCase):
 
     def test_effect_result_is_detached_and_read_only_even_after_undo(self):
         self.start_attack()
-        result = self.presentation.results[0]
+        result = self.presentation.results[0].result
         self.assertEqual((result.actor_uid, result.target_uid, result.target_cell,
                           result.target_team, result.damage, result.killed),
                          ("A2", "D2", (5, 4), "enemy", 10, False))

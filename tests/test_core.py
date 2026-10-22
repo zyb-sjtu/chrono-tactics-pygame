@@ -65,12 +65,13 @@ class ScenarioChecks(unittest.TestCase):
         self.assertTrue(battle.move((2, 0)))
         self.assertTrue(battle.attack(target))
         self.assertEqual(target.health, 33)
-        battle.finish_attack()
+        battle.finish_attack(battle.pending_attack.resolution_id)
         self.assertIs(battle.active_unit, target)
         self.assertTrue(battle.undo())
-        self.assertIs(battle.active_unit, actor)
-        self.assertEqual(actor.cell, (0, 0))
-        self.assertEqual(target.health, 50)
+        self.assertEqual(battle.active_unit.uid, actor.uid)
+        self.assertIsNot(battle.active_unit, actor)
+        self.assertEqual(battle.active_unit.cell, (0, 0))
+        self.assertEqual(board.units[1].health, 50)
 
     def test_rejects_invalid_dimensions_empty_or_one_sided_scenarios(self):
         source = alternate_scenario()
@@ -140,6 +141,8 @@ class CoreBoundaryChecks(unittest.TestCase):
         script = """
 import importlib.abc
 import importlib.util
+from dataclasses import asdict
+import json
 import sys
 assert importlib.util.find_spec('pygame') is None
 class NoPygame(importlib.abc.MetaPathFinder):
@@ -159,7 +162,7 @@ battle = Battle(board)
 assert battle.move((4, 4))
 assert battle.attack(board.enemies[1])
 assert board.enemies[1].health == 90
-battle.finish_attack()
+battle.finish_attack(battle.pending_attack.resolution_id)
 assert battle.undo()
 assert board.enemies[1].health == 100
 assert build_board_view(board, battle, battle.active_unit).active_uid == 'A2'
@@ -168,10 +171,15 @@ controller = Controller(default_scenario())
 assert controller.move_to((4, 4))
 assert controller.attack('D2')
 assert controller.get_view_state().input_locked
+token = controller.get_view_state().pending_resolution
+assert not controller.complete_presentation(None)
 controller.update(0)
 assert controller.get_view_state().active.uid == 'A1'
+assert not controller.complete_presentation(token)
 assert controller.handle_action(UIAction.UNDO)
 assert controller.get_view_state().active.cell == (1, 3)
+assert controller.get_view_state().presentation_generation == 1
+json.dumps(asdict(battle.history[0]))
 assert 'pygame' not in sys.modules
 print('core-without-pygame: OK')
 """

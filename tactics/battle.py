@@ -1,27 +1,19 @@
 """Speed order and one move / one adjacent attack per turn; no AI."""
 
-from dataclasses import asdict, dataclass
-from typing import Optional
+from dataclasses import dataclass
+from typing import Optional, Tuple
 
-from .models import Unit
-
-
-@dataclass(frozen=True)
-class AttackResult:
-    actor: Unit
-    target: Unit
-    damage: int
-    killed: bool
+from .models import AttackResult, UnitSnapshot
 
 
 @dataclass(frozen=True)
 class TurnSnapshot:
-    units: tuple
-    order: tuple
+    units: Tuple[UnitSnapshot, ...]
+    order_uids: Tuple[str, ...]
     index: int
     round_number: int
     phase: str
-    log: tuple
+    log: Tuple[Tuple[str, str], ...]
     winner: Optional[str]
 
 
@@ -35,6 +27,8 @@ class Battle:
         self.phase = "move"
         self.winner = None
         self.pending_attack = None
+        # Protocol identity is monotonic for this battle, never rewound with gameplay.
+        self._next_resolution_id = 1
         self.log = []
         self.notify("按速度从高到低行动，双方均手动操作", "Speed order; both teams are controlled manually.")
         self.history = [self._snapshot()]
@@ -56,9 +50,9 @@ class Battle:
         return self.phase != "resolving" and len(self.history) > 1
 
     def _snapshot(self):
-        return TurnSnapshot(tuple((unit, asdict(unit)) for unit in self.board.units),
-                            self.entry_order, self.index, self.round_number,
-                            self.phase, tuple(self.log), self.winner)
+        return TurnSnapshot(tuple(UnitSnapshot.capture(unit) for unit in self.board.units),
+                            tuple(unit.uid for unit in self.entry_order), self.index, self.round_number,
+                            self.phase, tuple(tuple(message) for message in self.log), self.winner)
 
     def undo(self):
         """Restore the previous unit turn's start, discarding this turn as well."""
@@ -66,11 +60,9 @@ class Battle:
             return False
         self.history.pop()
         snapshot = self.history[-1]
-        self.board.units = tuple(unit for unit, _ in snapshot.units)
-        for unit, values in snapshot.units:
-            for name, value in values.items():
-                setattr(unit, name, value)
-        self.entry_order = snapshot.order
+        self.board.units = tuple(state.create_unit() for state in snapshot.units)
+        by_uid = {unit.uid: unit for unit in self.board.units}
+        self.entry_order = tuple(by_uid[uid] for uid in snapshot.order_uids)
         self.index = snapshot.index
         self.round_number = snapshot.round_number
         self.phase = snapshot.phase
@@ -109,8 +101,13 @@ class Battle:
             return False
         actor = self.active_unit
         damage = max(0, actor.attack)
+        previous_hp = target.health
         target.health = max(0, target.health - damage)
-        self.pending_attack = AttackResult(actor, target, damage, not target.alive)
+        self.pending_attack = AttackResult(
+            self._next_resolution_id, actor.uid, target.uid, tuple(target.cell), target.team,
+            damage, previous_hp, target.health, not target.alive,
+        )
+        self._next_resolution_id += 1
         self.phase = "resolving"
         self.notify("{} 攻击 {}，造成 {} 点伤害".format(actor.name, target.name, damage),
                     "{} attacked {} for {} damage.".format(actor.uid, target.uid, damage))
@@ -118,9 +115,10 @@ class Battle:
             self.notify("{} 被击杀".format(target.name), "{} was defeated.".format(target.uid))
         return True
 
-    def finish_attack(self):
-        """Called once the presentation has finished its attack/death effects."""
-        if self.phase != "resolving":
+    def finish_attack(self, resolution_id):
+        """Only the currently pending resolution may hand off, once."""
+        if (self.phase != "resolving" or self.pending_attack is None
+                or self.pending_attack.resolution_id != resolution_id):
             return False
         self.pending_attack = None
         self._advance()

@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import FrozenSet, Optional, Tuple
 
-from .models import Cell
+from .models import AttackResult, Cell
 
 
 @dataclass(frozen=True)
@@ -62,6 +62,8 @@ class BattleView:
     can_skip: bool
     can_end_turn: bool
     input_locked: bool
+    presentation_generation: int
+    pending_resolution: Optional["ResolutionToken"]
 
     @property
     def finished(self):
@@ -69,15 +71,17 @@ class BattleView:
 
 
 @dataclass(frozen=True)
-class AttackPresentation:
-    """Only values cross into effects; rule AttackResult stays internal until M3."""
+class ResolutionToken:
+    """Identity of one blocking presentation in one controller generation."""
 
-    actor_uid: str
-    target_uid: str
-    target_cell: Cell
-    target_team: str
-    damage: int
-    killed: bool
+    generation: int
+    resolution_id: int
+
+
+@dataclass(frozen=True)
+class AttackPresentation:
+    token: ResolutionToken
+    result: AttackResult
 
 
 def build_board_view(board, battle, selected):
@@ -100,7 +104,7 @@ def build_board_view(board, battle, selected):
     )
 
 
-def build_battle_view(board, battle, selected):
+def build_battle_view(board, battle, selected, presentation_generation, pending_resolution):
     """Build one consistent snapshot, including units that a later undo may revive."""
     units = tuple(UnitView(
         unit.uid, unit.name, unit.team, unit.role, tuple(unit.cell),
@@ -117,4 +121,5 @@ def build_battle_view(board, battle, selected):
         tuple(by_uid[unit.uid] for unit in battle.order),
         tuple(tuple(message) for message in battle.log),
         battle.can_undo, can_act, can_act, battle.phase == "resolving",
+        presentation_generation, pending_resolution,
     )

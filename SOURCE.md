@@ -48,6 +48,8 @@ jobs:
         run: python -S -m unittest discover -s tests -p test_core.py -v
       - name: Verify controller without site packages
         run: python -S -m unittest discover -s tests -p test_controller.py -v
+      - name: Verify snapshots and resolutions without site packages
+        run: python -S -m unittest discover -s tests -p test_resolution.py -v
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
       - name: Check source bundle
@@ -84,7 +86,7 @@ htmlcov/
 
 ## 先确认实际状态
 
-- 最近发布版本是 v0.1.0，开发代码已完成 M1、M2：场景注入、纯逻辑地图、独立渲染、Controller、完整只读视图与 UIAction。M3–M5 尚未实施；以 `TASKS.md` 区分现有能力和规划。
+- 最近发布版本是 v0.1.0，开发代码已完成 M1–M3：场景/渲染分离、Controller/只读视图、纯数据快照及结算确认。M4–M5 尚未实施；以 `TASKS.md` 区分现有能力和规划。
 - 修改玩法、结构或资源入口前，阅读 [整体架构](docs/ARCHITECTURE.md)、[实施路线](docs/ROADMAP.md) 与 [功能开发规范](docs/FEATURE_DEVELOPMENT.md)。接入美术时同时遵守 [资源规范](docs/ASSET_GUIDE.md)。用户提供的原始报告是评审材料，当前开发决策以这些评审后文档为准。
 
 ## 开发边界
@@ -93,7 +95,9 @@ htmlcov/
 - 业务规则放在 `tactics/battle.py`，空间与路径规则放在 `tactics/board.py`。Board 显式接收 Scenario，不恢复像素坐标或绘图入口；坐标由 Geometry 转换，绘制由 BoardRenderer 读取 BoardView 完成。
 - 应用操作统一经过 `Controller`，通过 `get_view_state()` 查询独立的 BattleView；不向 Game、Panel、Renderer、Effects 暴露活动 Unit/Board/Battle。Game 只做组装、输入适配、循环与清理；Panel 用 `hit_test(position)` 返回 UIAction，按钮矩形保持内部实现。
 - `move_to/attack` 对当前行动者提交指令，与查看谁的属性无关；鼠标通过 `click_cell` 保留“先选回行动者再操作”的交互。不要让未来 AI 模拟像素点击，也不以重建 Game 内部字段作为测试夹具；用 Scenario 构建局面。
-- M2 使用小型表现接口（play_attack/update/busy/clear）和独立 AttackPresentation；规则内部结果与快照的实体引用、结算编号和表现代次仍待 M3，资源加载待 M4。
+- 表现接口为 `play_attack(AttackPresentation)/update(elapsed)->tuple[ResolutionToken,...]/clear()`。Controller 只接受当前结算编号与表现代次的完成通知，不以全局 busy 状态推进回合；动画不修改规则。资源加载仍待 M4。
+- AttackResult、UnitSnapshot、TurnSnapshot 均为独立不可变值；行动队列快照存 UID。回溯重建 Unit，跨回溯的旧实体引用不再有效，调用方按 UID 重新查询。新 Unit 字段必须同步快照与恢复，字段覆盖测试不得绕过。
+- 结算编号在同一 Battle 中单调递增且不回溯；Controller 成功回溯或程序化 restart 时先提升表现代次并作废待确认，再清理表现、恢复/重建规则。失败回溯不改变代次或表现；新异步效果必须沿用匹配确认入口。
 - 后续功能必须建立在可扩展边界上：先明确规则入口、数据归属、回溯策略、表现/资源接入和验收证据。前置能力缺失时先补齐最小必要部分，与需求一并交付；不能以架构未完成为由无限延后任务，也不为每个小改动制造额外批准流程。
 - 新增规则代码不依赖 Pygame；渲染、UI、动画和未来 AI 不直接改战斗状态。UI/AI 共用合法性校验和指令入口，避免复制规则。
 - 新增运行状态必须明确快照与恢复行为；新增资源、图片、字体、动画进度不得进入规则快照。对外视图和结算结果使用独立数据与稳定 ID，不向表现层泄露可变实体。
@@ -107,6 +111,7 @@ htmlcov/
 - 完成修改后运行 `python -m unittest discover -s tests -v`，并说明真实窗口与无窗口测试的验证边界。
 - 修改规则、场景、几何或棋盘视图后，另运行 `python -S -m unittest discover -s tests -p test_core.py -v`，保证无第三方包时仍可运行。不要为兼容旧测试把 Pygame 加回核心。
 - 修改协调、动作或完整视图后，另运行 `python -S -m unittest discover -s tests -p test_controller.py -v`。CI 在安装依赖前执行这两组检查。
+- 修改快照、结算或动画交接后，另运行 `python -S -m unittest discover -s tests -p test_resolution.py -v`；CI 安装依赖前执行三组共 44 项检查。真实动画还需完整回归验证，纯测试不能代替实际完成通知与清理检查。
 - 保留原有行为覆盖；接口迁移时可调整测试夹具，不为保留旧字段访问而保留架构漏洞。新增架构边界在相应阶段就加入检查，不推迟到最终验收。
 - 使用 `python scripts/export_source.py` 更新 `SOURCE.md`，再用 `python scripts/export_source.py --check` 检查一致性。
 - 不提交虚拟环境、缓存、安装器、凭据或 `dist/`、`.delivery/` 中的生成文件。`artifacts/*.png` 是随文档交付的运行截图。
@@ -118,6 +123,17 @@ htmlcov/
 # 更新记录
 
 ## 未发布
+
+### M3 · 纯数据回溯与结算确认
+
+- AttackResult 改为结算编号、行动/目标 UID、目标位置/阵营、完整伤害、前后生命及击杀等不可变值，不保留活动实体引用。
+- 新增覆盖 Unit 全部字段的 UnitSnapshot；TurnSnapshot 只存单位值、UID 顺序槽位、轮数、阶段、结果与日志，回溯按 UID 重建运行单位。
+- Battle 为合法攻击分配单调递增且不回溯的编号，finish_attack 必须匹配当前编号，重复或错误编号无效。
+- AttackPresentation 携带 ResolutionToken（表现代次、结算编号）；Effects.update 返回完成通知，Controller 验证后交接，不再轮询全局 busy。
+- 成功回溯及程序化 restart 先作废旧代次，再清除表现、恢复/重建状态；失败回溯不产生副作用。没有新增玩家重开按钮或快捷键。
+- 保留原 75 项覆盖，新增 16 项纯数据/协议检查与 3 项真实动画通知检查，共 94 项通过；44 项无需第三方包并纳入 CI 安装依赖前步骤。
+- Windows 13 个关键画面与 M2 逐像素一致；覆盖击杀形体消失、连续回溯复活、重开清理、结算中关闭和 5×4 注入场景。
+- 保持 100% 攻击伤害、行动顺序、动画时长及上一行动回溯语义；磁盘存档、外部内容与美术资源尚未实施。
 
 ### M2 · 操作协调与完整界面视图
 
@@ -168,7 +184,7 @@ htmlcov/
 ````markdown
 # Chrono Tactics · 离线回溯战棋
 
-仓库名称：`chrono-tactics-pygame`，最近发布版本：`0.1.0`；当前开发代码已完成 M1、M2（未发布）。
+仓库名称：`chrono-tactics-pygame`，最近发布版本：`0.1.0`；当前开发代码已完成 M1–M3（未发布）。
 
 项目仓库：[zyb-sjtu/chrono-tactics-pygame](https://github.com/zyb-sjtu/chrono-tactics-pygame)。这是私有仓库，需要登录有权限的 GitHub 账号访问。
 
@@ -176,7 +192,7 @@ htmlcov/
 
 ## 整体规划与后续开发
 
-已完成评审、M1 与 M2：场景注入、纯逻辑地图、独立渲染、Controller 操作入口、完整只读视图和 UIAction。主循环只组装与适配输入，侧栏和动画接收独立值。规则内部 ID 结果/快照和资源管理仍属于 M3–M4。
+已完成评审和 M1–M3：场景/渲染分离、Controller 操作入口、完整只读视图、纯数据快照和结算确认。回溯按 UID 重建单位，动画通知必须匹配结算编号及表现代次，重复或过期通知不会推进回合。资源清单与美术加载仍属于 M4。
 
 | 文档 | 内容 |
 | --- | --- |
@@ -187,8 +203,9 @@ htmlcov/
 | [功能开发规范](docs/FEATURE_DEVELOPMENT.md) | 新功能的数据归属、回溯方案、扩展边界与完成条件 |
 | [M1 实施与验收](docs/M1_IMPLEMENTATION.md) | M1 模块接口、场景示例、57 项检查与 8 帧像素对照 |
 | [M2 实施与验收](docs/M2_IMPLEMENTATION.md) | Controller 接口、完整视图、75 项检查与 13 帧像素对照 |
+| [M3 实施与验收](docs/M3_IMPLEMENTATION.md) | 纯数据快照、结算与代次协议、94 项检查及 13 帧像素对照 |
 
-下一任务是 **ARCH-03 / M3**。后续功能需要先具备对应的最小架构边界；新增状态必须能回溯，新增美术通过资源与渲染入口接入。约束同时写入 [AGENTS.md](AGENTS.md)，实现进度见 [TASKS.md](TASKS.md)。
+下一任务是 **ARCH-04 / M4**。后续功能需要先具备对应的最小架构边界；新增状态必须能回溯，新增美术通过资源与渲染入口接入。约束同时写入 [AGENTS.md](AGENTS.md)，实现进度见 [TASKS.md](TASKS.md)。
 
 ## 运行
 
@@ -266,9 +283,10 @@ E:\gamedesign\
 ├── scripts/export_source.py # 源码汇总生成与一致性检查
 ├── docs/
 │   ├── ARCHITECTURE_REVIEW.md # 对原整改报告的源码核对与评审
-│   ├── ARCHITECTURE.md      # M1/M2 已实施，其余为目标架构
+│   ├── ARCHITECTURE.md      # M1–M3 已实施，其余为目标架构
 │   ├── M1_IMPLEMENTATION.md # M1 接口与验证记录
 │   ├── M2_IMPLEMENTATION.md # M2 指令、视图与验证记录
+│   ├── M3_IMPLEMENTATION.md # M3 快照、结算确认与验证记录
 │   ├── ROADMAP.md           # 阶段、前置与验收
 │   ├── ASSET_GUIDE.md       # 美术资源与动画规范
 │   ├── FEATURE_DEVELOPMENT.md # 后续开发约束
@@ -276,24 +294,25 @@ E:\gamedesign\
 ├── tactics\
 │   ├── __init__.py
 │   ├── settings.py          # 格子像素、侧栏等表现默认值
-│   ├── models.py            # 单位运行状态
+│   ├── models.py            # 单位状态、纯数据单位快照和攻击结果
 │   ├── scenario.py          # 不可变场景、验证、默认阵容
 │   ├── board.py             # 纯逻辑地图、空间查询与 BFS
 │   ├── geometry.py          # 不依赖 Pygame 的坐标转换
 │   ├── actions.py           # UIAction 与操作结果
-│   ├── controller.py        # 统一操作、选中 UID、动画交接和回溯清理
+│   ├── controller.py        # 统一操作、选中 UID、代次与结算确认
 │   ├── view_models.py       # 完整只读视图与独立表现数据
 │   ├── board_renderer.py    # 只读视图驱动的棋盘绘制
-│   ├── battle.py            # 伤害、击杀、速度队列、回合快照与回溯
-│   ├── effects.py           # 伤害跳字、几何击杀动画、逐帧更新
+│   ├── battle.py            # 规则、结算编号、纯数据快照与回溯
+│   ├── effects.py           # 伤害/击杀动画、逐帧更新与完成通知
 │   ├── panel.py             # 字体回退、只读侧栏与动作命中
 │   └── game.py              # 鼠标/键盘事件、主循环、退出清理
 ├── tests\
 │   ├── test_battle.py       # 11 项战斗规则检查，无需创建窗口
 │   ├── test_game.py         # 11 项窗口交互、绘制与字体检查
-│   ├── test_effects.py      # 7 项动画、按键、血量显示和退出检查
+│   ├── test_effects.py      # 10 项动画、通知、清理和交互检查
 │   ├── test_core.py         # 12 项无第三方包的 M1 核心检查
 │   ├── test_controller.py   # 16 项无第三方包的协调与数据边界检查
+│   ├── test_resolution.py   # 16 项无第三方包的快照和结算协议检查
 │   ├── test_rendering.py    # 6 项只读视图、渲染、按钮和场景注入检查
 │   └── test_rewind.py       # 12 项回溯、击杀及行动顺序检查
 ├── artifacts\               # 实际运行截图，不是游戏资源
@@ -331,11 +350,12 @@ git archive --format=zip --prefix=chrono-tactics-pygame/ --output=dist/chrono-ta
 
 ## 验证记录
 
-M2 开发版本目前共 **75 项检查通过**，其中 **28 项可在无第三方包环境执行**。原有行为覆盖保留；Windows 实际窗口的 13 个状态画面与 M1 逐像素一致，包含查看、英文界面、伤害、击杀、回溯和战斗结束。完整检查分别在 dummy 与 Windows 显示驱动下通过，5×4 场景继续通过交互检查。详情见 [M2 实施记录](docs/M2_IMPLEMENTATION.md)。
+M3 开发版本目前共 **94 项检查通过**，其中 **44 项可在无第三方包环境执行**。原有行为覆盖保留；Windows 实际窗口的 13 个状态画面与 M2 逐像素一致，包含查看、英文界面、伤害、击杀、回溯和战斗结束。完整检查分别在 dummy 与 Windows 显示驱动下通过，5×4 场景继续通过交互检查；新增通知和代次检查覆盖重复/过期确认、回溯重打与程序化重开。详情见 [M3 实施记录](docs/M3_IMPLEMENTATION.md)。
 
 ```powershell
 .\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_core.py -v
 .\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_controller.py -v
+.\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_resolution.py -v
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
@@ -359,7 +379,7 @@ v0.1.0 基线记录：2026-10-22，本机 Python 3.9.1 / Pygame 2.6.1 / SDL 2.28
 ````markdown
 # 项目进度
 
-最近发布版本：`0.1.0`。开发代码已完成 M1、M2（未发布）；已实现能力与后续规划分开记录。
+最近发布版本：`0.1.0`。开发代码已完成 M1–M3（未发布）；已实现能力与后续规划分开记录。
 
 ## 已实现能力
 
@@ -372,7 +392,7 @@ v0.1.0 基线记录：2026-10-22，本机 Python 3.9.1 / Pygame 2.6.1 / SDL 2.28
 | COMBAT-02 | 已完成 | 击杀动画、消失、死亡单位退出队列、一方全灭结束战斗 |
 | REWIND-01 | 已完成 | 回溯上一单位行动开始前、连续回溯、恢复死亡单位和战斗状态 |
 | FIX-01 | 已完成 | Windows 系统字体扫描异常回退，保留英文降级界面 |
-| QA-01 | 已完成 | 75 项回归检查，其中 28 项无第三方包；M2 Windows 13 帧与 M1 逐像素一致，保留第二场景验收 |
+| QA-01 | 已完成 | 94 项回归检查，其中 44 项无第三方包；M3 Windows 13 帧与 M2 逐像素一致，保留第二场景验收 |
 | DELIVERY-01 | 已完成 | 运行文档、源码汇总生成脚本、忽略规则和自动测试配置 |
 
 CI 配置覆盖 Windows / Linux 与 Python 3.9 / 3.12。远程执行结果以 GitHub Actions 为准，配置存在不代表运行已通过。
@@ -386,11 +406,11 @@ CI 配置覆盖 Windows / Linux 与 Python 3.9 / 3.12。远程执行结果以 Gi
 | ARCH-00 | M0 | 已完成 | 评审用户意见、整体架构、资源与功能开发规范、分阶段路线；后续约束写入 AGENTS |
 | ARCH-01 | M1 | 已完成 | 场景注入、纯逻辑 Board、Geometry、BoardRenderer 与最小 BoardView；57 项检查及 8 帧一致性验收 |
 | ARCH-02 | M2 | 已完成 | Controller 统一操作与动画交接、完整只读 View、UIAction 命中；Game/表现不持有可变战斗对象，75 项检查及 13 帧一致性验收 |
-| ARCH-03 | M3 | 未开始 | 稳定 ID 结果、纯数据快照、结算编号与表现代次，可靠回溯和完成确认 |
+| ARCH-03 | M3 | 已完成 | ID 化 AttackResult、纯数据快照/UID 重建、结算编号与表现代次确认；拒绝重复/过期通知，94 项检查及 13 帧一致性验收 |
 | ARCH-04 | M4 | 未开始 | 内容/资源清单与验证、加载缓存、图片/动画真实接入、无素材回退 |
 | ARCH-05 | M5 | 未开始 | 场景与外观扩展演练、完整回归、真实窗口与跨平台验收 |
 
-实现与验证见 [M1_IMPLEMENTATION](docs/M1_IMPLEMENTATION.md) 和 [M2_IMPLEMENTATION](docs/M2_IMPLEMENTATION.md)。下一实施任务为 **ARCH-03 / M3**：规则内部结果 ID 化、纯数据快照、结算编号与表现代次。M2 已切断表现层的活动实体引用；不代表内部 AttackResult/TurnSnapshot 已完成 M3 迁移。
+实现与验证见 [M1](docs/M1_IMPLEMENTATION.md)、[M2](docs/M2_IMPLEMENTATION.md) 和 [M3 实施记录](docs/M3_IMPLEMENTATION.md)。下一实施任务为 **ARCH-04 / M4**：内容/资源清单、验证、缓存和真实素材接入。M3 提供程序化 restart 以管理生命周期代次，未新增玩家菜单，也未实现磁盘存档或资源加载。
 
 阶段依赖、提交拆分和完成条件见 [ROADMAP](docs/ROADMAP.md)，技术边界见 [ARCHITECTURE](docs/ARCHITECTURE.md)。每个阶段同步增加所需边界测试，不等全部迁移后才测试。
 
@@ -402,19 +422,19 @@ CI 配置覆盖 Windows / Linux 与 Python 3.9 / 3.12。远程执行结果以 Gi
 ````markdown
 # 整体架构与扩展边界
 
-状态：M1、M2 已实施；M3–M5 仍为目标架构。规则与 Controller 已不依赖 Pygame，界面和动画读取独立数据。完整进度以 [TASKS.md](../TASKS.md) 为准，实现细节见 [M1](M1_IMPLEMENTATION.md) 和 [M2 验收记录](M2_IMPLEMENTATION.md)。
+状态：M1–M3 已实施；M4–M5 仍为目标架构。规则与 Controller 不依赖 Pygame，界面、动画和快照使用独立值，交接匹配结算编号与代次。完整进度以 [TASKS.md](../TASKS.md) 为准，实现细节见 [M1](M1_IMPLEMENTATION.md)、[M2](M2_IMPLEMENTATION.md) 和 [M3 验收记录](M3_IMPLEMENTATION.md)。
 
 最简单的划分：规则决定“能做什么、结果是什么”；协调层决定“接收哪次操作、何时继续”；表现层负责“输入来自哪里、画面怎样显示”。替换图片不应影响伤害，增加技能不应要求改写主循环。
 
 ## 现状与目标
 
-现状：`models` 存放运行单位状态；`scenario` 验证初始阵容和障碍；`Board` 管理逻辑地图；`Geometry` 转换坐标；`BoardRenderer`/`Panel` 读取只读视图。`Controller` 统一操作、选中 UID 和动画交接，向 Effects 提交独立 AttackPresentation。`Game` 只组装模块、转换键鼠输入并调度循环。`Battle` 仍管理战斗与内存回溯，其内部结果与快照引用留给 M3。
+现状：`models` 存放运行 Unit、不可变 UnitSnapshot/AttackResult；`scenario` 验证初始阵容和障碍；`Board` 管理逻辑地图；`Geometry` 转换坐标；`BoardRenderer`/`Panel` 读取只读视图。`Controller` 统一操作、选中 UID、表现代次及动画交接，向 Effects 提交含 token/result 的 AttackPresentation。`Game` 只组装模块、转换键鼠输入并调度循环。`Battle` 管理战斗、结算编号和纯数据回溯，按 UID 重建恢复后的单位。
 
 目标仍使用 Python/Pygame，先维持当前平铺模块结构。模块职责稳定后才考虑按包分组，避免为目录美观改动所有导入。
 
 ```text
 tactics/
-  models.py          纯数据：单位状态、定义引用、坐标
+  models.py          运行单位、纯数据单位快照和攻击结果、坐标
   scenario.py        场景定义、验证、初始状态构建
   board.py           地图状态、空间查询、路径规则
   battle.py          指令合法性、伤害、行动顺序、回溯
@@ -428,7 +448,7 @@ tactics/
   game.py            初始化、组装、事件循环与退出
 ```
 
-这是分阶段职责图。scenario、geometry、board_renderer 在 M1 落地；controller、完整 UI 视图及 actions.py 的 UIAction/ActionResult 在 M2 落地；assets 尚未实现，不提前创建空模块。
+这是分阶段职责图。scenario、geometry、board_renderer 在 M1 落地；controller、完整 UI 视图及 actions.py 的 UIAction/ActionResult 在 M2 落地；纯数据快照、结算编号与代次确认在 M3 落地。assets 尚未实现，不提前创建空模块。
 
 ## 依赖方向
 
@@ -458,7 +478,7 @@ flowchart TD
 | renderer / panel / effects / assets | Pygame、只读视图、资源与布局 | 改写 Unit/Battle、自己计算第二套移动或攻击规则 |
 | game | 组装上述模块、适配操作系统输入 | 重复实现指令校验、伤害或回溯 |
 
-M1/M2 的规则、场景、几何、棋盘渲染、侧栏与协调边界已有测试；核心与控制器可在无第三方包的环境运行。M3 的内部快照和结算协议、M4 的资源加载仍为后续目标。
+M1–M3 的规则、场景、几何、渲染、侧栏、协调及快照/结算边界已有测试；核心与控制器可在无第三方包的环境运行。资源加载仍为 M4 目标。
 
 ## 数据模型
 
@@ -508,7 +528,7 @@ AttackResolved
 
 DTO 不保留可变 Unit/Battle 引用；嵌套集合也使用只读形式或独立副本。`frozen` 数据类中的可变对象不会自动变为只读。Renderer 只显示计算好的可达格与目标格，不调用 Battle 查询合法性。
 
-M2 实际接口：`get_view_state()` 返回 BattleView，其中 `board` 是既有 BoardView，`units` 是完整阵容（含死亡单位）的 UnitView 元组，`active/selected` 是独立 UnitView，`order` 仅包含存活单位。日志使用双语元组，按钮提供 `can_undo/can_skip/can_end_turn`，另有 `input_locked`。结算编号、表现代次和 visual_id 尚未加入。
+实际接口：`get_view_state()` 返回 BattleView，其中 `board` 是既有 BoardView，`units` 是完整阵容（含死亡单位）的 UnitView 元组，`active/selected` 是独立 UnitView，`order` 仅包含存活单位。日志使用双语元组，按钮提供 `can_undo/can_skip/can_end_turn`，另有 `input_locked`。M3 增加 `presentation_generation` 和可空的 `pending_resolution: ResolutionToken`；visual_id 与内容定义留给 M4。
 
 Controller 的 `select/move_to/attack/click_cell/handle_action/undo` 返回 ActionResult，包含 `accepted` 与失败 `reason`，支持布尔判断。显式移动/攻击提交给当前行动者，不依赖查看对象；鼠标 `click_cell` 额外保留“查看行动者时才尝试移动/攻击”的交互策略。二者最终调用同一 Battle 校验。UIAction 仅包括跳过阶段、结束行动、回溯。
 
@@ -518,19 +538,23 @@ Controller 的 `select/move_to/attack/click_cell/handle_action/undo` 返回 Acti
 
 保持现有语义：合法攻击立即计算生命和击杀，进入 resolving；表现层根据结果绘制跳字与死亡形体；协调层收到有效完成通知后调用规则交接一次。
 
-Game 在启动时将表现适配器交给 Controller。该接口只需要“播放结果、逐帧更新、报告完成、清除旧代次”几种操作；规则不导入适配器，协调层不导入 Pygame。纯逻辑测试使用立即完成的测试适配器，不依赖真实时间或窗口。
+Game 在启动时将表现适配器交给 Controller。M3 接口为 `play_attack(AttackPresentation)/update(elapsed)->tuple[ResolutionToken,...]/clear()`：播放结果、逐帧更新并返回完成通知、清除旧表现。规则不导入适配器，协调层不导入 Pygame。未传适配器时使用 NullPresentation，攻击仍先进入 resolving，再在下一次 update 返回通知并交接。
 
-M2 实际使用 `play_attack(AttackPresentation)/update(elapsed)/busy/clear()`；Controller 在每次 update 后检查 resolving 与 busy，结束时交接一次。未传适配器时使用 NullPresentation，攻击仍先进入 resolving，再在下一次 update 交接。以下编号与代次约束由 M3 实施，不将 busy 轮询视为完整异步通知协议。
+AttackResult 包含 resolution_id、actor_uid、target_uid、target_cell、target_team、damage、previous_hp、current_hp、killed。AttackPresentation 组合 `token: ResolutionToken(generation, resolution_id)` 与 `result: AttackResult`。Controller.update 消费通知，统一调用 `complete_presentation(token)`，只有当前 token 才能继续调用 `Battle.finish_attack(resolution_id)`；不以 Effects.busy 为交接条件。
 
 每次结算有编号，每次回溯/重开场景提升表现代次。只有当前代次、当前结算的完成通知有效，重复通知无效。动画播放不改变已结算的伤害；待机循环和环境特效不是阻塞任务，不参与行动交接的等待。
+
+结算编号由 Battle 分配，合法攻击才消耗编号，同一 Battle 内单调递增且不回溯。代次由 Controller 管理，成功回溯及程序化 restart 先提升代次、清空待确认，再清理表现和恢复规则。restart 重建同一 Scenario 的战斗，允许结算编号从 1 开始，但旧代次通知不能命中新战斗。当前没有玩家重开菜单；一个表现适配器属于一个 Controller 生命周期。
 
 死亡的规则状态与临时死亡形体分开：状态可已判定死亡，表现保留该位置的短暂形体，播放完成后销毁。回溯必须先使旧表现失效，再恢复规则状态并重建视图，不保留重复的死亡形体或伤害数字。
 
 ## 回溯与未来存档
 
-当前内存快照保存 Unit 引用和属性副本，运行上有效。M3 将其迁移为以 UID 关联的纯数据状态；保留入口顺序槽位，避免删除单位时造成行动序号偏移。
+当前内存快照为不可变 TurnSnapshot：完整 UnitSnapshot 元组、order_uids、index、round_number、phase、双语 log 元组和 winner。每个 UnitSnapshot 覆盖 Unit 的所有字段，不含活动实体、字典、字体或图片。回溯创建新 Unit，并按 UID 重建原入口顺序槽位；不因死亡压缩槽位，也不依赖快照前的对象身份。跨回溯的调用方必须按 UID 重新查询。
 
 快照明确包含轮数、队列槽位、阶段、战斗结果、单位状态及日志所需数据。新增规则字段必须同时说明初始值、修改者、快照和恢复行为；将来引入随机规则时再将相应随机状态纳入快照。
+
+历史仅在单位行动开始或战斗结束时记录，不支持恢复到 resolving 中途；待结算在这些边界必为 None。场景尺寸/障碍是当前不可变配置，不在每个行动快照重复保存。结算计数器、表现代次、待确认 token 属于不回溯的协议身份，不进入规则快照；以后引入可变地形或其他状态时再显式扩展快照。
 
 图片缓存、动画帧、字体和显示时钟不得进入快照。选中状态在恢复后按现有规则重置到当前行动者。快照不是直接 pickle 整个对象图；如以后新增持久化，再基于已验证的纯数据格式增加 schema_version、内容版本和迁移策略。
 
@@ -560,7 +584,7 @@ M2 实际使用 `play_attack(AttackPresentation)/update(elapsed)/busy/clear()`�
 ````markdown
 # 架构整改意见评审
 
-状态：M0 历史评审，基线为 `ff67755` / `v0.1.0`。下文源码事实对应评审时的结构；后续 M1、M2 已实施，当前进度与验证见 [M1](M1_IMPLEMENTATION.md)、[M2 实施记录](M2_IMPLEMENTATION.md) 和 TASKS。
+状态：M0 历史评审，基线为 `ff67755` / `v0.1.0`。下文源码事实对应评审时的结构；后续 M1–M3 已实施，当前进度与验证见 [M1](M1_IMPLEMENTATION.md)、[M2](M2_IMPLEMENTATION.md)、[M3 实施记录](M3_IMPLEMENTATION.md) 和 TASKS。
 
 评审材料：[用户提供的原报告](references/architecture_proposal.md)。本文将原报告中的建议与已经实现的能力分开记录。
 
@@ -568,7 +592,7 @@ M2 实际使用 `play_attack(AttackPresentation)/update(elapsed)/busy/clear()`�
 
 原报告的主要判断准确，适合作为渐进重构的起点。建议采纳“规则、应用协调、表现与资源分离”的方向，并补齐数据身份、回溯与动画协议、资源制作规范、功能开发准入和逐阶段验收。当前原型无需推翻，也不需要先建设通用游戏引擎。
 
-M0 交付的是整体规划和后续开发约束，当时不包括运行代码重构。后续 M1 已完成场景、几何与棋盘渲染分离；M2 已完成 Controller、完整只读视图与 UIAction。规则内部快照/结算协议及 assets 仍待 M3/M4，不将规划当成现成能力。
+M0 交付的是整体规划和后续开发约束，当时不包括运行代码重构。后续 M1 已完成场景、几何与棋盘渲染分离；M2 已完成 Controller、完整只读视图与 UIAction；M3 已完成纯数据快照与结算确认。assets 仍待 M4，不将规划当成现成能力。
 
 ## 对照源码的判断
 
@@ -831,7 +855,7 @@ CI 能自动检查的边界在相应迁移阶段加入，不宣称现在已有�
 
 状态：代码和本机验收完成。评审前基线为 `b072548`；实施分支为 `refactor/m1-rule-render-separation`。远程结果以对应 PR / Actions 为准，任务状态见 [TASKS](../TASKS.md)。
 
-本文件保留 M1 完成时的接口与验收记录。后续 Controller、完整视图与 UIAction 已在 M2 实施，当前调用方式见 [M2 记录](M2_IMPLEMENTATION.md)；下文的“留给 M2”描述属于当时阶段边界。
+本文件保留 M1 完成时的接口与验收记录。后续 Controller、完整视图与 UIAction 已在 M2 实施，快照与结算确认已在 M3 实施，当前调用方式见 [M2](M2_IMPLEMENTATION.md) 和 [M3 记录](M3_IMPLEMENTATION.md)；下文的“留给 M2/M3”属于当时阶段边界。
 
 ## 范围和结果
 
@@ -943,7 +967,7 @@ CI 在安装 requirements 之前执行上述 `-S` 核心检查，再安装 Pygam
 ## M1 完成时留给后续的内容
 
 - M2：Controller、完整 UI 视图、UIAction 命中封装（现已完成，见 M2 记录）。
-- M3：ID 化结算结果、纯数据快照和结算/表现代次协议。
+- M3：ID 化结算结果、纯数据快照和结算/表现代次协议（现已完成，见 M3 记录）。
 - M4：外部 JSON 内容、AssetManager、图片/动画素材加载。
 - M5：完整的后续扩展与资源交付演练。
 ````
@@ -954,6 +978,8 @@ CI 在安装 requirements 之前执行上述 `-S` 核心检查，再安装 Pygam
 # M2 实施与验收记录
 
 状态：代码与本机验收完成，2026-10-22。基线为 M1 合并提交 `431b403`，实施分支为 `refactor/m2-controller-view-separation`。远程执行结果以对应 PR / Actions 为准，任务状态见 [TASKS](../TASKS.md)。
+
+本文件保留 M2 完成时的接口与验收记录。M3 已将内部结果/快照迁为纯数据，并以结算编号和代次确认替代 busy 轮询；当前协议及迁移方式见 [M3 记录](M3_IMPLEMENTATION.md)。下文“留给 M3”属于当时阶段边界。
 
 ## 范围与数据归属
 
@@ -1052,12 +1078,115 @@ M2 的 AttackPresentation 是当前规则到表现的边界转换。规则内部
 像素一致性只用于本次保行为重构验收，不限制将来更换美术，也不要求不同系统字体产生相同像素。
 ````
 
+## docs/M3_IMPLEMENTATION.md
+
+````markdown
+# M3 实施与验收记录
+
+状态：代码和本机验收完成，2026-10-22。基线为 M2 合并提交 `babeffd`，实施分支为 `refactor/m3-snapshot-resolution-contract`。远程执行结果以对应 PR / Actions 为准，任务状态见 [TASKS](../TASKS.md)。
+
+## 结果与范围
+
+本阶段将规则结算和历史迁为独立不可变值，按 UID 恢复单位，并使动画交接匹配结算编号与表现代次。默认阵容、移动、速度顺序、100% 攻击伤害、击杀动画时长与“回到上一单位行动开始前”的语义保持一致，没有增加 AI、技能、磁盘存档或资源加载。
+
+| 数据 / 模块 | 当前实现 |
+| --- | --- |
+| models.UnitSnapshot | frozen；包含 Unit 全部字段，用 capture/create_unit 在运行实体与独立值间转换 |
+| models.AttackResult | frozen；结算编号、行动/目标 UID、目标位置/阵营、完整伤害、前后生命、击杀标记 |
+| battle.TurnSnapshot | frozen；单位快照元组、order_uids、index、round_number、phase、双语 log 元组、winner |
+| battle.Battle | 合法攻击分配单调编号；finish_attack 必须匹配当前编号；回溯按 UID 重建 Unit 和顺序槽位 |
+| view_models.ResolutionToken | frozen；generation 与 resolution_id 的组合身份 |
+| view_models.AttackPresentation | frozen；token + result，不含活动实体 |
+| controller.Controller | 表现代次、当前待确认 token、验证完成通知、回溯/重开前使旧表现失效 |
+| effects.CombatEffects | 更新跳字和死亡形体，阻塞效果全部完成后只返回一次 token；clear 取消待通知 |
+
+Game、Panel、BoardRenderer、Board、Scenario、Geometry 没有增加 M3 玩法分支。Game 仍只调用 Controller.update，无需了解通知和快照细节。
+
+## 快照、身份与恢复
+
+历史在单位行动开始或战斗结束时记录。每个单位的 UID、名称、阵营、职业、坐标、当前/最大生命、攻击、防御、速度和移动力均保存为独立值；集合与坐标使用元组。队列保存原始速度排序的 UID 槽位，包含死亡单位，不因死亡压缩。
+
+恢复时重新创建整份运行阵容，再按 order_uids 关联同一批新 Unit，恢复轮数、槽位、阶段、结果和日志，清空待结算。死亡状态仍由 health 决定，存活查询和路径/队列过滤沿用原规则。旧 Unit 对象不会被重新挂回战斗；外部跨回溯保存对象引用不再有效，应按 UID 查询。测试相应迁移了对象身份断言，原有行为断言保留。
+
+新增 Unit 字段必须同步 UnitSnapshot。字段覆盖测试比较两个数据类的完整字段集合，避免悄悄漏存新属性。新增其他规则状态也必须显式扩展 TurnSnapshot，不能只恢复画面。
+
+不进入快照的内容：
+
+- 场景尺寸与障碍：当前为不可变配置；未来可变地形需要新增恢复字段。
+- 结算计数器：属于协议身份，在同一个 Battle 中只增不减；回溯重打得到新编号。
+- 表现代次、待确认 token、选中 UID：由 Controller 管理；恢复后选中当前行动者。
+- 图片、字体、Surface、动画年龄和效果列表：只属于表现层。
+
+当前历史不保存 resolving 中途，不提供任意时刻恢复 API；记录边界上的 pending_attack 必为 None。快照可通过 asdict 转为基本值并由 JSON 编码，是独立性检查；本阶段没有定义磁盘格式、版本迁移或加载接口。
+
+## 结算与表现完成协议
+
+```text
+合法攻击 → Battle 立即扣血并生成 AttackResult(resolution_id, ...)
+        → Controller 记录 ResolutionToken(当前代次, resolution_id)
+        → Effects 播放 AttackPresentation(token, result)
+        → Effects.update 返回已完成 token 的元组
+        → Controller.complete_presentation 校验当前代次与当前 token
+        → Battle.finish_attack(resolution_id) 再次匹配当前结算
+        → 交接一次、清空待确认、选中新行动者
+```
+
+错误编号、错误代次、旧回合通知、重复通知或没有待确认时的通知都返回失败，保持当前局面不变。收到一批新旧混合通知时也只接受当前有效的一次。Controller 不再以全局 busy 为完成信号；无完成通知时即使 busy 为假也不交接，未来待机或环境动画持续 busy 也不能拖住已经完成的攻击。
+
+表现适配器的新接口：
+
+```python
+play_attack(event: AttackPresentation)  # event.token / event.result
+update(elapsed) -> tuple               # 本帧完成的 ResolutionToken；无完成时返回 ()
+clear()                               # 取消旧形体、数字和尚未发出的通知
+```
+
+当前 CombatEffects 只包含本次攻击的阻塞效果：死亡约 0.65 秒结束，跳字约 0.9 秒结束，二者全部结束后返回一次 token。busy 保留供显示/测试查询，Controller 不读取它。未来接入待机/环境效果时应与阻塞攻击任务分开管理，不能加入攻击完成判定。
+
+NullPresentation 保留无窗口行为：播放后排入一次完成 token，下一次 update 取出并清空。旧适配器如果只实现 busy 或 update 返回 None，必须迁移到此接口，不保留模糊的兼容路径。
+
+## 回溯与重开先作废旧表现
+
+成功回溯时先增加 generation、清空待确认，再调用 clear，最后恢复规则并重置选中。即使 clear 期间旧回调重入，或已在传输中的通知无法取消，旧 token 也已失效。不可回溯时不增加代次、不清理表现。
+
+新增 `Controller.restart()` 是程序化生命周期入口，重建当前不可变 Scenario 的战斗并清理历史。它允许取消结算中的旧表现；新 Battle 编号从 1 开始，但代次已经增加，旧编号相同的通知不能命中新战斗。没有新增玩家快捷键、按钮或菜单。一个表现适配器属于一个 Controller 生命周期；不同 Controller 不共用在途回调。
+
+### 接口取舍、迁移与回退
+
+本次保留平铺模块和普通函数调用，不引入消息总线、ECS 或通用序列化框架。小型 token 返回接口足以支持当前逐帧动画；未来异步完成也走同一 `complete_presentation` 校验，不直接改回合。
+
+迁移：原 AttackResult.actor/target 改为 UID 与值；原 AttackPresentation 平铺字段改为 token/result；原 finish_attack() 改为 finish_attack(resolution_id)；跨回溯对象引用改为按 UID 查找。旧 M2 示例中的 Controller 移动、按 UID 攻击、update、undo 调用仍有效。BattleView 新增 presentation_generation 与 pending_resolution；比较恢复后的逻辑局面时应单独看不回溯的代次。
+
+这些是内部开发接口变更，没有已发布的外部数据格式需要迁移。需要回退整个阶段时可使用 M2 基线 `babeffd` 的完整代码与测试；不要局部恢复旧动画接口或把实体引用重新塞回新快照。
+
+## 验收证据
+
+本机 Python 3.9.1 / Pygame 2.6.1 / SDL 2.28.4：**94 项检查通过，退出码 0**。保留原 75 项覆盖，新增 16 项快照/协议检查与 3 项真实效果通知/清理检查。
+
+```powershell
+.\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_core.py -v
+.\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_controller.py -v
+.\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_resolution.py -v
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+```
+
+前三组共 **44 项**，在无第三方包环境通过；核心独立子进程明确禁止导入 Pygame。CI 在安装依赖前执行三组，再运行完整回归，矩阵继续为 Windows/Linux × Python 3.9/3.12；远程结果见对应 Actions。
+
+新增检查覆盖：快照深层不可变、完整字段与基本值编码、运行实体变化不污染历史、按 UID 重建全部属性和规范槽位、死亡/跨轮恢复、零伤害/过量伤害与生命变化、编号不回溯、错误/重复/过期完成、回溯重打、结算中重开且编号相同、清理前作废及清理时旧回调、混合通知批次、实际跳字/死亡通知只发一次，以及连续击杀/回溯/重开无重复残留。
+
+完整 94 项分别在 dummy 显示驱动与本机 Windows 实际窗口通过。固定场景、操作和动画时间捕获的 **13 帧与 M2 逐像素一致**：开局、查看、移动、跳字、交接、回溯、敌方回合、英文界面、击杀动画、消失、复活、战斗结束、结束后回溯。额外保留 5×4 场景的实际窗口交互及结算中 QUIT 释放 display/font。验证通过程序调用和自动事件完成，并非人工逐次操作。
+
+像素基线保存在本机忽略目录 `.delivery/m3-before`、`.delivery/m3-after`。本阶段未变动绘图和布局，因此无需新增相同的游戏截图作为素材；后续换美术不受像素一致性约束。
+
+下一阶段 M4 接入内容/资源清单、验证、图片/缩放缓存和真实素材链路；不将当前几何动画称为素材动画加载。
+````
+
 ## docs/ROADMAP.md
 
 ````markdown
 # 架构实施路线与验收
 
-状态：M0、M1、M2 已完成；M3–M5 未开始。最近发布仍为 `v0.1.0`，M1/M2 属于未发布的开发变更；当前未实现资源加载，也未完成内部快照与结算协议迁移。
+状态：M0–M3 已完成；M4–M5 未开始。最近发布仍为 `v0.1.0`，M1–M3 属于未发布的开发变更；当前未实现资源加载或磁盘存档。
 
 本路线以当前 41 项行为检查为迁移基线。测试数量可增加，导入和夹具可随接口迁移，关键行为不能丢失。每个阶段在专用分支完成小批次提交，先验证、再审查差异并合并；不在一次提交中同时迁移架构和改动玩法。
 
@@ -1068,7 +1197,7 @@ M2 的 AttackPresentation 是当前规则到表现的边界转换。规则内部
 | M0 / ARCH-00 | v0.1.0 | 意见评审、整体架构、资源规范、开发约束、路线与状态记录 | 本次文档、源码汇总一致；原游戏回归通过 |
 | M1 / ARCH-01（已完成） | M0 | Scenario 纯数据初始化；Board 去除 Pygame；Geometry、BoardRenderer 和最小 BoardView 实际接管旧绘制 | 57 项检查通过；12 项无第三方包；8 帧逐像素一致；5×4 场景实际窗口验收，详见 M1 实施记录 |
 | M2 / ARCH-02（已完成） | M1 | Controller 操作入口、完整只读 View、UIAction 命中接口；Game 缩减为组装与循环 | 75 项检查通过，28 项无第三方包；13 帧与 M1 一致；完整交互与输入锁定通过，详见 M2 实施记录 |
-| M3 / ARCH-03 | M2 | ID 化的结算结果、纯数据快照、结算编号与表现代次；回溯清除旧表现 | 伤害与回溯行为不变；死亡及跨轮恢复一致；重复/过期完成通知不能推进回合；快照不含 Surface、Font 或活动实体引用 |
+| M3 / ARCH-03（已完成） | M2 | ID 化结算结果、纯数据快照/UID 重建、结算编号与表现代次；回溯清除旧表现 | 94 项检查通过，44 项无第三方包；错误/重复/过期通知无效；死亡及跨轮恢复一致；13 帧与 M2 一致，详见 M3 实施记录 |
 | M4 / ARCH-04 | M3 | 外部内容/资源清单、验证、图片和缩放缓存；一条真实素材替换链路 | 替换单位和地砖只修改清单/素材；相同文件只加载一次；不同尺寸缓存正确；缺失可定位并按策略回退；场景/定义错误明确拒绝 |
 | M5 / ARCH-05 | M1–M4 | 扩展演练、开发模板、完整 CI 与真实窗口验收、阶段版本交付 | 新场景与第二套外观分别通过数据接入；现有流程、动画、击杀和回溯全部通过；发布文件和文档对应同一提交 |
 
@@ -1146,9 +1275,9 @@ M1–M4 可以继续细分为下列小提交，不以“文件已经创建”作
 
 ## 当前下一步
 
-M1/M2 已达到“原画面与玩法保持一致，规则与操作协调可脱离 Pygame 运行，表现只读独立值”，见 [M1](M1_IMPLEMENTATION.md) 和 [M2 实施与验收](M2_IMPLEMENTATION.md)。
+M1–M3 已达到“原画面与玩法保持一致，规则与协调不依赖 Pygame，表现与快照使用独立值，交接验证结算编号及代次”，见 [M1](M1_IMPLEMENTATION.md)、[M2](M2_IMPLEMENTATION.md) 和 [M3 实施与验收](M3_IMPLEMENTATION.md)。
 
-下一个任务是 **ARCH-03 / M3**：迁移规则内部 AttackResult/TurnSnapshot 的实体引用，引入结算编号、表现代次及匹配确认。M2 仅将现有结算转换为独立 AttackPresentation，并通过 busy 轮询保持单次交接；没有提前加入异步完成通知或磁盘存档。
+下一个任务是 **ARCH-04 / M4**：接入 JSON 内容/资源清单、路径验证、图片和缩放缓存，在默认渲染路径完成地砖/单位素材替换，并沿用 M3 完成通知接入非循环动画。保留无素材几何回退，不把已有几何动画或可转字典的内存快照称为美术加载/磁盘存档。
 ````
 
 ## docs/references/architecture_proposal.md
@@ -1529,28 +1658,20 @@ class ActionResult:
 ```python
 """Speed order and one move / one adjacent attack per turn; no AI."""
 
-from dataclasses import asdict, dataclass
-from typing import Optional
+from dataclasses import dataclass
+from typing import Optional, Tuple
 
-from .models import Unit
-
-
-@dataclass(frozen=True)
-class AttackResult:
-    actor: Unit
-    target: Unit
-    damage: int
-    killed: bool
+from .models import AttackResult, UnitSnapshot
 
 
 @dataclass(frozen=True)
 class TurnSnapshot:
-    units: tuple
-    order: tuple
+    units: Tuple[UnitSnapshot, ...]
+    order_uids: Tuple[str, ...]
     index: int
     round_number: int
     phase: str
-    log: tuple
+    log: Tuple[Tuple[str, str], ...]
     winner: Optional[str]
 
 
@@ -1564,6 +1685,8 @@ class Battle:
         self.phase = "move"
         self.winner = None
         self.pending_attack = None
+        # Protocol identity is monotonic for this battle, never rewound with gameplay.
+        self._next_resolution_id = 1
         self.log = []
         self.notify("按速度从高到低行动，双方均手动操作", "Speed order; both teams are controlled manually.")
         self.history = [self._snapshot()]
@@ -1585,9 +1708,9 @@ class Battle:
         return self.phase != "resolving" and len(self.history) > 1
 
     def _snapshot(self):
-        return TurnSnapshot(tuple((unit, asdict(unit)) for unit in self.board.units),
-                            self.entry_order, self.index, self.round_number,
-                            self.phase, tuple(self.log), self.winner)
+        return TurnSnapshot(tuple(UnitSnapshot.capture(unit) for unit in self.board.units),
+                            tuple(unit.uid for unit in self.entry_order), self.index, self.round_number,
+                            self.phase, tuple(tuple(message) for message in self.log), self.winner)
 
     def undo(self):
         """Restore the previous unit turn's start, discarding this turn as well."""
@@ -1595,11 +1718,9 @@ class Battle:
             return False
         self.history.pop()
         snapshot = self.history[-1]
-        self.board.units = tuple(unit for unit, _ in snapshot.units)
-        for unit, values in snapshot.units:
-            for name, value in values.items():
-                setattr(unit, name, value)
-        self.entry_order = snapshot.order
+        self.board.units = tuple(state.create_unit() for state in snapshot.units)
+        by_uid = {unit.uid: unit for unit in self.board.units}
+        self.entry_order = tuple(by_uid[uid] for uid in snapshot.order_uids)
         self.index = snapshot.index
         self.round_number = snapshot.round_number
         self.phase = snapshot.phase
@@ -1638,8 +1759,13 @@ class Battle:
             return False
         actor = self.active_unit
         damage = max(0, actor.attack)
+        previous_hp = target.health
         target.health = max(0, target.health - damage)
-        self.pending_attack = AttackResult(actor, target, damage, not target.alive)
+        self.pending_attack = AttackResult(
+            self._next_resolution_id, actor.uid, target.uid, tuple(target.cell), target.team,
+            damage, previous_hp, target.health, not target.alive,
+        )
+        self._next_resolution_id += 1
         self.phase = "resolving"
         self.notify("{} 攻击 {}，造成 {} 点伤害".format(actor.name, target.name, damage),
                     "{} attacked {} for {} damage.".format(actor.uid, target.uid, damage))
@@ -1647,9 +1773,10 @@ class Battle:
             self.notify("{} 被击杀".format(target.name), "{} was defeated.".format(target.uid))
         return True
 
-    def finish_attack(self):
-        """Called once the presentation has finished its attack/death effects."""
-        if self.phase != "resolving":
+    def finish_attack(self, resolution_id):
+        """Only the currently pending resolution may hand off, once."""
+        if (self.phase != "resolving" or self.pending_attack is None
+                or self.pending_attack.resolution_id != resolution_id):
             return False
         self.pending_attack = None
         self._advance()
@@ -1832,8 +1959,8 @@ class BoardRenderer:
 ```python
 """Application operations and animation handoff, independent of Pygame.
 
-The injected presentation provides play_attack(values), update(seconds), busy and
-clear(). It never receives live entities. A no-op implementation supports callers
+The injected presentation provides play_attack(values), update(seconds) returning
+completion tokens, and clear(). It never receives live entities. A no-op supports callers
 without a window; a successful attack still resolves on the next update().
 """
 
@@ -1841,28 +1968,33 @@ from .actions import ActionResult, UIAction
 from .battle import Battle
 from .board import Board
 from .scenario import Scenario
-from .view_models import AttackPresentation, BattleView, build_battle_view
+from .view_models import AttackPresentation, BattleView, ResolutionToken, build_battle_view
 
 
 class NullPresentation:
-    busy = False
+    def __init__(self):
+        self._completed = ()
 
     def play_attack(self, result):
-        pass
+        self._completed = (result.token,)
 
     def update(self, elapsed):
-        pass
+        completed, self._completed = self._completed, ()
+        return completed
 
     def clear(self):
-        pass
+        self._completed = ()
 
 
 class Controller:
     def __init__(self, scenario: Scenario, presentation=None):
+        self._scenario = scenario
         self._board = Board(scenario)
         self._battle = Battle(self._board)
         self._presentation = NullPresentation() if presentation is None else presentation
         self._selected_uid = self._battle.active_unit.uid
+        self._generation = 0
+        self._pending_resolution = None
 
     def _unit(self, uid):
         return next((unit for unit in self._board.units if unit.uid == uid), None)
@@ -1872,7 +2004,8 @@ class Controller:
         self._selected_uid = actor.uid if actor is not None else None
 
     def get_view_state(self) -> BattleView:
-        return build_battle_view(self._board, self._battle, self._unit(self._selected_uid))
+        return build_battle_view(self._board, self._battle, self._unit(self._selected_uid),
+                                 self._generation, self._pending_resolution)
 
     def select(self, uid: str) -> ActionResult:
         if self._battle.phase == "resolving":
@@ -1896,10 +2029,8 @@ class Controller:
             return ActionResult(False, "illegal_target")
         result = self._battle.pending_attack
         self._select_active()
-        self._presentation.play_attack(AttackPresentation(
-            result.actor.uid, result.target.uid, tuple(result.target.cell),
-            result.target.team, result.damage, result.killed,
-        ))
+        self._pending_resolution = ResolutionToken(self._generation, result.resolution_id)
+        self._presentation.play_attack(AttackPresentation(self._pending_resolution, result))
         return ActionResult(True)
 
     def click_cell(self, cell) -> ActionResult:
@@ -1934,17 +2065,40 @@ class Controller:
         return ActionResult(True)
 
     def undo(self) -> ActionResult:
-        if not self._battle.undo():
+        if not self._battle.can_undo:
             return ActionResult(False, "undo_unavailable")
+        self._invalidate_presentation()
+        self._battle.undo()
+        self._select_active()
+        return ActionResult(True)
+
+    def _invalidate_presentation(self):
+        # Invalidate callbacks before clearing effects or rebuilding rule entities.
+        self._generation += 1
+        self._pending_resolution = None
         self._presentation.clear()
+
+    def restart(self) -> ActionResult:
+        """Programmatic lifecycle entry; no new keyboard command or menu."""
+        self._invalidate_presentation()
+        self._board = Board(self._scenario)
+        self._battle = Battle(self._board)
+        self._select_active()
+        return ActionResult(True)
+
+    def complete_presentation(self, token: ResolutionToken) -> ActionResult:
+        if (self._pending_resolution is None or token != self._pending_resolution
+                or token.generation != self._generation):
+            return ActionResult(False, "stale_resolution")
+        if not self._battle.finish_attack(token.resolution_id):
+            return ActionResult(False, "stale_resolution")
+        self._pending_resolution = None
         self._select_active()
         return ActionResult(True)
 
     def update(self, elapsed):
-        self._presentation.update(max(0, elapsed))
-        if self._battle.phase == "resolving" and not self._presentation.busy:
-            self._battle.finish_attack()
-            self._select_active()
+        for token in self._presentation.update(max(0, elapsed)):
+            self.complete_presentation(token)
 ```
 
 ## tactics/effects.py
@@ -1984,6 +2138,7 @@ class CombatEffects:
         self.geometry = geometry
         self.damage_texts = []
         self.deaths = []
+        self._pending_token = None
         self.damage_font = pygame.font.Font(None, 32)
         self.label_font = pygame.font.Font(None, 20)
 
@@ -1991,7 +2146,10 @@ class CombatEffects:
     def busy(self):
         return bool(self.damage_texts or self.deaths)
 
-    def play_attack(self, result: AttackPresentation):
+    def play_attack(self, event: AttackPresentation):
+        self.clear()
+        self._pending_token = event.token
+        result = event.result
         self.damage_texts.append(DamageText(result.target_cell, result.damage))
         if result.killed:
             self.deaths.append(DeathEffect(result.target_cell, result.target_team, result.target_uid))
@@ -1999,12 +2157,17 @@ class CombatEffects:
     def clear(self):
         self.damage_texts.clear()
         self.deaths.clear()
+        self._pending_token = None
 
     def update(self, elapsed):
         for effect in self.damage_texts + self.deaths:
             effect.age += max(0, elapsed)
         self.damage_texts = [effect for effect in self.damage_texts if effect.age < DAMAGE_DURATION]
         self.deaths = [effect for effect in self.deaths if effect.age < DEATH_DURATION]
+        if self._pending_token is not None and not self.busy:
+            token, self._pending_token = self._pending_token, None
+            return (token,)
+        return ()
 
     def draw(self, surface):
         old_clip = surface.get_clip()
@@ -2187,9 +2350,9 @@ class BoardGeometry:
 ## tactics/models.py
 
 ```python
-"""Mutable unit state and shared grid coordinates; no scene or rendering data."""
+"""Runtime units and immutable rule values; no scene or rendering data."""
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Tuple
 
 Cell = Tuple[int, int]
@@ -2212,6 +2375,45 @@ class Unit:
     @property
     def alive(self):
         return self.health > 0
+
+
+@dataclass(frozen=True)
+class UnitSnapshot:
+    """Complete unit values; no reference to a running entity or presentation."""
+
+    uid: str
+    name: str
+    team: str
+    role: str
+    cell: Cell
+    health: int
+    max_health: int
+    attack: int
+    defense: int
+    speed: int
+    movement: int
+
+    @classmethod
+    def capture(cls, unit):
+        values = asdict(unit)
+        values["cell"] = tuple(unit.cell)
+        return cls(**values)
+
+    def create_unit(self):
+        return Unit(**asdict(self))
+
+
+@dataclass(frozen=True)
+class AttackResult:
+    resolution_id: int
+    actor_uid: str
+    target_uid: str
+    target_cell: Cell
+    target_team: str
+    damage: int
+    previous_hp: int
+    current_hp: int
+    killed: bool
 ```
 
 ## tactics/panel.py
@@ -2483,7 +2685,7 @@ FPS = 60
 from dataclasses import dataclass
 from typing import FrozenSet, Optional, Tuple
 
-from .models import Cell
+from .models import AttackResult, Cell
 
 
 @dataclass(frozen=True)
@@ -2542,6 +2744,8 @@ class BattleView:
     can_skip: bool
     can_end_turn: bool
     input_locked: bool
+    presentation_generation: int
+    pending_resolution: Optional["ResolutionToken"]
 
     @property
     def finished(self):
@@ -2549,15 +2753,17 @@ class BattleView:
 
 
 @dataclass(frozen=True)
-class AttackPresentation:
-    """Only values cross into effects; rule AttackResult stays internal until M3."""
+class ResolutionToken:
+    """Identity of one blocking presentation in one controller generation."""
 
-    actor_uid: str
-    target_uid: str
-    target_cell: Cell
-    target_team: str
-    damage: int
-    killed: bool
+    generation: int
+    resolution_id: int
+
+
+@dataclass(frozen=True)
+class AttackPresentation:
+    token: ResolutionToken
+    result: AttackResult
 
 
 def build_board_view(board, battle, selected):
@@ -2580,7 +2786,7 @@ def build_board_view(board, battle, selected):
     )
 
 
-def build_battle_view(board, battle, selected):
+def build_battle_view(board, battle, selected, presentation_generation, pending_resolution):
     """Build one consistent snapshot, including units that a later undo may revive."""
     units = tuple(UnitView(
         unit.uid, unit.name, unit.team, unit.role, tuple(unit.cell),
@@ -2597,6 +2803,7 @@ def build_battle_view(board, battle, selected):
         tuple(by_uid[unit.uid] for unit in battle.order),
         tuple(tuple(message) for message in battle.log),
         battle.can_undo, can_act, can_act, battle.phase == "resolving",
+        presentation_generation, pending_resolution,
     )
 ```
 
@@ -2703,11 +2910,12 @@ class BattleChecks(unittest.TestCase):
         self.assertEqual(self.battle.phase, "resolving")
         self.assertIs(self.battle.active_unit, self.actor)
         self.assertEqual(self.battle.pending_attack.damage, 37)
-        self.assertTrue(self.battle.finish_attack())
+        resolution_id = self.battle.pending_attack.resolution_id
+        self.assertTrue(self.battle.finish_attack(resolution_id))
         self.assertIs(self.battle.active_unit, self.board.allies[0])
         self.assertEqual(self.battle.phase, "move")
         self.assertFalse(self.battle.attack(target))
-        self.assertFalse(self.battle.finish_attack())
+        self.assertFalse(self.battle.finish_attack(resolution_id))
 
     def test_skips_and_round_reset(self):
         self.battle.skip_phase()
@@ -2733,7 +2941,7 @@ class BattleChecks(unittest.TestCase):
         health = target.health
         self.assertTrue(self.battle.attack(target))
         self.assertEqual(target.health, health - enemy.attack)
-        self.battle.finish_attack()
+        self.battle.finish_attack(self.battle.pending_attack.resolution_id)
         self.assertEqual(self.battle.index, 3)
 
 
@@ -2764,17 +2972,24 @@ class HeldPresentation:
         self.results = []
         self.elapsed = []
         self.clears = 0
+        self.pending = None
 
     def play_attack(self, result):
         self.results.append(result)
+        self.pending = result.token
         self.busy = True
 
     def update(self, elapsed):
         self.elapsed.append(elapsed)
+        if not self.busy and self.pending is not None:
+            token, self.pending = self.pending, None
+            return (token,)
+        return ()
 
     def clear(self):
         self.clears += 1
         self.busy = False
+        self.pending = None
 
 
 def changed_scenario(**changes):
@@ -2841,7 +3056,7 @@ class ControllerChecks(unittest.TestCase):
         resolving = self.view
         self.finish()
         self.controller.undo()
-        self.assertEqual(self.view, before)
+        self.assertEqual(replace(self.view, presentation_generation=before.presentation_generation), before)
         self.assertEqual(before.active.cell, (1, 3))
         self.assertEqual(next(unit.health for unit in before.units if unit.uid == "D2"), 100)
         self.assertEqual(resolving.active.cell, (4, 4))
@@ -2940,7 +3155,7 @@ class ControllerChecks(unittest.TestCase):
         self.finish()
         self.controller.move_to((0, 1))
         self.assertTrue(self.controller.handle_action(UIAction.UNDO))
-        self.assertEqual(self.view, before)
+        self.assertEqual(replace(self.view, presentation_generation=before.presentation_generation), before)
         self.assertEqual(self.presentation.clears, 1)
         self.assertFalse(self.presentation.busy)
         self.assertFalse(self.controller.undo())
@@ -2989,7 +3204,7 @@ class ControllerChecks(unittest.TestCase):
 
     def test_effect_result_is_detached_and_read_only_even_after_undo(self):
         self.start_attack()
-        result = self.presentation.results[0]
+        result = self.presentation.results[0].result
         self.assertEqual((result.actor_uid, result.target_uid, result.target_cell,
                           result.target_team, result.damage, result.killed),
                          ("A2", "D2", (5, 4), "enemy", 10, False))
@@ -3087,12 +3302,13 @@ class ScenarioChecks(unittest.TestCase):
         self.assertTrue(battle.move((2, 0)))
         self.assertTrue(battle.attack(target))
         self.assertEqual(target.health, 33)
-        battle.finish_attack()
+        battle.finish_attack(battle.pending_attack.resolution_id)
         self.assertIs(battle.active_unit, target)
         self.assertTrue(battle.undo())
-        self.assertIs(battle.active_unit, actor)
-        self.assertEqual(actor.cell, (0, 0))
-        self.assertEqual(target.health, 50)
+        self.assertEqual(battle.active_unit.uid, actor.uid)
+        self.assertIsNot(battle.active_unit, actor)
+        self.assertEqual(battle.active_unit.cell, (0, 0))
+        self.assertEqual(board.units[1].health, 50)
 
     def test_rejects_invalid_dimensions_empty_or_one_sided_scenarios(self):
         source = alternate_scenario()
@@ -3162,6 +3378,8 @@ class CoreBoundaryChecks(unittest.TestCase):
         script = """
 import importlib.abc
 import importlib.util
+from dataclasses import asdict
+import json
 import sys
 assert importlib.util.find_spec('pygame') is None
 class NoPygame(importlib.abc.MetaPathFinder):
@@ -3181,7 +3399,7 @@ battle = Battle(board)
 assert battle.move((4, 4))
 assert battle.attack(board.enemies[1])
 assert board.enemies[1].health == 90
-battle.finish_attack()
+battle.finish_attack(battle.pending_attack.resolution_id)
 assert battle.undo()
 assert board.enemies[1].health == 100
 assert build_board_view(board, battle, battle.active_unit).active_uid == 'A2'
@@ -3190,10 +3408,15 @@ controller = Controller(default_scenario())
 assert controller.move_to((4, 4))
 assert controller.attack('D2')
 assert controller.get_view_state().input_locked
+token = controller.get_view_state().pending_resolution
+assert not controller.complete_presentation(None)
 controller.update(0)
 assert controller.get_view_state().active.uid == 'A1'
+assert not controller.complete_presentation(token)
 assert controller.handle_action(UIAction.UNDO)
 assert controller.get_view_state().active.cell == (1, 3)
+assert controller.get_view_state().presentation_generation == 1
+json.dumps(asdict(battle.history[0]))
 assert 'pygame' not in sys.modules
 print('core-without-pygame: OK')
 """
@@ -3344,6 +3567,50 @@ class CombatInteractionChecks(unittest.TestCase):
         self.game.run()
         self.assertFalse(pygame.display.get_init())
         self.assertFalse(pygame.font.get_init())
+
+    def test_real_effect_adapter_emits_matching_completion_only_once(self):
+        self.start_attack()
+        token = self.view.pending_resolution
+        self.assertEqual(self.game.effects.update(0.2), ())
+        self.assertEqual(self.game.effects.update(0.71), (token,))
+        self.assertEqual(self.game.effects.update(10), ())
+        self.assertEqual(self.view.phase, "resolving")  # Effects cannot mutate the battle.
+        self.assertTrue(self.game.controller.complete_presentation(token))
+        after = self.view
+        self.assertFalse(self.game.controller.complete_presentation(token))
+        self.assertEqual(self.view, after)
+
+    def test_death_completion_waits_for_longer_damage_popup(self):
+        self.start_attack(lethal=True)
+        token = self.view.pending_resolution
+        self.assertEqual(self.game.effects.update(0.7), ())
+        self.assertFalse(self.game.effects.deaths)
+        self.assertTrue(self.game.effects.damage_texts)
+        self.assertEqual(self.view.phase, "resolving")
+        self.assertEqual(self.game.effects.update(0.21), (token,))
+        self.assertFalse(self.game.effects.busy)
+        self.assertEqual(self.game.effects.update(1), ())
+
+    def test_repeated_kill_undo_and_restart_leave_no_duplicate_visuals_or_notifications(self):
+        self.start_attack(lethal=True)
+        for _ in range(2):
+            token = self.view.pending_resolution
+            self.assertEqual((len(self.game.effects.deaths), len(self.game.effects.damage_texts)), (1, 1))
+            self.game.update(1)
+            self.assertTrue(self.game.controller.undo())
+            self.assertFalse(self.game.effects.busy)
+            self.assertEqual(self.game.effects.update(1), ())
+            self.assertFalse(self.game.controller.complete_presentation(token))
+            self.assertEqual(self.target.health, 5)
+            self.click(self.game.geometry.cell_center((4, 4)))
+            self.click(self.game.geometry.cell_center((5, 4)))
+        old = self.view.pending_resolution
+        self.game.controller.restart()
+        self.assertFalse(self.game.effects.busy)
+        self.assertEqual(self.game.effects.update(1), ())
+        self.assertFalse(self.game.controller.complete_presentation(old))
+        self.assertEqual((self.actor.cell, self.target.health), ((1, 3), 5))
+        self.game.draw()
 
 
 if __name__ == "__main__":
@@ -3652,6 +3919,311 @@ if __name__ == "__main__":
     unittest.main()
 ```
 
+## tests/test_resolution.py
+
+```python
+"""M3 snapshot and completion contracts, runnable with python -S."""
+
+from dataclasses import FrozenInstanceError, asdict, fields, is_dataclass, replace
+import json
+import unittest
+
+from tactics.actions import UIAction
+from tactics.battle import Battle
+from tactics.board import Board
+from tactics.controller import Controller
+from tactics.models import Unit, UnitSnapshot
+from tactics.scenario import default_scenario
+from tactics.view_models import ResolutionToken
+
+
+def scenario_with(**changes):
+    scenario = default_scenario()
+    return replace(scenario, units=tuple(
+        replace(unit, **changes.get(unit.uid, {})) for unit in scenario.units))
+
+
+def assert_pure(test, value):
+    if is_dataclass(value):
+        test.assertTrue(value.__dataclass_params__.frozen)
+        for field in fields(value):
+            assert_pure(test, getattr(value, field.name))
+    elif isinstance(value, tuple):
+        for child in value:
+            assert_pure(test, child)
+    else:
+        test.assertIn(type(value), (str, int, bool, type(None)))
+
+
+class SnapshotAndResultChecks(unittest.TestCase):
+    def setUp(self):
+        self.board = Board(default_scenario())
+        self.battle = Battle(self.board)
+
+    def attack(self):
+        self.assertTrue(self.battle.move((4, 4)))
+        self.assertTrue(self.battle.attack(next(unit for unit in self.board.units if unit.uid == "D2")))
+        return self.battle.pending_attack
+
+    def test_snapshots_are_deeply_immutable_values_covering_every_unit_field(self):
+        snapshot = self.battle.history[0]
+        self.assertEqual({field.name for field in fields(UnitSnapshot)},
+                         {field.name for field in fields(Unit)})
+        assert_pure(self, snapshot)
+        self.assertEqual(snapshot.order_uids, ("A2", "A1", "D1", "A3", "D2", "D3"))
+        with self.assertRaises(FrozenInstanceError):
+            snapshot.units[0].health = 0
+        with self.assertRaises(FrozenInstanceError):
+            snapshot.index = 2
+        self.assertIsInstance(json.loads(json.dumps(asdict(snapshot)))["units"], list)
+        self.assertFalse(hasattr(snapshot, "_next_resolution_id"))
+
+    def test_saved_values_do_not_change_with_runtime_damage_attributes_or_logs(self):
+        snapshot = self.battle.history[0]
+        before = asdict(snapshot)
+        self.attack()
+        for unit in self.board.units:
+            unit.health = 1
+            unit.attack = 999
+            unit.cell = (0, 0)
+            unit.name = "Changed"
+        self.battle.notify("changed", "changed")
+        self.assertEqual(asdict(snapshot), before)
+
+    def test_undo_recreates_all_attributes_and_canonical_slots_by_uid(self):
+        self.board = Board(scenario_with(A2={"health": 800, "max_health": 1000, "attack": 300},
+                                         D2={"health": 5}))
+        self.battle = Battle(self.board)
+        original_units = self.board.units
+        before = self.battle.history[0]
+        result = self.attack()
+        self.battle.finish_attack(result.resolution_id)
+        self.battle.move((0, 1))
+        for unit in self.board.units:
+            unit.name, unit.role, unit.defense = "Changed", "Other", 999
+            unit.speed, unit.movement, unit.max_health, unit.health = 1, 0, 1, 1
+        self.assertTrue(self.battle.undo())
+        self.assertEqual(self.battle._snapshot(), before)
+        for old, current in zip(original_units, self.board.units):
+            self.assertIsNot(old, current)
+        by_uid = {unit.uid: unit for unit in self.board.units}
+        self.assertTrue(all(unit is by_uid[unit.uid] for unit in self.battle.entry_order))
+        self.assertEqual((by_uid["D2"].health, by_uid["A2"].health, by_uid["A2"].max_health), (5, 800, 1000))
+        self.battle.move((4, 4))
+        self.assertFalse(self.battle.attack(original_units[4]))  # Stale object identity is not a target.
+        self.assertTrue(self.battle.attack(by_uid["D2"]))
+
+    def test_dead_state_and_round_are_restored_through_multiple_undos(self):
+        self.board = Board(scenario_with(D2={"health": 5}))
+        self.battle = Battle(self.board)
+        result = self.attack()
+        self.battle.finish_attack(result.resolution_id)
+        after_kill = self.battle.history[-1]
+        for _ in range(4):
+            self.battle.end_turn()
+        self.assertEqual((self.battle.round_number, self.battle.active_unit.uid), (2, "A2"))
+        for _ in range(4):
+            self.assertTrue(self.battle.undo())
+        self.assertEqual(self.battle._snapshot(), after_kill)
+        self.assertEqual(next(unit.health for unit in self.board.units if unit.uid == "D2"), 0)
+        self.assertNotIn("D2", tuple(unit.uid for unit in self.battle.order))
+        self.assertTrue(self.battle.undo())
+        self.assertEqual(next(unit.health for unit in self.board.units if unit.uid == "D2"), 5)
+        self.assertIn("D2", tuple(unit.uid for unit in self.battle.order))
+
+    def test_rule_completion_requires_matching_id_and_ids_do_not_rewind(self):
+        self.assertFalse(self.battle.attack(self.board.enemies[1]))
+        first = self.attack()
+        self.assertEqual(first.resolution_id, 1)
+        before = self.battle._snapshot()
+        self.assertFalse(self.battle.finish_attack(first.resolution_id + 1))
+        self.assertEqual(self.battle._snapshot(), before)
+        self.assertTrue(self.battle.finish_attack(first.resolution_id))
+        self.assertFalse(self.battle.finish_attack(first.resolution_id))
+        self.battle.undo()
+        second = self.attack()
+        self.assertGreater(second.resolution_id, first.resolution_id)
+        self.assertFalse(self.battle.finish_attack(first.resolution_id))
+        self.assertEqual(self.battle.phase, "resolving")
+        self.assertTrue(self.battle.finish_attack(second.resolution_id))
+
+    def test_attack_results_capture_ids_location_full_damage_and_hp_change(self):
+        for attack, health, expected_hp, killed in ((10, 100, 90, False), (300, 7, 0, True), (0, 7, 7, False)):
+            with self.subTest(attack=attack):
+                self.board = Board(scenario_with(A2={"attack": attack}, D2={"health": health}))
+                self.battle = Battle(self.board)
+                result = self.attack()
+                assert_pure(self, result)
+                self.assertEqual((result.actor_uid, result.target_uid, result.target_team,
+                                  result.target_cell, result.damage, result.previous_hp,
+                                  result.current_hp, result.killed),
+                                 ("A2", "D2", "enemy", (5, 4), attack, health, expected_hp, killed))
+                with self.assertRaises(FrozenInstanceError):
+                    result.current_hp = 100
+                self.board.enemies[1].cell = (7, 7)
+                self.board.enemies[1].health = 1
+                self.assertEqual((result.target_cell, result.current_hp), ((5, 4), expected_hp))
+
+
+class DelayedPresentation:
+    """Can deliver in-flight notifications even after clear; controller must reject them."""
+
+    def __init__(self):
+        self.events = []
+        self.completions = []
+        self.clears = 0
+        self.busy = False
+        self.on_clear = None
+
+    def play_attack(self, event):
+        self.events.append(event)
+
+    def update(self, elapsed):
+        completed, self.completions = tuple(self.completions), []
+        return completed
+
+    def clear(self):
+        self.clears += 1
+        if self.on_clear is not None:
+            self.on_clear()
+
+
+class CompletionContractChecks(unittest.TestCase):
+    def setUp(self):
+        self.presentation = DelayedPresentation()
+        self.controller = Controller(default_scenario(), self.presentation)
+
+    @property
+    def view(self):
+        return self.controller.get_view_state()
+
+    def attack(self):
+        self.assertTrue(self.controller.move_to((4, 4)))
+        self.assertTrue(self.controller.attack("D2"))
+        return self.presentation.events[-1].token
+
+    def test_matching_completion_is_accepted_only_once(self):
+        token = self.attack()
+        self.assertEqual(self.view.pending_resolution, token)
+        assert_pure(self, self.presentation.events[-1])
+        self.assertTrue(self.controller.complete_presentation(token))
+        after = self.view
+        self.assertEqual(after.active.uid, "A1")
+        self.assertIsNone(after.pending_resolution)
+        self.assertFalse(self.controller.complete_presentation(token))
+        self.assertEqual(self.view, after)
+
+    def test_wrong_generation_or_resolution_is_rejected_without_side_effects(self):
+        token = self.attack()
+        before = self.view
+        for wrong in (replace(token, generation=token.generation + 1),
+                      replace(token, resolution_id=token.resolution_id + 1), None):
+            self.assertFalse(self.controller.complete_presentation(wrong))
+            self.assertEqual(self.view, before)
+        self.assertTrue(self.controller.complete_presentation(token))
+
+    def test_busy_false_without_completion_cannot_handoff(self):
+        self.attack()
+        self.assertFalse(self.presentation.busy)
+        before = self.view
+        self.controller.update(10000)
+        self.assertEqual(self.view, before)
+
+    def test_background_busy_does_not_block_explicit_attack_completion(self):
+        token = self.attack()
+        self.presentation.busy = True  # Future ambient/idle animation may continue forever.
+        self.presentation.completions.append(token)
+        self.controller.update(0)
+        self.assertEqual((self.view.active.uid, self.view.phase), ("A1", "move"))
+
+    def test_undo_replay_rejects_old_completion_before_and_during_new_attack(self):
+        old = self.attack()
+        self.controller.complete_presentation(old)
+        self.controller.undo()
+        self.assertEqual(self.view.presentation_generation, old.generation + 1)
+        self.assertFalse(self.controller.complete_presentation(old))
+        current = self.attack()
+        self.assertGreater(current.resolution_id, old.resolution_id)
+        before = self.view
+        self.assertFalse(self.controller.complete_presentation(old))
+        self.assertEqual(self.view, before)
+        self.assertTrue(self.controller.complete_presentation(current))
+
+    def test_restart_during_attack_cancels_old_generation_even_when_ids_repeat(self):
+        old = self.attack()
+        self.assertTrue(self.controller.restart())
+        self.assertEqual((self.view.presentation_generation, self.view.active.cell), (1, (1, 3)))
+        self.assertEqual(next(unit.health for unit in self.view.units if unit.uid == "D2"), 100)
+        self.assertFalse(self.view.can_undo)
+        current = self.attack()
+        self.assertEqual(old.resolution_id, current.resolution_id)
+        self.assertNotEqual(old.generation, current.generation)
+        self.assertFalse(self.controller.complete_presentation(old))
+        self.assertEqual(self.view.pending_resolution, current)
+        self.assertTrue(self.controller.complete_presentation(current))
+
+    def test_generation_is_invalidated_before_clear_can_deliver_late_callback(self):
+        old = self.attack()
+        results = []
+
+        def late_callback():
+            self.assertEqual(self.view.presentation_generation, old.generation + 1)
+            self.assertIsNone(self.view.pending_resolution)
+            results.append(self.controller.complete_presentation(old))
+
+        self.presentation.on_clear = late_callback
+        self.controller.restart()  # Old token was valid and resolving immediately before clear.
+        self.assertEqual(len(results), 1)
+        self.assertFalse(results[0])
+        self.assertEqual((self.view.active.uid, self.view.phase), ("A2", "move"))
+        self.assertEqual(self.presentation.clears, 1)
+
+    def test_failed_undo_does_not_advance_generation_or_clear_current_presentation(self):
+        before = self.view
+        self.assertFalse(self.controller.undo())
+        self.assertEqual(self.view, before)
+        self.controller.handle_action(UIAction.END_TURN)
+        self.controller.undo()
+        self.attack()
+        before = self.view
+        clears = self.presentation.clears
+        self.assertFalse(self.controller.undo())
+        self.assertEqual(self.view, before)
+        self.assertEqual(self.presentation.clears, clears)
+
+    def test_batch_of_late_duplicate_and_current_notifications_hands_off_once(self):
+        old = self.attack()
+        self.controller.complete_presentation(old)
+        self.presentation.completions.append(old)
+        self.controller.undo()  # In-flight notification survives adapter.clear().
+        current = self.attack()
+        self.presentation.completions += [current, current, old]
+        self.controller.update(0)
+        after = self.view
+        self.assertEqual((after.active.uid, after.round_number), ("A1", 1))
+        self.controller.update(1)
+        self.assertEqual(self.view, after)
+
+    def test_final_kill_completion_cannot_repeat_after_finish_or_undo(self):
+        scenario = scenario_with(D2={"health": 5})
+        scenario = replace(scenario, units=tuple(unit for unit in scenario.units if unit.uid in ("A2", "D2")))
+        self.controller = Controller(scenario, self.presentation)
+        token = self.attack()
+        self.assertFalse(self.view.finished)
+        self.controller.complete_presentation(token)
+        self.assertEqual(self.view.winner, "ally")
+        after = self.view
+        self.assertFalse(self.controller.complete_presentation(token))
+        self.assertEqual(self.view, after)
+        self.controller.undo()
+        self.assertFalse(self.controller.complete_presentation(token))
+        self.assertEqual(next(unit.health for unit in self.view.units if unit.uid == "D2"), 5)
+
+
+if __name__ == "__main__":
+    unittest.main()
+```
+
 ## tests/test_rewind.py
 
 ```python
@@ -3669,8 +4241,14 @@ class RewindAndDefeatChecks(unittest.TestCase):
     def setUp(self):
         self.board = Board(default_scenario())
         self.battle = Battle(self.board)
-        self.actor = self.battle.active_unit
-        self.target = self.board.enemies[1]
+
+    @property
+    def actor(self):
+        return next(unit for unit in self.board.units if unit.uid == "A2")
+
+    @property
+    def target(self):
+        return next(unit for unit in self.board.units if unit.uid == "D2")
 
     def test_first_turn_has_no_previous_turn_even_after_moving(self):
         self.assertFalse(self.battle.can_undo)
@@ -3684,7 +4262,7 @@ class RewindAndDefeatChecks(unittest.TestCase):
         log = list(self.battle.log)
         self.battle.move((4, 4))
         self.battle.attack(self.target)
-        self.battle.finish_attack()
+        self.battle.finish_attack(self.battle.pending_attack.resolution_id)
         self.assertTrue(self.battle.move((0, 1)))
         self.assertTrue(self.battle.undo())
         self.assertEqual([asdict(unit) for unit in self.board.units], before)
@@ -3755,7 +4333,7 @@ class RewindAndDefeatChecks(unittest.TestCase):
         self.assertEqual(self.battle.active_unit.uid, "D1")
         self.battle.skip_phase()
         self.battle.attack(ally)
-        self.battle.finish_attack()
+        self.battle.finish_attack(self.battle.pending_attack.resolution_id)
         self.assertEqual(self.battle.active_unit.uid, "A3")
 
     def test_killing_next_actor_skips_the_dead_slot(self):
@@ -3765,7 +4343,7 @@ class RewindAndDefeatChecks(unittest.TestCase):
         self.battle.end_turn()
         self.battle.skip_phase()
         self.battle.attack(enemy)
-        self.battle.finish_attack()
+        self.battle.finish_attack(self.battle.pending_attack.resolution_id)
         self.assertEqual(self.battle.active_unit.uid, "A3")
 
     def test_round_wrap_can_skip_a_dead_first_slot(self):
@@ -3776,7 +4354,7 @@ class RewindAndDefeatChecks(unittest.TestCase):
         self.assertEqual(self.battle.active_unit.uid, "D3")
         self.battle.skip_phase()
         self.battle.attack(self.actor)
-        self.battle.finish_attack()
+        self.battle.finish_attack(self.battle.pending_attack.resolution_id)
         self.assertEqual(self.battle.active_unit.uid, "A1")
         self.assertEqual(self.battle.round_number, 2)
 
@@ -3787,7 +4365,7 @@ class RewindAndDefeatChecks(unittest.TestCase):
         battle.move((4, 4))
         battle.attack(self.target)
         self.assertFalse(battle.finished)
-        battle.finish_attack()
+        battle.finish_attack(battle.pending_attack.resolution_id)
         self.assertEqual(battle.winner, "ally")
         self.assertIsNone(battle.active_unit)
         self.assertFalse(battle.end_turn())
@@ -3803,17 +4381,17 @@ class RewindAndDefeatChecks(unittest.TestCase):
         self.actor.max_health = 1000
         self.actor.health = 800
         battle = Battle(self.board)
-        original_order = battle.order
+        original_order = tuple(unit.uid for unit in battle.order)
         for _ in range(2):
             self.assertTrue(battle.move((4, 4)))
             self.assertTrue(battle.attack(self.target))
-            battle.finish_attack()
+            battle.finish_attack(battle.pending_attack.resolution_id)
             self.assertFalse(self.target.alive)
             self.assertTrue(battle.undo())
             self.assertTrue(self.target.alive)
             self.assertEqual(self.target.health, self.target.max_health)
             self.assertEqual((self.actor.health, self.actor.max_health), (800, 1000))
-            self.assertEqual(battle.order, original_order)
+            self.assertEqual(tuple(unit.uid for unit in battle.order), original_order)
             self.assertEqual(self.actor.cell, (1, 3))
 
 

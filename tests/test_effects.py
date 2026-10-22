@@ -132,6 +132,50 @@ class CombatInteractionChecks(unittest.TestCase):
         self.assertFalse(pygame.display.get_init())
         self.assertFalse(pygame.font.get_init())
 
+    def test_real_effect_adapter_emits_matching_completion_only_once(self):
+        self.start_attack()
+        token = self.view.pending_resolution
+        self.assertEqual(self.game.effects.update(0.2), ())
+        self.assertEqual(self.game.effects.update(0.71), (token,))
+        self.assertEqual(self.game.effects.update(10), ())
+        self.assertEqual(self.view.phase, "resolving")  # Effects cannot mutate the battle.
+        self.assertTrue(self.game.controller.complete_presentation(token))
+        after = self.view
+        self.assertFalse(self.game.controller.complete_presentation(token))
+        self.assertEqual(self.view, after)
+
+    def test_death_completion_waits_for_longer_damage_popup(self):
+        self.start_attack(lethal=True)
+        token = self.view.pending_resolution
+        self.assertEqual(self.game.effects.update(0.7), ())
+        self.assertFalse(self.game.effects.deaths)
+        self.assertTrue(self.game.effects.damage_texts)
+        self.assertEqual(self.view.phase, "resolving")
+        self.assertEqual(self.game.effects.update(0.21), (token,))
+        self.assertFalse(self.game.effects.busy)
+        self.assertEqual(self.game.effects.update(1), ())
+
+    def test_repeated_kill_undo_and_restart_leave_no_duplicate_visuals_or_notifications(self):
+        self.start_attack(lethal=True)
+        for _ in range(2):
+            token = self.view.pending_resolution
+            self.assertEqual((len(self.game.effects.deaths), len(self.game.effects.damage_texts)), (1, 1))
+            self.game.update(1)
+            self.assertTrue(self.game.controller.undo())
+            self.assertFalse(self.game.effects.busy)
+            self.assertEqual(self.game.effects.update(1), ())
+            self.assertFalse(self.game.controller.complete_presentation(token))
+            self.assertEqual(self.target.health, 5)
+            self.click(self.game.geometry.cell_center((4, 4)))
+            self.click(self.game.geometry.cell_center((5, 4)))
+        old = self.view.pending_resolution
+        self.game.controller.restart()
+        self.assertFalse(self.game.effects.busy)
+        self.assertEqual(self.game.effects.update(1), ())
+        self.assertFalse(self.game.controller.complete_presentation(old))
+        self.assertEqual((self.actor.cell, self.target.health), ((1, 3), 5))
+        self.game.draw()
+
 
 if __name__ == "__main__":
     unittest.main()
