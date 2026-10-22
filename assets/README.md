@@ -2,6 +2,8 @@
 
 默认 9 张 PNG 由 `scripts/generate_demo_assets.py` 使用 Pygame 几何图形生成；M5 增加 [dusk 外观](skins/dusk/README.md) 的 17 张 PNG，由 `scripts/generate_dusk_assets.py` 生成。没有下载或引用第三方美术，不代表最终风格。资源无第三方素材许可要求；项目整体授权仍由仓库所有者决定，本文件不另设开源许可证。
 
+透视扩展另有 [war_torn 背景](skins/war_torn/README.md)：用户提供的原始 PNG，来源、真实尺寸与 SHA256 单独记录，不由上述生成脚本重建。角色暂用几何回退，背景作为必需资源通过 presentation 使用。
+
 | 文件 | 原始 / 基准显示尺寸 | 锚点 | 用途 |
 | --- | --- | --- | --- |
 | tiles/floor.png | 64×64 / 64×64 | (0.5, 0.5)，格子中心 | 地砖 |

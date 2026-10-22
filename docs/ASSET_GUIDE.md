@@ -92,6 +92,8 @@ AssetManager 集中解析清单、加载原图、生成缩放/切帧结果。初
 
 ## 图层顺序
 
+透视模式使用 `board.background` 引用必需 PNG（optional=false、pivot=[0,0]），native/display 尺寸须匹配 presentation.reference_image_size。整图仅按 contain 缩放并缓存，不平铺、不按深度尺度重复缩放。四角在原图坐标系，背景、网格、拾取共用同一变换；角色/障碍预载有限深度尺度。角色脚底为投影站立点，按屏幕 Y/稳定 UID 排序，HUD 最后绘制。实际例子见 [透视战场](PERSPECTIVE_BATTLEFIELD.md)。旧 floor/obstacle 入口继续可用。
+
 1. 地砖、地面装饰。
 2. 移动/攻击范围与目标格提示。
 3. 角色与障碍阴影。

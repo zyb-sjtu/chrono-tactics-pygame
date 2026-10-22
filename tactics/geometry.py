@@ -50,3 +50,14 @@ class BoardGeometry:
     def cell_center(self, cell: Cell):
         x, y, width, height = self.cell_rect(cell)
         return x + width // 2, y + height // 2
+
+    def cell_anchor(self, cell: Cell):
+        x, y, width, height = self.cell_rect(cell)
+        return x + width // 2, y + height
+
+    def cell_scale(self, cell: Cell):
+        self.cell_rect(cell)
+        return self.cell_size / 64
+
+    def body_rect(self, cell: Cell):
+        return self.cell_rect(cell)

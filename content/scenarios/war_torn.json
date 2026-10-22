@@ -1,0 +1,14 @@
+{
+  "schema_version":1,
+  "id":"war_torn",
+  "cols":8,"rows":8,
+  "obstacles":[[0,1],[7,6],[6,0]],
+  "spawns":[
+    {"uid":"A2","definition_id":"scout","team":"ally","cell":[1,4],"overrides":{"health":80}},
+    {"uid":"A1","definition_id":"vanguard","team":"ally","cell":[1,6]},
+    {"uid":"A3","definition_id":"guard","team":"ally","cell":[2,6]},
+    {"uid":"D1","definition_id":"dummy","team":"enemy","cell":[5,3],"overrides":{"health":5}},
+    {"uid":"D2","definition_id":"dummy","team":"enemy","cell":[6,2],"overrides":{"speed":9}},
+    {"uid":"D3","definition_id":"dummy","team":"enemy","cell":[6,5],"overrides":{"speed":8}}
+  ]
+}

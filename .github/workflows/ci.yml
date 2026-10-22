@@ -38,6 +38,10 @@ jobs:
         run: python -S -m unittest discover -s tests -p test_resolution.py -v
       - name: Verify content and manifest without site packages
         run: python -S -m unittest discover -s tests -p test_content.py -v
+      - name: Verify perspective geometry without site packages
+        run: python -S -m unittest discover -s tests -p test_perspective_geometry.py -v
+      - name: Verify presentation configuration without site packages
+        run: python -S -m unittest discover -s tests -p test_presentation_layout.py -v
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
       - name: Check source bundle

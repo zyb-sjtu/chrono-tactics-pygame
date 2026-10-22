@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "id": "war_torn_8x8",
+  "mode": "perspective",
+  "scenario_file": "scenarios/war_torn.json",
+  "asset_root": "assets/skins/war_torn",
+  "viewport": {"reference_size":[1280,720],"background_fit":"contain"},
+  "board": {
+    "cols":8,"rows":8,"reference_image_size":[1672,941],
+    "corners":{"p00":[1060,270],"p10":[1530,452],"p11":[892,898],"p01":[340,568]}
+  },
+  "hud": {"layout":"overlay","safe_margin":24},
+  "debug": {"show_grid":false,"show_cell_centers":false,"show_coordinates":false}
+}

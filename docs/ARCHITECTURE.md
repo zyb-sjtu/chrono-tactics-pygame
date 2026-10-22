@@ -2,6 +2,8 @@
 
 状态：M1–M5 已实施。规则与 Controller 不依赖 Pygame；内容/清单用纯加载器验证，图片由资源层缓存，界面、动画和快照保持职责分离。M5 在不修改运行代码的情况下交付第二场景/外观并验证一致性，见 [M5 验收记录](M5_IMPLEMENTATION.md)。当前接口见 [M4 记录](M4_IMPLEMENTATION.md)，进度见 [TASKS](../TASKS.md)。
 
+后续透视扩展沿用这些边界：`presentation_layout` 与 `perspective_geometry` 为纯布局/数学，`PerspectiveBoardRenderer` 与 `SceneHUD` 是独立表现实现；Game 选择组装，不在旧渲染器/侧栏堆条件。规则与快照完全不感知透视模式。资源与效果复用统一脚底/尺度接口，见 [透视实施记录](PERSPECTIVE_BATTLEFIELD.md)。
+
 最简单的划分：规则决定“能做什么、结果是什么”；协调层决定“接收哪次操作、何时继续”；表现层负责“输入来自哪里、画面怎样显示”。替换图片不应影响伤害，增加技能不应要求改写主循环。
 
 ## 现状与目标

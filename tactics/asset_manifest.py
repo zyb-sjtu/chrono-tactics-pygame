@@ -88,8 +88,10 @@ def load_manifest(root):
                 raise DataError(where + ": " + state + " needs a known " +
                                 ("looping idle animation or image" if state == "idle" else "non-looping animation"))
         visuals.append((visual_id, tuple(record.items())))
-    fields(data["board"], (), ("floor", "obstacle"), label + ".board")
+    fields(data["board"], (), ("floor", "obstacle", "background"), label + ".board")
     for state, asset_id in data["board"].items():
         if text(asset_id, label + ".board." + state) not in data["images"]:
             raise DataError(label + ".board: unknown image " + asset_id)
+        if state == "background" and data["images"][asset_id]["optional"]:
+            raise DataError(label + ".board.background: background image must be required (optional=false)")
     return Manifest(tuple(images), tuple(animations), tuple(visuals), tuple(data["board"].items()))

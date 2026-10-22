@@ -132,8 +132,29 @@ class AssetManager:
         asset_id = dict(self.manifest.board).get(state)
         return self.get_image(asset_id, scale) if asset_id else None
 
+    def background(self, reference_size, scale):
+        """Validate native reference pixels and cache the complete contain-fitted image."""
+        asset_id = dict(self.manifest.board).get("background")
+        if asset_id is None:
+            raise DataError("perspective presentation needs board.background in asset manifest")
+        spec = self._images[asset_id]
+        sprite = self.get_image(asset_id, scale)
+        if (spec.display_size != tuple(reference_size) or spec.pivot != (0, 0)
+                or self._originals[spec.path].get_size() != tuple(reference_size)):
+            raise DataError("{}: background native/display size must match presentation {} and pivot [0,0]".format(
+                spec.path, reference_size))
+        return sprite
+
     def preload(self, scale=1):
         for asset_id in self._images:
             self.get_image(asset_id, scale)
         for asset_id in self._animations:
             self.get_clip(asset_id, scale)
+
+    def preload_units(self, scales):
+        """Cache discrete depth sizes without scaling the full background at each depth."""
+        for scale in scales:
+            for definition_id in self._bindings:
+                for state in ("idle", "attack", "death"):
+                    self.visual(definition_id, state, scale)
+            self.board_image("obstacle", scale)
