@@ -13,6 +13,7 @@ class BoardUnitView:
     cell: Cell
     health: int
     max_health: int
+    definition_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -41,6 +42,7 @@ class UnitView:
     defense: int
     speed: int
     movement: int
+    definition_id: str = ""
 
     @property
     def alive(self):
@@ -96,7 +98,7 @@ def build_board_view(board, battle, selected):
             target_cells = frozenset(unit.cell for unit in battle.attack_targets())
     return BoardView(
         board.cols, board.rows, frozenset(board.obstacles),
-        tuple(BoardUnitView(unit.uid, unit.team, tuple(unit.cell), unit.health, unit.max_health)
+        tuple(BoardUnitView(unit.uid, unit.team, tuple(unit.cell), unit.health, unit.max_health, unit.definition_id)
               for unit in board.living_units),
         active.uid if active is not None else None,
         selected.uid if selected is not None else None,
@@ -109,6 +111,7 @@ def build_battle_view(board, battle, selected, presentation_generation, pending_
     units = tuple(UnitView(
         unit.uid, unit.name, unit.team, unit.role, tuple(unit.cell),
         unit.health, unit.max_health, unit.attack, unit.defense, unit.speed, unit.movement,
+        unit.definition_id,
     ) for unit in board.units)
     by_uid = {unit.uid: unit for unit in units}
     actor = battle.active_unit

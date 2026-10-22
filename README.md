@@ -1,14 +1,14 @@
 # Chrono Tactics · 离线回溯战棋
 
-仓库名称：`chrono-tactics-pygame`，最近发布版本：`0.1.0`；当前开发代码已完成 M1–M3（未发布）。
+仓库名称：`chrono-tactics-pygame`，最近发布版本：`0.1.0`；当前开发代码已完成 M1–M4（未发布）。
 
 项目仓库：[zyb-sjtu/chrono-tactics-pygame](https://github.com/zyb-sjtu/chrono-tactics-pygame)。这是私有仓库，需要登录有权限的 GitHub 账号访问。
 
-使用 Python 和 Pygame 绘制，运行时不访问网络，不需要外部美术资源。棋盘保持 8×8，每格 64×64 像素；为展示属性和回合信息，侧栏扩为 384 像素，窗口为 896×512。
+使用 Python 和 Pygame 绘制，运行时不访问网络，不需要另行下载美术。默认显示随项目提供的演示地砖与斥候 PNG，也可用 --geometry 回到几何模式。棋盘保持 8×8，每格 64×64，侧栏 384 像素，窗口 896×512。
 
 ## 整体规划与后续开发
 
-已完成评审和 M1–M3：场景/渲染分离、Controller 操作入口、完整只读视图、纯数据快照和结算确认。回溯按 UID 重建单位，动画通知必须匹配结算编号及表现代次，重复或过期通知不会推进回合。资源清单与美术加载仍属于 M4。
+已完成评审和 M1–M4：规则与表现分离、纯数据回溯、结算确认、JSON 内容/资源清单、PNG 缓存和实际素材动画。回溯按 UID 重建单位，重复或过期动画通知不会推进回合。当前是程序生成的演示美术，最终风格与 M5 扩展/发布验收尚未交付。
 
 | 文档 | 内容 |
 | --- | --- |
@@ -20,8 +20,9 @@
 | [M1 实施与验收](docs/M1_IMPLEMENTATION.md) | M1 模块接口、场景示例、57 项检查与 8 帧像素对照 |
 | [M2 实施与验收](docs/M2_IMPLEMENTATION.md) | Controller 接口、完整视图、75 项检查与 13 帧像素对照 |
 | [M3 实施与验收](docs/M3_IMPLEMENTATION.md) | 纯数据快照、结算与代次协议、94 项检查及 13 帧像素对照 |
+| [M4 实施与验收](docs/M4_IMPLEMENTATION.md) | JSON 格式、资源替换、缓存、动画、123 项检查与实际窗口 |
 
-下一任务是 **ARCH-04 / M4**。后续功能需要先具备对应的最小架构边界；新增状态必须能回溯，新增美术通过资源与渲染入口接入。约束同时写入 [AGENTS.md](AGENTS.md)，实现进度见 [TASKS.md](TASKS.md)。
+下一任务是 **ARCH-05 / M5**。后续功能需要先具备对应的最小架构边界；新增状态必须能回溯，新增美术通过资源与渲染入口接入。约束同时写入 [AGENTS.md](AGENTS.md)，实现进度见 [TASKS.md](TASKS.md)。
 
 ## 运行
 
@@ -33,6 +34,15 @@ cd E:\gamedesign
 ```
 
 如果旧版窗口还开着，请先关闭，再执行以上命令。
+
+切回旧几何画面（不加载资源清单/图片），或选择关卡和资源目录：
+
+```powershell
+.\.venv\Scripts\python.exe main.py --geometry
+.\.venv\Scripts\python.exe main.py --scenario scenarios/training_ground.json --assets assets
+```
+
+默认内容/资源路径相对项目位置解析，与工作目录无关。--scenario 相对 content 根；显式传入 --content-root 或 --assets 时，目录相对当前工作目录或使用绝对路径。更换单位、地砖和动画只改 JSON/PNG，步骤见 [M4 记录](docs/M4_IMPLEMENTATION.md) 和 [资源来源](assets/README.md)。
 
 在新机器安装（Python 3.9 或以上、可用的桌面环境）：
 
@@ -52,7 +62,7 @@ $env:PATH = 'D:\Miniconda3;D:\Miniconda3\Library\bin;' + $env:PATH
 
 ## 战斗规则
 
-- 3 个蓝色圆形友方与 3 个红色方形木桩均为单位，具有当前生命、最大生命、攻击、防御、速度、移动力。侧栏显示 `生命: 80/100` 这样的当前值/上限格式，棋盘单位下方显示血条。默认阵容和数值在 `tactics/scenario.py` 中配置，暂为功能演示占位值。
+- 3 个蓝方与 3 个红色木桩均为单位，具有生命、攻击、防御、速度、移动力；默认斥候使用带帽蓝色演示精灵，其余为蓝圆/红方块几何回退。侧栏显示 `生命: 80/100`，棋盘显示血条。基础数值在 `content/units.json`，阵容/实例覆盖在 `content/scenarios/training_ground.json`，仍为演示占位值。
 - 入场时将双方单位按速度从高到低排序，同速按入场顺序排列。每轮各行动一次，全部行动后进入下一轮，按相同顺序继续。
 - 每次行动分为**一次移动 → 一次攻击**。可以跳过移动、跳过攻击，或直接结束行动；成功攻击后，动画播放完毕再交接给下一位。
 - 移动和攻击均按上下左右四方向计算，不允许斜走或斜向攻击。
@@ -99,10 +109,11 @@ E:\gamedesign\
 ├── scripts/export_source.py # 源码汇总生成与一致性检查
 ├── docs/
 │   ├── ARCHITECTURE_REVIEW.md # 对原整改报告的源码核对与评审
-│   ├── ARCHITECTURE.md      # M1–M3 已实施，其余为目标架构
+│   ├── ARCHITECTURE.md      # M1–M4 已实施，M5 待验收
 │   ├── M1_IMPLEMENTATION.md # M1 接口与验证记录
 │   ├── M2_IMPLEMENTATION.md # M2 指令、视图与验证记录
 │   ├── M3_IMPLEMENTATION.md # M3 快照、结算确认与验证记录
+│   ├── M4_IMPLEMENTATION.md # M4 内容、资源与验证记录
 │   ├── ROADMAP.md           # 阶段、前置与验收
 │   ├── ASSET_GUIDE.md       # 美术资源与动画规范
 │   ├── FEATURE_DEVELOPMENT.md # 后续开发约束
@@ -112,6 +123,10 @@ E:\gamedesign\
 │   ├── settings.py          # 格子像素、侧栏等表现默认值
 │   ├── models.py            # 单位状态、纯数据单位快照和攻击结果
 │   ├── scenario.py          # 不可变场景、验证、默认阵容
+│   ├── content.py           # 纯 JSON 定义/场景加载
+│   ├── data_files.py        # 纯 JSON 与安全相对路径工具
+│   ├── asset_manifest.py    # 纯清单、帧/状态引用验证
+│   ├── assets.py            # PNG/缩放缓存、锚点与帧列表
 │   ├── board.py             # 纯逻辑地图、空间查询与 BFS
 │   ├── geometry.py          # 不依赖 Pygame 的坐标转换
 │   ├── actions.py           # UIAction 与操作结果
@@ -125,13 +140,22 @@ E:\gamedesign\
 ├── tests\
 │   ├── test_battle.py       # 11 项战斗规则检查，无需创建窗口
 │   ├── test_game.py         # 11 项窗口交互、绘制与字体检查
-│   ├── test_effects.py      # 10 项动画、通知、清理和交互检查
+│   ├── test_effects.py      # 10 项几何动画、通知、清理和交互检查
+│   ├── test_assets.py       # 16 项 PNG、缓存、渲染和动画检查
+│   ├── test_content.py      # 13 项无第三方包的内容/清单检查
 │   ├── test_core.py         # 12 项无第三方包的 M1 核心检查
 │   ├── test_controller.py   # 16 项无第三方包的协调与数据边界检查
 │   ├── test_resolution.py   # 16 项无第三方包的快照和结算协议检查
 │   ├── test_rendering.py    # 6 项只读视图、渲染、按钮和场景注入检查
 │   └── test_rewind.py       # 12 项回溯、击杀及行动顺序检查
+├── content/                 # units.json、scenarios/training_ground.json
+├── assets/                  # manifest.json、README、tiles/units 下的 9 张 PNG
+├── scripts/generate_demo_assets.py # 重建演示 PNG，不下载外部资源
 ├── artifacts\               # 实际运行截图，不是游戏资源
+│   ├── m4_assets.png        # 当前默认地砖/斥候素材
+│   ├── m4_attack.png        # 素材攻击与跳字
+│   ├── m4_death.png         # 素材死亡帧
+│   ├── m4_revived.png       # 回溯恢复素材单位
 │   ├── initial.png          # 开局移动范围
 │   ├── selected.png         # 移动后可攻击目标
 │   ├── damage_popup.png     # 实际攻击 10 的跳字
@@ -166,12 +190,13 @@ git archive --format=zip --prefix=chrono-tactics-pygame/ --output=dist/chrono-ta
 
 ## 验证记录
 
-M3 开发版本目前共 **94 项检查通过**，其中 **44 项可在无第三方包环境执行**。原有行为覆盖保留；Windows 实际窗口的 13 个状态画面与 M2 逐像素一致，包含查看、英文界面、伤害、击杀、回溯和战斗结束。完整检查分别在 dummy 与 Windows 显示驱动下通过，5×4 场景继续通过交互检查；新增通知和代次检查覆盖重复/过期确认、回溯重打与程序化重开。详情见 [M3 实施记录](docs/M3_IMPLEMENTATION.md)。
+M4 共 **123 项测试**，本机 **122 通过、1 项跳过**（Windows 无创建符号链接权限；其他路径越界检查通过）。其中 **57 项无需第三方包**，含该跳过项。完整检查在 dummy 与 Windows 实际窗口完成；几何模式 13 帧与 M3 逐像素一致，素材模式验证了透明度、锚点、图层、缓存、攻击/死亡与回溯，并通过其他工作目录下的实际入口验证。详情见 [M4 记录](docs/M4_IMPLEMENTATION.md)。
 
 ```powershell
 .\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_core.py -v
 .\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_controller.py -v
 .\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_resolution.py -v
+.\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_content.py -v
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
@@ -182,6 +207,10 @@ v0.1.0 基线记录：2026-10-22，本机 Python 3.9.1 / Pygame 2.6.1 / SDL 2.28
 保留字体问题修复：优先直接加载 Windows 字体文件，失败后再扫描系统字体；扫描抛出 TypeError、OSError、ValueError 或 pygame.error 时，回退到 Pygame 内置字体与英文界面。不修改系统字体或注册表。
 
 自动测试配置位于 [.github/workflows/ci.yml](.github/workflows/ci.yml)，使用虚拟显示驱动执行回归检查；它不能替代实际窗口的显示效果检查。远程运行结果见仓库 Actions 页面。CI 使用的动作版本参照 [checkout](https://github.com/actions/checkout) 和 [setup-python](https://github.com/actions/setup-python) 官方用法。
+
+![M4 默认演示素材](artifacts/m4_assets.png)
+
+以下为保留的几何模式画面：
 
 ![伤害跳字](artifacts/damage_popup.png)
 

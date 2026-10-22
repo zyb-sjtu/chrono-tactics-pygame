@@ -26,6 +26,7 @@ class UnitSpawn:
     defense: int = 5
     speed: int = 10
     movement: int = 3
+    definition_id: str = ""
 
     def __post_init__(self):
         object.__setattr__(self, "cell", _cell(self.cell, "unit {} cell".format(self.uid)))
@@ -54,6 +55,8 @@ class Scenario:
         for spawn in self.units:
             if not isinstance(spawn, UnitSpawn):
                 raise ValueError("scenario units must be immutable UnitSpawn values")
+            if not isinstance(spawn.definition_id, str):
+                raise ValueError("unit definition_id must be a string")
             for name in ("uid", "name", "role"):
                 value = getattr(spawn, name)
                 if not isinstance(value, str) or not value.strip():
@@ -87,15 +90,6 @@ class Scenario:
 
 
 def default_scenario():
-    return Scenario(
-        "training_ground", 8, 8,
-        (
-            UnitSpawn("A1", "先锋", "ally", "近卫", (1, 1), speed=12),
-            UnitSpawn("A2", "斥候", "ally", "侦察", (1, 3), health=80, speed=14, movement=4),
-            UnitSpawn("A3", "卫士", "ally", "守备", (2, 6), health=120, max_health=120, speed=10, movement=2),
-            UnitSpawn("D1", "木桩1", "enemy", "训练木桩", (6, 1), speed=11),
-            UnitSpawn("D2", "木桩2", "enemy", "训练木桩", (5, 4), speed=9),
-            UnitSpawn("D3", "木桩3", "enemy", "训练木桩", (6, 6), speed=8),
-        ),
-        frozenset(((3, 1), (3, 2), (3, 3), (4, 5), (4, 6))),
-    )
+    # Local import keeps the public factory while content imports these data types.
+    from .content import load_content
+    return load_content().scenario

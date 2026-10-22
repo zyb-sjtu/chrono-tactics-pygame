@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "id": "training_ground",
+  "cols": 8,
+  "rows": 8,
+  "obstacles": [[3,1],[3,2],[3,3],[4,5],[4,6]],
+  "spawns": [
+    {"uid":"A1","definition_id":"vanguard","team":"ally","cell":[1,1]},
+    {"uid":"A2","definition_id":"scout","team":"ally","cell":[1,3],"overrides":{"health":80}},
+    {"uid":"A3","definition_id":"guard","team":"ally","cell":[2,6]},
+    {"uid":"D1","definition_id":"dummy","team":"enemy","cell":[6,1],"overrides":{"name":"木桩1"}},
+    {"uid":"D2","definition_id":"dummy","team":"enemy","cell":[5,4],"overrides":{"name":"木桩2","speed":9}},
+    {"uid":"D3","definition_id":"dummy","team":"enemy","cell":[6,6],"overrides":{"name":"木桩3","speed":8}}
+  ]
+}

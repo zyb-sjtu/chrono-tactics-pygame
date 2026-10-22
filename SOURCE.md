@@ -1,6 +1,6 @@
 # 完整项目源码
 
-本文件由 `python scripts/export_source.py` 生成。包含项目全部文本源码、配置和文档；不包含自身、截图、虚拟环境、缓存及压缩包。
+本文件由 `python scripts/export_source.py` 生成。包含项目全部文本源码、配置和文档；不包含自身、二进制 PNG、截图、虚拟环境、缓存及压缩包。演示 PNG 可由 scripts/generate_demo_assets.py 重建。
 
 ## .gitattributes
 
@@ -50,6 +50,8 @@ jobs:
         run: python -S -m unittest discover -s tests -p test_controller.py -v
       - name: Verify snapshots and resolutions without site packages
         run: python -S -m unittest discover -s tests -p test_resolution.py -v
+      - name: Verify content and manifest without site packages
+        run: python -S -m unittest discover -s tests -p test_content.py -v
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
       - name: Check source bundle
@@ -86,7 +88,7 @@ htmlcov/
 
 ## 先确认实际状态
 
-- 最近发布版本是 v0.1.0，开发代码已完成 M1–M3：场景/渲染分离、Controller/只读视图、纯数据快照及结算确认。M4–M5 尚未实施；以 `TASKS.md` 区分现有能力和规划。
+- 最近发布版本是 v0.1.0，开发代码已完成 M1–M4：规则/表现分离、纯数据回溯与结算确认，以及 JSON 内容、资源缓存和图片/动画链路。M5 尚未实施；以 `TASKS.md` 区分现有能力和规划。
 - 修改玩法、结构或资源入口前，阅读 [整体架构](docs/ARCHITECTURE.md)、[实施路线](docs/ROADMAP.md) 与 [功能开发规范](docs/FEATURE_DEVELOPMENT.md)。接入美术时同时遵守 [资源规范](docs/ASSET_GUIDE.md)。用户提供的原始报告是评审材料，当前开发决策以这些评审后文档为准。
 
 ## 开发边界
@@ -95,7 +97,10 @@ htmlcov/
 - 业务规则放在 `tactics/battle.py`，空间与路径规则放在 `tactics/board.py`。Board 显式接收 Scenario，不恢复像素坐标或绘图入口；坐标由 Geometry 转换，绘制由 BoardRenderer 读取 BoardView 完成。
 - 应用操作统一经过 `Controller`，通过 `get_view_state()` 查询独立的 BattleView；不向 Game、Panel、Renderer、Effects 暴露活动 Unit/Board/Battle。Game 只做组装、输入适配、循环与清理；Panel 用 `hit_test(position)` 返回 UIAction，按钮矩形保持内部实现。
 - `move_to/attack` 对当前行动者提交指令，与查看谁的属性无关；鼠标通过 `click_cell` 保留“先选回行动者再操作”的交互。不要让未来 AI 模拟像素点击，也不以重建 Game 内部字段作为测试夹具；用 Scenario 构建局面。
-- 表现接口为 `play_attack(AttackPresentation)/update(elapsed)->tuple[ResolutionToken,...]/clear()`。Controller 只接受当前结算编号与表现代次的完成通知，不以全局 busy 状态推进回合；动画不修改规则。资源加载仍待 M4。
+- 表现接口为 `play_attack(AttackPresentation)/update(elapsed)->tuple[ResolutionToken,...]/clear()`。Controller 只接受当前结算编号与表现代次的完成通知，不以全局 busy 状态推进回合；动画不修改规则。素材动画沿用此接口，循环待机由 Renderer 更新，不进入阻塞队列。
+- 默认内容从 `content/units.json` 和 `content/scenarios/training_ground.json` 加载，禁止重新在 Python 写第二份默认数值。JSON 引用和结构错误必须启动时定位；Unit.definition_id 属于快照与视图，外观/图片路径不进入规则状态。
+- AssetManager 在显示初始化后加载 `assets/manifest.json`；预载原图、帧列表和显示尺寸，绘制时只读缓存。图片按解析后的路径缓存、缩放按路径/尺寸缓存，缺失也缓存并按资源 ID 记录一次。路径不得逃逸资源根。
+- 当前支持 PNG、显式帧列表、idle 循环及 attack/death 非循环，不假装支持图集切帧、音频或热重载。大精灵与死亡形体按脚底/稳定 ID 排序，全部标签、高亮和血条在形体之后绘制。`--geometry` 完全绕过资源加载；可选图片缺失使用几何回退，必需图片/清单错误不能静默忽略。
 - AttackResult、UnitSnapshot、TurnSnapshot 均为独立不可变值；行动队列快照存 UID。回溯重建 Unit，跨回溯的旧实体引用不再有效，调用方按 UID 重新查询。新 Unit 字段必须同步快照与恢复，字段覆盖测试不得绕过。
 - 结算编号在同一 Battle 中单调递增且不回溯；Controller 成功回溯或程序化 restart 时先提升表现代次并作废待确认，再清理表现、恢复/重建规则。失败回溯不改变代次或表现；新异步效果必须沿用匹配确认入口。
 - 后续功能必须建立在可扩展边界上：先明确规则入口、数据归属、回溯策略、表现/资源接入和验收证据。前置能力缺失时先补齐最小必要部分，与需求一并交付；不能以架构未完成为由无限延后任务，也不为每个小改动制造额外批准流程。
@@ -112,6 +117,7 @@ htmlcov/
 - 修改规则、场景、几何或棋盘视图后，另运行 `python -S -m unittest discover -s tests -p test_core.py -v`，保证无第三方包时仍可运行。不要为兼容旧测试把 Pygame 加回核心。
 - 修改协调、动作或完整视图后，另运行 `python -S -m unittest discover -s tests -p test_controller.py -v`。CI 在安装依赖前执行这两组检查。
 - 修改快照、结算或动画交接后，另运行 `python -S -m unittest discover -s tests -p test_resolution.py -v`；CI 安装依赖前执行三组共 44 项检查。真实动画还需完整回归验证，纯测试不能代替实际完成通知与清理检查。
+- 修改内容或清单后，另运行 `python -S -m unittest discover -s tests -p test_content.py -v`，CI 安装依赖前合计 57 项；原图/缩放缓存和实际资源链路由 `test_assets.py` 及真实窗口检查。Windows 无创建符号链接权限时该项可明确跳过，路径越界等其他检查仍须通过。
 - 保留原有行为覆盖；接口迁移时可调整测试夹具，不为保留旧字段访问而保留架构漏洞。新增架构边界在相应阶段就加入检查，不推迟到最终验收。
 - 使用 `python scripts/export_source.py` 更新 `SOURCE.md`，再用 `python scripts/export_source.py --check` 检查一致性。
 - 不提交虚拟环境、缓存、安装器、凭据或 `dist/`、`.delivery/` 中的生成文件。`artifacts/*.png` 是随文档交付的运行截图。
@@ -123,6 +129,19 @@ htmlcov/
 # 更新记录
 
 ## 未发布
+
+### M4 · 内容与资源接入
+
+- 默认单位定义和训练场迁到 JSON，保留 default_scenario() 入口；严格验证格式、版本、重复 ID/键、定义引用、属性和出生局面，错误包含文件位置。
+- Unit/UnitSnapshot/View 增加 definition_id，攻击结果补充双方定义 ID 和行动位置；用于关联外观，不改变移动、伤害、顺序或回溯算法。
+- 新增纯 manifest 解析与 Pygame AssetManager；校验根目录边界、PNG 路径、尺寸、锚点、动画帧/状态引用。原图按路径、缩放按路径与尺寸缓存，可选失败缓存并报告一次，必需缺失启动时拒绝。
+- 默认渲染实际接入项目脚本生成的地砖和 64×96 斥候 PNG，支持循环待机、非循环攻击/死亡、脚底锚点、按脚底排序及独立高亮/血条层。
+- 素材动画沿用 M3 token 完成确认；等待当前阻塞任务，不等待循环待机。缺失帧按几何效果回退，回溯/重开清理旧形体及通知。
+- 新增 --geometry、--scenario、--content-root、--assets 启动参数；默认路径不依赖工作目录。显式几何模式无需资源清单，错误配置清晰退出。
+- 新增 13 项纯内容/清单与 16 项实际 PNG/渲染检查，共 123 项；本机 122 通过，1 项 Windows 符号链接权限跳过。57 项可在无第三方包环境执行（含该跳过项）。
+- 路径断言比较规范化结果，兼容 Windows CI 临时目录的 8.3 短路径别名；根目录边界与符号链接逃逸校验保持启用。
+- 无窗口与 Windows 实际窗口回归完成；几何模式 13 帧与 M3 一致，素材模式验证透明度、缩放、图层、攻击/死亡、复活及异地目录入口，新增 4 张截图。
+- SOURCE 汇总纳入 content/assets 文本；演示 PNG 及来源/制作约定随源码交付。M5 扩展与发布演练仍未实施。
 
 ### M3 · 纯数据回溯与结算确认
 
@@ -184,15 +203,15 @@ htmlcov/
 ````markdown
 # Chrono Tactics · 离线回溯战棋
 
-仓库名称：`chrono-tactics-pygame`，最近发布版本：`0.1.0`；当前开发代码已完成 M1–M3（未发布）。
+仓库名称：`chrono-tactics-pygame`，最近发布版本：`0.1.0`；当前开发代码已完成 M1–M4（未发布）。
 
 项目仓库：[zyb-sjtu/chrono-tactics-pygame](https://github.com/zyb-sjtu/chrono-tactics-pygame)。这是私有仓库，需要登录有权限的 GitHub 账号访问。
 
-使用 Python 和 Pygame 绘制，运行时不访问网络，不需要外部美术资源。棋盘保持 8×8，每格 64×64 像素；为展示属性和回合信息，侧栏扩为 384 像素，窗口为 896×512。
+使用 Python 和 Pygame 绘制，运行时不访问网络，不需要另行下载美术。默认显示随项目提供的演示地砖与斥候 PNG，也可用 --geometry 回到几何模式。棋盘保持 8×8，每格 64×64，侧栏 384 像素，窗口 896×512。
 
 ## 整体规划与后续开发
 
-已完成评审和 M1–M3：场景/渲染分离、Controller 操作入口、完整只读视图、纯数据快照和结算确认。回溯按 UID 重建单位，动画通知必须匹配结算编号及表现代次，重复或过期通知不会推进回合。资源清单与美术加载仍属于 M4。
+已完成评审和 M1–M4：规则与表现分离、纯数据回溯、结算确认、JSON 内容/资源清单、PNG 缓存和实际素材动画。回溯按 UID 重建单位，重复或过期动画通知不会推进回合。当前是程序生成的演示美术，最终风格与 M5 扩展/发布验收尚未交付。
 
 | 文档 | 内容 |
 | --- | --- |
@@ -204,8 +223,9 @@ htmlcov/
 | [M1 实施与验收](docs/M1_IMPLEMENTATION.md) | M1 模块接口、场景示例、57 项检查与 8 帧像素对照 |
 | [M2 实施与验收](docs/M2_IMPLEMENTATION.md) | Controller 接口、完整视图、75 项检查与 13 帧像素对照 |
 | [M3 实施与验收](docs/M3_IMPLEMENTATION.md) | 纯数据快照、结算与代次协议、94 项检查及 13 帧像素对照 |
+| [M4 实施与验收](docs/M4_IMPLEMENTATION.md) | JSON 格式、资源替换、缓存、动画、123 项检查与实际窗口 |
 
-下一任务是 **ARCH-04 / M4**。后续功能需要先具备对应的最小架构边界；新增状态必须能回溯，新增美术通过资源与渲染入口接入。约束同时写入 [AGENTS.md](AGENTS.md)，实现进度见 [TASKS.md](TASKS.md)。
+下一任务是 **ARCH-05 / M5**。后续功能需要先具备对应的最小架构边界；新增状态必须能回溯，新增美术通过资源与渲染入口接入。约束同时写入 [AGENTS.md](AGENTS.md)，实现进度见 [TASKS.md](TASKS.md)。
 
 ## 运行
 
@@ -217,6 +237,15 @@ cd E:\gamedesign
 ```
 
 如果旧版窗口还开着，请先关闭，再执行以上命令。
+
+切回旧几何画面（不加载资源清单/图片），或选择关卡和资源目录：
+
+```powershell
+.\.venv\Scripts\python.exe main.py --geometry
+.\.venv\Scripts\python.exe main.py --scenario scenarios/training_ground.json --assets assets
+```
+
+默认内容/资源路径相对项目位置解析，与工作目录无关。--scenario 相对 content 根；显式传入 --content-root 或 --assets 时，目录相对当前工作目录或使用绝对路径。更换单位、地砖和动画只改 JSON/PNG，步骤见 [M4 记录](docs/M4_IMPLEMENTATION.md) 和 [资源来源](assets/README.md)。
 
 在新机器安装（Python 3.9 或以上、可用的桌面环境）：
 
@@ -236,7 +265,7 @@ $env:PATH = 'D:\Miniconda3;D:\Miniconda3\Library\bin;' + $env:PATH
 
 ## 战斗规则
 
-- 3 个蓝色圆形友方与 3 个红色方形木桩均为单位，具有当前生命、最大生命、攻击、防御、速度、移动力。侧栏显示 `生命: 80/100` 这样的当前值/上限格式，棋盘单位下方显示血条。默认阵容和数值在 `tactics/scenario.py` 中配置，暂为功能演示占位值。
+- 3 个蓝方与 3 个红色木桩均为单位，具有生命、攻击、防御、速度、移动力；默认斥候使用带帽蓝色演示精灵，其余为蓝圆/红方块几何回退。侧栏显示 `生命: 80/100`，棋盘显示血条。基础数值在 `content/units.json`，阵容/实例覆盖在 `content/scenarios/training_ground.json`，仍为演示占位值。
 - 入场时将双方单位按速度从高到低排序，同速按入场顺序排列。每轮各行动一次，全部行动后进入下一轮，按相同顺序继续。
 - 每次行动分为**一次移动 → 一次攻击**。可以跳过移动、跳过攻击，或直接结束行动；成功攻击后，动画播放完毕再交接给下一位。
 - 移动和攻击均按上下左右四方向计算，不允许斜走或斜向攻击。
@@ -283,10 +312,11 @@ E:\gamedesign\
 ├── scripts/export_source.py # 源码汇总生成与一致性检查
 ├── docs/
 │   ├── ARCHITECTURE_REVIEW.md # 对原整改报告的源码核对与评审
-│   ├── ARCHITECTURE.md      # M1–M3 已实施，其余为目标架构
+│   ├── ARCHITECTURE.md      # M1–M4 已实施，M5 待验收
 │   ├── M1_IMPLEMENTATION.md # M1 接口与验证记录
 │   ├── M2_IMPLEMENTATION.md # M2 指令、视图与验证记录
 │   ├── M3_IMPLEMENTATION.md # M3 快照、结算确认与验证记录
+│   ├── M4_IMPLEMENTATION.md # M4 内容、资源与验证记录
 │   ├── ROADMAP.md           # 阶段、前置与验收
 │   ├── ASSET_GUIDE.md       # 美术资源与动画规范
 │   ├── FEATURE_DEVELOPMENT.md # 后续开发约束
@@ -296,6 +326,10 @@ E:\gamedesign\
 │   ├── settings.py          # 格子像素、侧栏等表现默认值
 │   ├── models.py            # 单位状态、纯数据单位快照和攻击结果
 │   ├── scenario.py          # 不可变场景、验证、默认阵容
+│   ├── content.py           # 纯 JSON 定义/场景加载
+│   ├── data_files.py        # 纯 JSON 与安全相对路径工具
+│   ├── asset_manifest.py    # 纯清单、帧/状态引用验证
+│   ├── assets.py            # PNG/缩放缓存、锚点与帧列表
 │   ├── board.py             # 纯逻辑地图、空间查询与 BFS
 │   ├── geometry.py          # 不依赖 Pygame 的坐标转换
 │   ├── actions.py           # UIAction 与操作结果
@@ -309,13 +343,22 @@ E:\gamedesign\
 ├── tests\
 │   ├── test_battle.py       # 11 项战斗规则检查，无需创建窗口
 │   ├── test_game.py         # 11 项窗口交互、绘制与字体检查
-│   ├── test_effects.py      # 10 项动画、通知、清理和交互检查
+│   ├── test_effects.py      # 10 项几何动画、通知、清理和交互检查
+│   ├── test_assets.py       # 16 项 PNG、缓存、渲染和动画检查
+│   ├── test_content.py      # 13 项无第三方包的内容/清单检查
 │   ├── test_core.py         # 12 项无第三方包的 M1 核心检查
 │   ├── test_controller.py   # 16 项无第三方包的协调与数据边界检查
 │   ├── test_resolution.py   # 16 项无第三方包的快照和结算协议检查
 │   ├── test_rendering.py    # 6 项只读视图、渲染、按钮和场景注入检查
 │   └── test_rewind.py       # 12 项回溯、击杀及行动顺序检查
+├── content/                 # units.json、scenarios/training_ground.json
+├── assets/                  # manifest.json、README、tiles/units 下的 9 张 PNG
+├── scripts/generate_demo_assets.py # 重建演示 PNG，不下载外部资源
 ├── artifacts\               # 实际运行截图，不是游戏资源
+│   ├── m4_assets.png        # 当前默认地砖/斥候素材
+│   ├── m4_attack.png        # 素材攻击与跳字
+│   ├── m4_death.png         # 素材死亡帧
+│   ├── m4_revived.png       # 回溯恢复素材单位
 │   ├── initial.png          # 开局移动范围
 │   ├── selected.png         # 移动后可攻击目标
 │   ├── damage_popup.png     # 实际攻击 10 的跳字
@@ -350,12 +393,13 @@ git archive --format=zip --prefix=chrono-tactics-pygame/ --output=dist/chrono-ta
 
 ## 验证记录
 
-M3 开发版本目前共 **94 项检查通过**，其中 **44 项可在无第三方包环境执行**。原有行为覆盖保留；Windows 实际窗口的 13 个状态画面与 M2 逐像素一致，包含查看、英文界面、伤害、击杀、回溯和战斗结束。完整检查分别在 dummy 与 Windows 显示驱动下通过，5×4 场景继续通过交互检查；新增通知和代次检查覆盖重复/过期确认、回溯重打与程序化重开。详情见 [M3 实施记录](docs/M3_IMPLEMENTATION.md)。
+M4 共 **123 项测试**，本机 **122 通过、1 项跳过**（Windows 无创建符号链接权限；其他路径越界检查通过）。其中 **57 项无需第三方包**，含该跳过项。完整检查在 dummy 与 Windows 实际窗口完成；几何模式 13 帧与 M3 逐像素一致，素材模式验证了透明度、锚点、图层、缓存、攻击/死亡与回溯，并通过其他工作目录下的实际入口验证。详情见 [M4 记录](docs/M4_IMPLEMENTATION.md)。
 
 ```powershell
 .\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_core.py -v
 .\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_controller.py -v
 .\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_resolution.py -v
+.\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_content.py -v
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
@@ -366,6 +410,10 @@ v0.1.0 基线记录：2026-10-22，本机 Python 3.9.1 / Pygame 2.6.1 / SDL 2.28
 保留字体问题修复：优先直接加载 Windows 字体文件，失败后再扫描系统字体；扫描抛出 TypeError、OSError、ValueError 或 pygame.error 时，回退到 Pygame 内置字体与英文界面。不修改系统字体或注册表。
 
 自动测试配置位于 [.github/workflows/ci.yml](.github/workflows/ci.yml)，使用虚拟显示驱动执行回归检查；它不能替代实际窗口的显示效果检查。远程运行结果见仓库 Actions 页面。CI 使用的动作版本参照 [checkout](https://github.com/actions/checkout) 和 [setup-python](https://github.com/actions/setup-python) 官方用法。
+
+![M4 默认演示素材](artifacts/m4_assets.png)
+
+以下为保留的几何模式画面：
 
 ![伤害跳字](artifacts/damage_popup.png)
 
@@ -379,23 +427,26 @@ v0.1.0 基线记录：2026-10-22，本机 Python 3.9.1 / Pygame 2.6.1 / SDL 2.28
 ````markdown
 # 项目进度
 
-最近发布版本：`0.1.0`。开发代码已完成 M1–M3（未发布）；已实现能力与后续规划分开记录。
+最近发布版本：`0.1.0`。开发代码已完成 M1–M4（未发布）；已实现能力与后续规划分开记录。
 
 ## 已实现能力
 
 | ID | 状态 | 内容 |
 | --- | --- | --- |
-| BOARD-01 | 已完成 | 8×8 棋盘，每格 64×64，无外部美术资源 |
+| BOARD-01 | 已完成 | 默认 8×8 棋盘，每格 64×64；项目内生成演示图片，保留几何模式 |
 | UNIT-01 | 已完成 | 双方各 3 个单位、固定障碍、点击查看属性 |
 | TURN-01 | 已完成 | 速度排序、四方向移动、相邻攻击、手动操作双方、跳过与交接 |
 | COMBAT-01 | 已完成 | 当前/最大生命与血条，攻击力 100% 伤害，伤害跳字 |
 | COMBAT-02 | 已完成 | 击杀动画、消失、死亡单位退出队列、一方全灭结束战斗 |
 | REWIND-01 | 已完成 | 回溯上一单位行动开始前、连续回溯、恢复死亡单位和战斗状态 |
 | FIX-01 | 已完成 | Windows 系统字体扫描异常回退，保留英文降级界面 |
-| QA-01 | 已完成 | 94 项回归检查，其中 44 项无第三方包；M3 Windows 13 帧与 M2 逐像素一致，保留第二场景验收 |
+| QA-01 | 已完成 | 123 项测试，本机 122 通过、1 项符号链接权限跳过；57 项无需第三方包；几何模式 13 帧与 M3 一致，素材真实窗口实测 |
+| ASSET-01 | 已完成 | JSON 单位/场景、清单验证、PNG 与缩放缓存、可选缺失回退、必需缺失拒绝、静态和循环/非循环素材接入 |
 | DELIVERY-01 | 已完成 | 运行文档、源码汇总生成脚本、忽略规则和自动测试配置 |
 
 CI 配置覆盖 Windows / Linux 与 Python 3.9 / 3.12。远程执行结果以 GitHub Actions 为准，配置存在不代表运行已通过。
+
+路径检查比较解析后的规范路径，兼容 Windows CI 临时目录的 8.3 短路径别名；不通过跳过或放宽根目录边界来解决平台差异。
 
 当前没有 AI、网络、存档或独立 EXE。数值仍为演示占位值，防御暂不参与伤害计算。
 
@@ -407,28 +458,122 @@ CI 配置覆盖 Windows / Linux 与 Python 3.9 / 3.12。远程执行结果以 Gi
 | ARCH-01 | M1 | 已完成 | 场景注入、纯逻辑 Board、Geometry、BoardRenderer 与最小 BoardView；57 项检查及 8 帧一致性验收 |
 | ARCH-02 | M2 | 已完成 | Controller 统一操作与动画交接、完整只读 View、UIAction 命中；Game/表现不持有可变战斗对象，75 项检查及 13 帧一致性验收 |
 | ARCH-03 | M3 | 已完成 | ID 化 AttackResult、纯数据快照/UID 重建、结算编号与表现代次确认；拒绝重复/过期通知，94 项检查及 13 帧一致性验收 |
-| ARCH-04 | M4 | 未开始 | 内容/资源清单与验证、加载缓存、图片/动画真实接入、无素材回退 |
+| ARCH-04 | M4 | 已完成 | 内容/资源清单、路径/引用验证、缓存和真实默认渲染链路；123 项测试、几何像素对照及素材窗口验收 |
 | ARCH-05 | M5 | 未开始 | 场景与外观扩展演练、完整回归、真实窗口与跨平台验收 |
 
-实现与验证见 [M1](docs/M1_IMPLEMENTATION.md)、[M2](docs/M2_IMPLEMENTATION.md) 和 [M3 实施记录](docs/M3_IMPLEMENTATION.md)。下一实施任务为 **ARCH-04 / M4**：内容/资源清单、验证、缓存和真实素材接入。M3 提供程序化 restart 以管理生命周期代次，未新增玩家菜单，也未实现磁盘存档或资源加载。
+实现与验证见 [M1](docs/M1_IMPLEMENTATION.md)、[M2](docs/M2_IMPLEMENTATION.md)、[M3](docs/M3_IMPLEMENTATION.md) 和 [M4 实施记录](docs/M4_IMPLEMENTATION.md)。下一实施任务为 **ARCH-05 / M5**：正式扩展演练、开发模板与阶段发布验收。当前演示素材不是最终美术，尚无图集切帧、音频、热重载或磁盘存档。
 
 阶段依赖、提交拆分和完成条件见 [ROADMAP](docs/ROADMAP.md)，技术边界见 [ARCHITECTURE](docs/ARCHITECTURE.md)。每个阶段同步增加所需边界测试，不等全部迁移后才测试。
 
 后续技能、AI、美术、地图、存档等需求，须先明确扩展点与最小必要前置，按 [FEATURE_DEVELOPMENT](docs/FEATURE_DEVELOPMENT.md) 实施。此表不是新增玩法承诺。
 ````
 
+## assets/README.md
+
+````markdown
+# 演示资源来源与替换
+
+这 9 张 PNG 是 `scripts/generate_demo_assets.py` 使用 Pygame 几何图形生成的项目演示素材，没有下载或引用第三方美术。它们用于验证资源链路，不代表最终美术风格。资源无第三方素材许可要求；项目整体授权仍由仓库所有者决定，本文件不另设开源许可证。
+
+| 文件 | 原始 / 基准显示尺寸 | 锚点 | 用途 |
+| --- | --- | --- | --- |
+| tiles/floor.png | 64×64 / 64×64 | (0.5, 0.5)，格子中心 | 地砖 |
+| units/scout_idle_0/1.png | 64×96 / 64×96 | (0.5, 1)，格子脚底中心 | 2 帧、2 fps 循环待机 |
+| units/scout_attack_0/1/2.png | 64×96 / 64×96 | (0.5, 1) | 3 帧、8 fps 非循环攻击 |
+| units/scout_death_0/1/2.png | 64×96 / 64×96 | (0.5, 1) | 3 帧、5 fps 非循环死亡 |
+
+重建演示 PNG（会覆盖上述指定文件，不改清单）：
+
+```powershell
+.\.venv\Scripts\python.exe scripts/generate_demo_assets.py
+```
+
+替换美术时修改 `manifest.json` 的文件、显示尺寸、pivot、帧列表及状态映射即可；不改单位 cell、移动力或战斗代码。文件相对本目录，使用正斜杠且不得逃逸资源根；图片当前限 PNG。角色与特效建议 RGBA，人物可以高于一个格子，点击仍按格子计算。
+
+缓存 Surface 按只读方式共享，渲染代码不得原地 fill、set_alpha 或改像素；临时效果请使用独立副本或预生成的帧，避免一次播放污染其他单位的缓存图片。
+
+当前定义对应四个 visual_id，只有斥候配置了图片与动画；其他 visual 的空对象明确表示几何回退。所有演示图片 optional=true，删除图片仍可用几何模式运行；清单格式错误、无效引用或必需图片不可用会在启动时报错。`--geometry` 完全跳过资源清单和图片加载。
+
+新引入的外部素材须在此记录作者、原始链接、许可证/授权范围、原始与显示尺寸、锚点和修改记录。详见 [资源规范](../docs/ASSET_GUIDE.md) 与 [M4 实施记录](../docs/M4_IMPLEMENTATION.md)。
+````
+
+## assets/manifest.json
+
+```text
+{
+  "schema_version": 1,
+  "images": {
+    "tile.floor": {"path":"tiles/floor.png","display_size":[64,64],"pivot":[0.5,0.5],"optional":true},
+    "scout.idle.0": {"path":"units/scout_idle_0.png","display_size":[64,96],"pivot":[0.5,1.0],"optional":true},
+    "scout.idle.1": {"path":"units/scout_idle_1.png","display_size":[64,96],"pivot":[0.5,1.0],"optional":true},
+    "scout.attack.0": {"path":"units/scout_attack_0.png","display_size":[64,96],"pivot":[0.5,1.0],"optional":true},
+    "scout.attack.1": {"path":"units/scout_attack_1.png","display_size":[64,96],"pivot":[0.5,1.0],"optional":true},
+    "scout.attack.2": {"path":"units/scout_attack_2.png","display_size":[64,96],"pivot":[0.5,1.0],"optional":true},
+    "scout.death.0": {"path":"units/scout_death_0.png","display_size":[64,96],"pivot":[0.5,1.0],"optional":true},
+    "scout.death.1": {"path":"units/scout_death_1.png","display_size":[64,96],"pivot":[0.5,1.0],"optional":true},
+    "scout.death.2": {"path":"units/scout_death_2.png","display_size":[64,96],"pivot":[0.5,1.0],"optional":true}
+  },
+  "animations": {
+    "scout.idle": {"frames":["scout.idle.0","scout.idle.1"],"fps":2,"loop":true},
+    "scout.attack": {"frames":["scout.attack.0","scout.attack.1","scout.attack.2"],"fps":8,"loop":false},
+    "scout.death": {"frames":["scout.death.0","scout.death.1","scout.death.2"],"fps":5,"loop":false}
+  },
+  "visuals": {
+    "unit.scout": {"idle":"scout.idle","attack":"scout.attack","death":"scout.death"},
+    "unit.vanguard": {},
+    "unit.guard": {},
+    "unit.dummy": {}
+  },
+  "board": {"floor":"tile.floor"}
+}
+```
+
+## content/scenarios/training_ground.json
+
+```text
+{
+  "schema_version": 1,
+  "id": "training_ground",
+  "cols": 8,
+  "rows": 8,
+  "obstacles": [[3,1],[3,2],[3,3],[4,5],[4,6]],
+  "spawns": [
+    {"uid":"A1","definition_id":"vanguard","team":"ally","cell":[1,1]},
+    {"uid":"A2","definition_id":"scout","team":"ally","cell":[1,3],"overrides":{"health":80}},
+    {"uid":"A3","definition_id":"guard","team":"ally","cell":[2,6]},
+    {"uid":"D1","definition_id":"dummy","team":"enemy","cell":[6,1],"overrides":{"name":"木桩1"}},
+    {"uid":"D2","definition_id":"dummy","team":"enemy","cell":[5,4],"overrides":{"name":"木桩2","speed":9}},
+    {"uid":"D3","definition_id":"dummy","team":"enemy","cell":[6,6],"overrides":{"name":"木桩3","speed":8}}
+  ]
+}
+```
+
+## content/units.json
+
+```text
+{
+  "schema_version": 1,
+  "units": [
+    {"id":"vanguard","name":"先锋","role":"近卫","max_health":100,"attack":10,"defense":5,"speed":12,"movement":3,"visual_id":"unit.vanguard"},
+    {"id":"scout","name":"斥候","role":"侦察","max_health":100,"attack":10,"defense":5,"speed":14,"movement":4,"visual_id":"unit.scout"},
+    {"id":"guard","name":"卫士","role":"守备","max_health":120,"attack":10,"defense":5,"speed":10,"movement":2,"visual_id":"unit.guard"},
+    {"id":"dummy","name":"木桩","role":"训练木桩","max_health":100,"attack":10,"defense":5,"speed":11,"movement":3,"visual_id":"unit.dummy"}
+  ]
+}
+```
+
 ## docs/ARCHITECTURE.md
 
 ````markdown
 # 整体架构与扩展边界
 
-状态：M1–M3 已实施；M4–M5 仍为目标架构。规则与 Controller 不依赖 Pygame，界面、动画和快照使用独立值，交接匹配结算编号与代次。完整进度以 [TASKS.md](../TASKS.md) 为准，实现细节见 [M1](M1_IMPLEMENTATION.md)、[M2](M2_IMPLEMENTATION.md) 和 [M3 验收记录](M3_IMPLEMENTATION.md)。
+状态：M1–M4 已实施，M5 待验收。规则与 Controller 不依赖 Pygame；内容/清单用纯加载器验证，图片由资源层缓存，界面、动画和快照保持职责分离。进度见 [TASKS](../TASKS.md)，当前接口见 [M4 验收记录](M4_IMPLEMENTATION.md)，早期决策见 M1–M3 记录。
 
 最简单的划分：规则决定“能做什么、结果是什么”；协调层决定“接收哪次操作、何时继续”；表现层负责“输入来自哪里、画面怎样显示”。替换图片不应影响伤害，增加技能不应要求改写主循环。
 
 ## 现状与目标
 
-现状：`models` 存放运行 Unit、不可变 UnitSnapshot/AttackResult；`scenario` 验证初始阵容和障碍；`Board` 管理逻辑地图；`Geometry` 转换坐标；`BoardRenderer`/`Panel` 读取只读视图。`Controller` 统一操作、选中 UID、表现代次及动画交接，向 Effects 提交含 token/result 的 AttackPresentation。`Game` 只组装模块、转换键鼠输入并调度循环。`Battle` 管理战斗、结算编号和纯数据回溯，按 UID 重建恢复后的单位。
+现状：`models` 存放运行 Unit、不可变 UnitSnapshot/AttackResult；`content` 读取单位定义与场景 JSON，`scenario` 验证局面；`Board` 管理逻辑地图；`Geometry` 转换坐标；`BoardRenderer`/`Panel` 读取只读视图。`Controller` 管理操作和结算确认，`Battle` 管理规则与纯数据回溯。`asset_manifest` 验证纯清单，`assets` 缓存 PNG/缩放和帧列表；Renderer 更新循环待机，Effects 播放阻塞动画并返回 token。`Game` 组装这些模块，不决定图片路径或玩法。
 
 目标仍使用 Python/Pygame，先维持当前平铺模块结构。模块职责稳定后才考虑按包分组，避免为目录美观改动所有导入。
 
@@ -436,6 +581,9 @@ CI 配置覆盖 Windows / Linux 与 Python 3.9 / 3.12。远程执行结果以 Gi
 tactics/
   models.py          运行单位、纯数据单位快照和攻击结果、坐标
   scenario.py        场景定义、验证、初始状态构建
+  content.py         JSON 单位定义、生成引用与场景加载
+  data_files.py      纯 JSON 校验、重复键拒绝、根目录内路径
+  asset_manifest.py  纯资源清单与帧/状态引用验证
   board.py           地图状态、空间查询、路径规则
   battle.py          指令合法性、伤害、行动顺序、回溯
   controller.py      指令入口、选中状态、输入锁定、结算协调
@@ -444,11 +592,11 @@ tactics/
   board_renderer.py  地图、单位、血条、高亮、图层
   panel.py           属性面板、按钮绘制及命中动作
   effects.py         伤害跳字、受击/死亡等表现
-  assets.py          资源清单、路径、图片和缩放缓存
+  assets.py          PNG 原图/缩放缓存、锚点、帧列表与表现形体值
   game.py            初始化、组装、事件循环与退出
 ```
 
-这是分阶段职责图。scenario、geometry、board_renderer 在 M1 落地；controller、完整 UI 视图及 actions.py 的 UIAction/ActionResult 在 M2 落地；纯数据快照、结算编号与代次确认在 M3 落地。assets 尚未实现，不提前创建空模块。
+这些模块均有实际调用方。M4 在既有边界接入外部内容和资源，没有创建消息总线、通用插件注册中心或未使用扩展目录。
 
 ## 依赖方向
 
@@ -478,7 +626,7 @@ flowchart TD
 | renderer / panel / effects / assets | Pygame、只读视图、资源与布局 | 改写 Unit/Battle、自己计算第二套移动或攻击规则 |
 | game | 组装上述模块、适配操作系统输入 | 重复实现指令校验、伤害或回溯 |
 
-M1–M3 的规则、场景、几何、渲染、侧栏、协调及快照/结算边界已有测试；核心与控制器可在无第三方包的环境运行。资源加载仍为 M4 目标。
+M1–M4 的规则、协调、快照、数据加载和渲染/资源边界已有测试；核心、内容和纯清单可在无第三方包的环境运行。AssetManager 与真实图片/动画需要 Pygame 显示环境。
 
 ## 数据模型
 
@@ -492,7 +640,7 @@ M1–M3 的规则、场景、几何、渲染、侧栏、协调及快照/结算�
 | BattleState | 轮数、行动槽位、阶段、存活状态、结果、规则新增状态 | 统一变更、统一回溯 |
 | PresentationState | 选中 UID、镜头、按钮悬停、动画进度、渲染代次 | 应用/表现层管理，不进入规则快照 |
 
-先从现有 Unit 和场景数据平滑迁移，只有 M4 的外部配置接入确实需要时再增加定义加载器。不是马上建立所有类型的注册中心。
+当前 UnitDefinition 包含定义 ID、基础属性及 visual_id，JSON 生成记录引用 definition_id 并可覆盖少量实例值。Unit/UnitSnapshot/View 保存 definition_id，表现层按定义映射到 visual_id，再从清单选择图片/动画。规则不查询文件或外观。暂不增加技能定义/装备等未使用注册类型。
 
 UID 在同场战斗中唯一且不会因死亡或队列压缩而重新编号。资源 ID、定义 ID 和场景 ID 与文件名解耦。不要用中文名称、像素位置、数组下标或图片路径关联战斗对象。
 
@@ -528,7 +676,7 @@ AttackResolved
 
 DTO 不保留可变 Unit/Battle 引用；嵌套集合也使用只读形式或独立副本。`frozen` 数据类中的可变对象不会自动变为只读。Renderer 只显示计算好的可达格与目标格，不调用 Battle 查询合法性。
 
-实际接口：`get_view_state()` 返回 BattleView，其中 `board` 是既有 BoardView，`units` 是完整阵容（含死亡单位）的 UnitView 元组，`active/selected` 是独立 UnitView，`order` 仅包含存活单位。日志使用双语元组，按钮提供 `can_undo/can_skip/can_end_turn`，另有 `input_locked`。M3 增加 `presentation_generation` 和可空的 `pending_resolution: ResolutionToken`；visual_id 与内容定义留给 M4。
+实际接口：`get_view_state()` 返回 BattleView，其中 `board` 是 BoardView，`units` 是完整阵容的 UnitView 元组，`active/selected` 是独立 UnitView，`order` 仅包含存活单位。日志使用双语元组，按钮提供可用状态，另有 input_locked、presentation_generation 和可空 pending_resolution。M4 在单位显示值中保留 definition_id；visual_id 由 Game 装配的定义映射交给 AssetManager，不让 Controller 读取美术清单。
 
 Controller 的 `select/move_to/attack/click_cell/handle_action/undo` 返回 ActionResult，包含 `accepted` 与失败 `reason`，支持布尔判断。显式移动/攻击提交给当前行动者，不依赖查看对象；鼠标 `click_cell` 额外保留“查看行动者时才尝试移动/攻击”的交互策略。二者最终调用同一 Battle 校验。UIAction 仅包括跳过阶段、结束行动、回溯。
 
@@ -540,7 +688,7 @@ Controller 的 `select/move_to/attack/click_cell/handle_action/undo` 返回 Acti
 
 Game 在启动时将表现适配器交给 Controller。M3 接口为 `play_attack(AttackPresentation)/update(elapsed)->tuple[ResolutionToken,...]/clear()`：播放结果、逐帧更新并返回完成通知、清除旧表现。规则不导入适配器，协调层不导入 Pygame。未传适配器时使用 NullPresentation，攻击仍先进入 resolving，再在下一次 update 返回通知并交接。
 
-AttackResult 包含 resolution_id、actor_uid、target_uid、target_cell、target_team、damage、previous_hp、current_hp、killed。AttackPresentation 组合 `token: ResolutionToken(generation, resolution_id)` 与 `result: AttackResult`。Controller.update 消费通知，统一调用 `complete_presentation(token)`，只有当前 token 才能继续调用 `Battle.finish_attack(resolution_id)`；不以 Effects.busy 为交接条件。
+AttackResult 包含结算编号、双方 UID、目标位置/阵营、伤害/生命变化及击杀标记，M4 补充双方 definition_id 和 actor_cell，供表现选择素材和位置。AttackPresentation 组合 token 与独立结果。Controller.update 消费通知并匹配确认，不以 Effects.busy 为交接条件；没有把显示帧或路径写入结果。
 
 每次结算有编号，每次回溯/重开场景提升表现代次。只有当前代次、当前结算的完成通知有效，重复通知无效。动画播放不改变已结算的伤害；待机循环和环境特效不是阻塞任务，不参与行动交接的等待。
 
@@ -560,9 +708,9 @@ AttackResult 包含 resolution_id、actor_uid、target_uid、target_cell、targe
 
 ## 内容和美术边界
 
-后续 `content/` 存放规则定义、场景等结构化数据，`assets/` 存放图片/动画等表现数据。逻辑定义仅引用外观 ID，不能通过图片颜色、尺寸或透明区域决定规则。资源清单将 ID 映射到文件、帧和锚点，细则见 [美术与资源规范](ASSET_GUIDE.md)。
+当前 content/ 存放 schema_version=1 的单位定义和场景，assets/manifest.json 存放图片、显式帧列表、visual 状态和地砖/障碍映射。解析器拒绝未知字段、重复键/ID、无效引用及越出资源根的路径；AssetManager 在初始化显示后预载与转换 PNG，缓存失败和缩放。细则见 [资源规范](ASSET_GUIDE.md) 与 [M4 记录](M4_IMPLEMENTATION.md)。
 
-美术接入必须经过真实渲染链路；只新增目录、空 AssetManager 或每帧读取 PNG 都不算完成。无素材时继续使用现有几何表现，当前原型仍能独立运行。
+默认路径已经使用地砖与斥候素材。SpriteBody 是只在表现层流转的当前帧形体值；Renderer 将单位、障碍和素材死亡形体排序后，再统一画标签、高亮和血条。Effects 继续画最上层伤害字及几何死亡回退。循环 idle 不进入结算队列，可选帧缺失则整段回退，--geometry 完全跳过资源清单。当前无图集、音频、自动重载或美术编辑器。
 
 ## 扩展入口
 
@@ -584,7 +732,7 @@ AttackResult 包含 resolution_id、actor_uid、target_uid、target_cell、targe
 ````markdown
 # 架构整改意见评审
 
-状态：M0 历史评审，基线为 `ff67755` / `v0.1.0`。下文源码事实对应评审时的结构；后续 M1–M3 已实施，当前进度与验证见 [M1](M1_IMPLEMENTATION.md)、[M2](M2_IMPLEMENTATION.md)、[M3 实施记录](M3_IMPLEMENTATION.md) 和 TASKS。
+状态：M0 历史评审，基线为 `ff67755` / `v0.1.0`。下文源码事实对应评审时的结构；后续 M1–M4 已实施，当前进度与验证见各阶段记录、[M4 实施记录](M4_IMPLEMENTATION.md) 和 TASKS。
 
 评审材料：[用户提供的原报告](references/architecture_proposal.md)。本文将原报告中的建议与已经实现的能力分开记录。
 
@@ -592,7 +740,7 @@ AttackResult 包含 resolution_id、actor_uid、target_uid、target_cell、targe
 
 原报告的主要判断准确，适合作为渐进重构的起点。建议采纳“规则、应用协调、表现与资源分离”的方向，并补齐数据身份、回溯与动画协议、资源制作规范、功能开发准入和逐阶段验收。当前原型无需推翻，也不需要先建设通用游戏引擎。
 
-M0 交付的是整体规划和后续开发约束，当时不包括运行代码重构。后续 M1 已完成场景、几何与棋盘渲染分离；M2 已完成 Controller、完整只读视图与 UIAction；M3 已完成纯数据快照与结算确认。assets 仍待 M4，不将规划当成现成能力。
+M0 交付的是整体规划和后续开发约束，当时不包括运行代码重构。后续已完成 M1–M3 的边界与纯数据迁移，M4 的内容和图片/动画链路也已接入；M5 系统扩展与阶段发布仍待验收。
 
 ## 对照源码的判断
 
@@ -659,13 +807,13 @@ M0 交付的是整体规划和后续开发约束，当时不包括运行代码�
 ````markdown
 # 美术、动画与资源接入规范
 
-状态：待 M4 实施的资源契约。当前游戏仍使用几何绘制，没有 AssetManager 或下述清单加载器。
+状态：M4 已实施 PNG、显式帧列表、锚点、加载/缩放缓存及几何回退；真实配置见 [manifest](../assets/manifest.json)，运行与限制见 [M4 记录](M4_IMPLEMENTATION.md)。图集切帧、move/hit 素材状态、音频和热重载尚未支持。
 
 目标是让美术可以在约定接口内替换，同时保持格子规则、单位属性和回溯不变。正式美术风格、画幅和角色设定留给后续需求，本文件不提前限定视觉风格。
 
 ## 资源与规则分开
 
-规划目录：
+当前目录与后续扩展位置：
 
 ```text
 content/
@@ -675,9 +823,7 @@ assets/
   manifest.json          外观 ID → 文件、帧、锚点
   tiles/
   units/
-  obstacles/
-  effects/
-  ui/
+  # obstacles/ effects/ ui/ 按实际资源需求再创建
   README.md              资源来源与制作约定
 ```
 
@@ -693,7 +839,7 @@ assets/
 
 角色可以高出格子，选中和点击仍按逻辑格子计算。血条、高亮和伤害字在专门图层绘制，不能被大精灵遮住。
 
-清单示意如下，**并非当前已支持的文件格式**；M4 实施时先固定最小 schema 并加入验证：
+当前 schema_version=1，完整根对象要求 images、animations、visuals、board。以下展示图片条目；其余字段与完整示例见实际 manifest 和 M4 记录：
 
 ```json
 {
@@ -711,7 +857,10 @@ assets/
       "pivot": [0.5, 1.0],
       "optional": true
     }
-  }
+  },
+  "animations": {},
+  "visuals": {},
+  "board": {"floor":"tile.floor"}
 }
 ```
 
@@ -719,12 +868,12 @@ assets/
 
 ## 动画契约
 
-角色外观按 `idle / move / attack / hit / death` 状态映射；只为实际使用的状态提供资源，不要求首批素材拥有全部动画。
+当前角色外观支持 `idle / attack / death` 状态映射；idle 可是单图或循环动画，attack/death 必须是非循环动画。move/hit 待实际需求再扩展，不要求首批素材拥有全部状态。
 
-动画清单至少包含帧来源、每帧区域或文件、帧率、锚点、是否循环和缺失时回退。可先支持显式帧列表；有实际图集素材后再加入切帧，避免一次实现多套未使用格式。
+当前动画条目为 frames（图片 ID 列表）、fps、loop；帧尺寸/锚点/缺失策略由所引用图片条目指定。有实际图集素材后再加入切帧，避免一次实现多套未使用格式。
 
 - idle 可以循环，是非阻塞表现。
-- attack、hit、death 按一次播放处理，按结算编号上报结束。
+- attack、death 按一次播放处理，沿用结算编号与表现代次完成确认；未来 hit 应遵循同一约束。
 - death 最后进入隐藏，不回到 idle。规则中已死亡的单位不得因动画循环重新出现。
 - 攻击伤害仍在合法指令结算时计算。素材中的打击帧可对齐跳字和闪光，但不自行决定伤害或多扣一次生命。
 - 攻击结算等待关联的阻塞表现完成；待机、环境装饰、可选镜头反馈不能无限延长回合。
@@ -737,7 +886,7 @@ assets/
 
 AssetManager 集中解析清单、加载原图、生成缩放/切帧结果。初始化和图片格式转换发生在 Pygame 显示环境准备后，规则与场景解析不要求窗口存在。
 
-原图按资源 ID/路径缓存，派生图按资源 ID、目标尺寸、帧区域和必要的变换参数缓存。重复请求命中缓存，不重复读盘或缩放；不同显示尺寸不能误复用同一结果。切换场景或开发期重载时有明确清理入口，第一版不建设通用热重载系统。
+原图按解析后的路径缓存（含失败），派生 Surface 按路径/目标尺寸缓存，Sprite 按资源 ID/目标尺寸保留各自 pivot，Clip 按动画 ID/比例缓存。重复请求不读盘或缩放，不同显示尺寸不会误复用；帧列表复用相同图片缓存。clear_cache/preload 是显式开发入口，不提供热重载菜单或文件监视。
 
 几何 fallback 由 renderer/effects 提供，不能让资源管理器创建或修改 Unit/Battle。
 
@@ -764,7 +913,7 @@ AssetManager 集中解析清单、加载原图、生成缩放/切帧结果。初
 
 - 无图片文件时，当前几何模式仍可启动、移动、攻击、击杀、回溯和退出。
 - 用一张测试地砖和一个测试单位图片接入实际 renderer，替换只涉及清单与资源。
-- 同一资源多次请求只加载一次，缩放/切帧缓存分别命中。
+- 同一文件通过多个资源 ID 请求也只加载一次；缩放和帧列表缓存分别命中。图集切帧不在当前验收范围。
 - 从不同工作目录启动也能定位资源，缺失和损坏文件有可定位结果。
 - 大于格子的精灵、透明边缘和脚底锚点显示正确；高亮、血条和跳字可读。
 - 击杀后形体消失，回溯后单位恢复，旧动画完成回调不推进新行动。
@@ -1085,6 +1234,8 @@ M2 的 AttackPresentation 是当前规则到表现的边界转换。规则内部
 
 状态：代码和本机验收完成，2026-10-22。基线为 M2 合并提交 `babeffd`，实施分支为 `refactor/m3-snapshot-resolution-contract`。远程执行结果以对应 PR / Actions 为准，任务状态见 [TASKS](../TASKS.md)。
 
+本文件记录 M3 完成时的接口。后续 M4 已增加 definition_id 及真实资源加载，当前接入方式见 [M4 记录](M4_IMPLEMENTATION.md)；下文“尚未实现资源”属于 M3 当时的边界。
+
 ## 结果与范围
 
 本阶段将规则结算和历史迁为独立不可变值，按 UID 恢复单位，并使动画交接匹配结算编号与表现代次。默认阵容、移动、速度顺序、100% 攻击伤害、击杀动画时长与“回到上一单位行动开始前”的语义保持一致，没有增加 AI、技能、磁盘存档或资源加载。
@@ -1181,12 +1332,120 @@ NullPresentation 保留无窗口行为：播放后排入一次完成 token，下
 下一阶段 M4 接入内容/资源清单、验证、图片/缩放缓存和真实素材链路；不将当前几何动画称为素材动画加载。
 ````
 
+## docs/M4_IMPLEMENTATION.md
+
+````markdown
+# M4 实施与验收记录
+
+状态：代码和本机验收完成，2026-10-22。基线为 M3 合并提交 `d827ba9`，实施分支 `feature/m4-content-assets`。远程结果以对应 PR / Actions 为准，进度见 [TASKS](../TASKS.md)。
+
+## 结果与边界
+
+默认启动现在实际加载 JSON 单位/场景、资源清单及项目内生成的 PNG，显示地砖和带帽斥候，支持循环待机、非循环攻击/死亡。其他单位与障碍继续使用几何回退；--geometry 完全不加载资源清单。当前没有图集切帧、move/hit 素材状态、音频、自动重载或美术编辑器。
+
+移动、伤害、行动顺序、立即扣血、死亡退出占格/队列、上一行动回溯及 M3 token 确认不变。Unit/UnitSnapshot/View 增加 definition_id，AttackResult 补充双方定义 ID 和行动位置；这些是纯标识/坐标，不含图片路径或播放时钟。新增字段已经纳入快照完整性检查。
+
+| 模块 | 实际职责 |
+| --- | --- |
+| data_files.py | UTF-8 JSON、重复键拒绝、严格字段/数值/版本检查、安全相对路径 |
+| content.py | 不可变 UnitDefinition/GameContent；读取定义、生成记录和覆盖值，调用既有 Scenario 验证 |
+| scenario.py | 保留 Python 场景接口；default_scenario() 读取同一默认 JSON，不维护第二份阵容/数值 |
+| asset_manifest.py | 无 Pygame 的图片、显式帧列表、visual 状态和 board 引用验证 |
+| assets.py | 显示初始化后加载/转换 PNG，缓存原图/缩放/Sprite/Clip，提供锚点与 SpriteBody 表现值 |
+| board_renderer.py | 地砖、范围、按脚底排序的障碍/单位/临时素材形体，再统一绘制标签/高亮/血条；更新非阻塞待机 |
+| effects.py | 播放攻击/死亡素材或几何回退，维护跳字，阻塞效果完成后返回一次 M3 token |
+| game.py / main.py | 组装和启动参数；不硬编码资源文件名、定义 ID 或新玩法分支 |
+
+## 内容格式与身份
+
+`content/units.json` 根字段为 schema_version=1、units 数组；每项必须有 id、name、role、max_health、attack、defense、speed、movement、visual_id。定义 ID 唯一，数值为非负整数（max_health>0），布尔值不能充当整数。
+
+`content/scenarios/*.json` 必须有 schema_version、id、cols、rows、obstacles 和 spawns。生成记录为：
+
+```json
+{"uid":"A2","definition_id":"scout","team":"ally","cell":[1,3],"overrides":{"health":80}}
+```
+
+overrides 可覆盖 name、health、max_health、attack、defense、speed、movement，不允许未知键。未提供 health 时使用本次 max_health；默认斥候通过实例覆盖保留 80/100。木桩共用 dummy 定义，通过实例名称和速度覆盖保持原阵容。未知定义、重复 UID、出生冲突、越界、非法生命/阵营仍在初始化拒绝。
+
+定义与状态分开：每局复制定义数值创建新的运行 Unit，定义本身不可变，运行中不动态回读 JSON。保存 definition_id 可在回溯后关联同一外观；AssetManager 使用 Game 装配的“定义 ID → visual_id”映射，规则不读取资源清单。
+
+Python 手写 Scenario 仍可构造完整属性，definition_id 默认为空；未绑定外观时使用几何。JSON 生成记录必须引用已存在定义；加载的每个定义都必须有已声明的 visual（空对象 {} 明确表示几何回退），不能用拼错外观 ID 静默隐藏问题。
+
+## 清单与替换流程
+
+`assets/manifest.json` 的 schema_version=1，根字段必须有 images、animations、visuals、board 四个对象。未知字段、重复 JSON 键/跨图片动画 ID、无效引用均拒绝。实际完整示例已随项目交付，不需要生成额外注册代码。
+
+图片条目：path、display_size（两个正整数）、pivot（0–1 相对坐标）、optional（布尔值）。路径相对资源根，使用正斜杠，只支持 .png；绝对路径、Windows 盘符/UNC、反斜杠和解析后越界的路径拒绝，解析也检查符号链接逃逸。
+
+动画条目：frames 是非空图片 ID 列表，fps 为有限正数，loop 为布尔值。visual 可有 idle、attack、death：idle 接单图或循环动画，attack/death 只能接非循环动画。board 可声明 floor、obstacle 图片。未声明的状态使用几何；没有静默接受未知引用。
+
+替换地砖或斥候只需：
+
+1. 将 PNG 放进资源根内，更新图片 path、基准显示尺寸及 pivot。
+2. 在 images 中为每个动画帧声明图片，再修改 animations 的 frames/fps；角色通过 visuals 的状态映射选片段。
+3. 单位定义保持 visual_id；如果新增一个外观，增加 visuals 条目后修改定义的 visual_id。
+4. 重启游戏验证。资源不改变 cell、占格、路径、生命或伤害；没有每帧读文件或热更新菜单。
+
+默认格子 64 像素，清单显示尺寸以此为基准，资源层按 Geometry 比例缩放。单位/障碍/死亡形体将 pivot 对齐格子底部中心，地砖对齐格子中心。斥候画幅 64×96，高出格子但不扩展点击区域；Renderer 按脚底行和稳定 ID 排序形体，最后统一绘制标签/高亮/血条。形体裁剪在棋盘边界，跳字及侧栏仍位于上层。
+
+演示图片均由 [生成脚本](../scripts/generate_demo_assets.py) 绘制，无外部下载；来源、尺寸、锚点及授权说明见 [assets/README](../assets/README.md)。这些是接口验证素材，不是最终美术交付。
+
+## 缓存与失败策略
+
+- 原图以解析后的路径为键，包括缺失/解码失败；多个 ID 引用同一文件也只读取一次。
+- 缩放 Surface 以路径和目标尺寸为键；Sprite 以资源 ID/尺寸为键保留不同 pivot；Clip 以动画 ID/比例为键复用帧缓存。
+- 初始化显示后预载全部声明图片与片段；重复绘制、待机更新和攻击播放不读盘、不重复缩放。请求新尺寸时只生成一次派生图。
+- 可选文件失败按 ID/路径记录一次，缓存 None 并使用几何。任意帧不可用时整个片段回退，避免残缺动画永久锁定结算。
+- 必需图片（即使未在当前画面使用）在启动时校验，缺失/损坏立即报错。内容、格式和引用错误同样拒绝，CLI 以 Configuration error 和文件/字段原因退出；资源失败后的窗口会清理。
+- clear_cache/preload 提供显式开发期清理/重建入口，不实现文件监视。开发者重载前应取消旧表现，正常使用直接重启进程。
+
+没有 PNG 时保留合法 manifest 可走可选缺失回退；如果连资源清单也不需要，使用 --geometry。几何模式仍需要合法规则内容文件，不能把错误场景静默换成另一个关卡。系统字体扫描异常与英文/内置字体回退保持原样。
+
+## 动画、交接与恢复
+
+Renderer 单独推进循环待机，不影响 Controller/Battle。Effects 在合法攻击后解析 actor_definition_id 对应攻击片段和被击杀目标的 death 片段，画面位置来自独立结果坐标，保持立即扣血。
+
+非循环片段和伤害跳字是本次结算的阻塞任务，全部完成后只发一次原 token。死亡片段结束即移除临时 SpriteBody，不切回 idle；规则中目标已不存在于存活 BoardView。可选素材缺失时使用原几何死亡形体与跳字，仍按 M3 确认。回溯/restart 清除图片形体、几何形体、跳字和尚未发出的通知，恢复单位重新显示正常 idle；晚到旧 token 仍由 Controller 拒绝。
+
+默认攻击片段 3 帧/8 fps，死亡片段 3 帧/5 fps；默认跳字约 0.9 秒，因此默认交接时机仍由较长跳字控制。自定义非循环素材更长时会等待实际片段结束，测试已覆盖 1 秒死亡片段；循环待机绝不进入等待。
+
+## 运行与验证
+
+```powershell
+.\.venv\Scripts\python.exe main.py
+.\.venv\Scripts\python.exe main.py --geometry
+.\.venv\Scripts\python.exe main.py --scenario scenarios/training_ground.json --assets assets
+.\.venv\Scripts\python.exe scripts/generate_demo_assets.py
+```
+
+默认根路径相对项目文件，允许从其他工作目录启动。--scenario 相对所选 content 根；显式 --content-root/--assets 接受当前工作目录相对路径或绝对目录。需要从外部路径传入场景时先选对应 content 根，不绕过根目录内引用约束。
+
+本机 Python 3.9.1 / Pygame 2.6.1 / SDL 2.28.4：123 项测试，122 通过，1 项因 Windows 无创建符号链接权限跳过，整体退出码 0。无窗口与 Windows 实际窗口两次完整回归均完成。新增 13 项纯内容/清单、16 项 PNG/缓存/渲染/动画检查，原 94 项覆盖保留；旧颜色断言明确在几何模式验证，素材另有真实链路检查。
+
+四组 `python -S` 共 57 项（含上述跳过项），验证内容、清单、核心和协调不依赖 Pygame；独立子进程还禁止导入 Pygame，并从其他工作目录读取默认文件和跑通战斗/回溯。CI 在安装依赖前运行四组，随后安装依赖、检查 SOURCE 并运行完整回归；平台继续覆盖 Windows/Linux × Python 3.9/3.12，结果以 Actions 实际结论为准。
+
+自动化覆盖多 ID 单次读盘、不同缩放缓存、负缓存/一次报告、显式重载、透明度与锚点、所有形体之后的血条、绘制裁剪、无素材像素回退、清单单独替换、规则结果一致、长死亡片段等待、恢复无残留、必需缺失/损坏/结构/引用错误等。符号链接项在支持的系统实际建链验证；Windows 跳过该项时，绝对路径、盘符、反斜杠和 .. 逃逸检查仍运行。
+
+路径断言统一比较 resolve 后的规范路径，兼容 Windows CI 将 RUNNER~1 等 8.3 别名解析为长目录名的行为；生产路径验证仍检查解析后的根目录边界。
+
+实际 Windows 额外检查默认素材、攻击、斥候死亡/消失、胜负、回溯复活与旧通知拒绝；main.py 的默认/几何两种入口从其他工作目录启动并在结算中 QUIT 正常释放。几何模式 13 帧与 M3 逐像素一致。检查了如下截图中的透明边缘、脚底位置、缩放、图层与侧栏；操作由程序调用和自动事件完成，并非人工逐次点击。
+
+![默认素材链路](../artifacts/m4_assets.png)
+
+![素材死亡验证场景](../artifacts/m4_death.png)
+
+## 后续
+
+M5 将正式交付第二场景和第二套外观、开发模板及阶段发布验收。当前临时测试数据和颜色替换证明 M4 链路可用，不提前把系统扩展演练或最终美术标记完成。
+````
+
 ## docs/ROADMAP.md
 
 ````markdown
 # 架构实施路线与验收
 
-状态：M0–M3 已完成；M4–M5 未开始。最近发布仍为 `v0.1.0`，M1–M3 属于未发布的开发变更；当前未实现资源加载或磁盘存档。
+状态：M0–M4 已完成；M5 未开始。最近发布仍为 `v0.1.0`，M1–M4 属于未发布的开发变更；资源加载和演示素材已接入，磁盘存档未实现。
 
 本路线以当前 41 项行为检查为迁移基线。测试数量可增加，导入和夹具可随接口迁移，关键行为不能丢失。每个阶段在专用分支完成小批次提交，先验证、再审查差异并合并；不在一次提交中同时迁移架构和改动玩法。
 
@@ -1198,7 +1457,7 @@ NullPresentation 保留无窗口行为：播放后排入一次完成 token，下
 | M1 / ARCH-01（已完成） | M0 | Scenario 纯数据初始化；Board 去除 Pygame；Geometry、BoardRenderer 和最小 BoardView 实际接管旧绘制 | 57 项检查通过；12 项无第三方包；8 帧逐像素一致；5×4 场景实际窗口验收，详见 M1 实施记录 |
 | M2 / ARCH-02（已完成） | M1 | Controller 操作入口、完整只读 View、UIAction 命中接口；Game 缩减为组装与循环 | 75 项检查通过，28 项无第三方包；13 帧与 M1 一致；完整交互与输入锁定通过，详见 M2 实施记录 |
 | M3 / ARCH-03（已完成） | M2 | ID 化结算结果、纯数据快照/UID 重建、结算编号与表现代次；回溯清除旧表现 | 94 项检查通过，44 项无第三方包；错误/重复/过期通知无效；死亡及跨轮恢复一致；13 帧与 M2 一致，详见 M3 实施记录 |
-| M4 / ARCH-04 | M3 | 外部内容/资源清单、验证、图片和缩放缓存；一条真实素材替换链路 | 替换单位和地砖只修改清单/素材；相同文件只加载一次；不同尺寸缓存正确；缺失可定位并按策略回退；场景/定义错误明确拒绝 |
+| M4 / ARCH-04（已完成） | M3 | JSON 内容/资源清单、验证、图片/缩放缓存；默认地砖与斥候静态/动画素材链路、几何回退 | 123 项测试，本机 122 通过/1 项权限跳过；57 项无需第三方包；13 帧几何模式一致；替换、缓存、回退与素材窗口验收，详见 M4 记录 |
 | M5 / ARCH-05 | M1–M4 | 扩展演练、开发模板、完整 CI 与真实窗口验收、阶段版本交付 | 新场景与第二套外观分别通过数据接入；现有流程、动画、击杀和回溯全部通过；发布文件和文档对应同一提交 |
 
 M1–M4 可以继续细分为下列小提交，不以“文件已经创建”作为完成条件。
@@ -1275,9 +1534,9 @@ M1–M4 可以继续细分为下列小提交，不以“文件已经创建”作
 
 ## 当前下一步
 
-M1–M3 已达到“原画面与玩法保持一致，规则与协调不依赖 Pygame，表现与快照使用独立值，交接验证结算编号及代次”，见 [M1](M1_IMPLEMENTATION.md)、[M2](M2_IMPLEMENTATION.md) 和 [M3 实施与验收](M3_IMPLEMENTATION.md)。
+M1–M4 已完成规则/表现边界、纯数据回溯、结算确认和首条真实资源链路，见 [M4 实施与验收](M4_IMPLEMENTATION.md) 及各阶段记录。几何模式保持原画面，默认素材模式只改变表现。
 
-下一个任务是 **ARCH-04 / M4**：接入 JSON 内容/资源清单、路径验证、图片和缩放缓存，在默认渲染路径完成地砖/单位素材替换，并沿用 M3 完成通知接入非循环动画。保留无素材几何回退，不把已有几何动画或可转字典的内存快照称为美术加载/磁盘存档。
+下一个任务是 **ARCH-05 / M5**：用正式交付的第二场景与第二套外观完成扩展演练、补齐开发模板、核对几何/素材两种模式及完整 CI，再作阶段发布。M4 的临时测试场景和颜色替换检查不替代这项系统验收。
 ````
 
 ## docs/references/architecture_proposal.md
@@ -1558,10 +1817,23 @@ Chrono Tactics 当前已经具备可继续迭代的基础结构，没有必要�
 """Run the offline tactics prototype."""
 
 from tactics.game import Game
+from tactics.data_files import DataError
+import argparse
 
 
 if __name__ == "__main__":
-    Game().run()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--scenario", default="scenarios/training_ground.json",
+                        help="JSON path relative to content root")
+    parser.add_argument("--content-root", help="unit definitions and scenarios root")
+    parser.add_argument("--assets", help="asset root containing manifest.json")
+    parser.add_argument("--geometry", action="store_true", help="use geometry without loading asset files")
+    args = parser.parse_args()
+    try:
+        Game(content_root=args.content_root, scenario_file=args.scenario,
+             asset_root=args.assets, geometric=args.geometry).run()
+    except DataError as error:
+        parser.exit(2, "Configuration error: {}\n".format(error))
 ```
 
 ## requirements.txt
@@ -1587,14 +1859,14 @@ def source_files():
     files = {path for path in ROOT.iterdir()
              if path.is_file() and (path.suffix in SUFFIXES or path.name in (".gitignore", ".gitattributes"))
              and path != OUTPUT}
-    for folder in ("tactics", "tests", "scripts", ".github", "docs"):
+    for folder in ("tactics", "tests", "scripts", ".github", "docs", "content", "assets"):
         files.update(path for path in (ROOT / folder).rglob("*")
                      if path.is_file() and path.suffix in SUFFIXES)
     return sorted(files, key=lambda path: path.relative_to(ROOT).as_posix())
 
 
 def render():
-    parts = ["# 完整项目源码\n\n本文件由 `python scripts/export_source.py` 生成。包含项目全部文本源码、配置和文档；不包含自身、截图、虚拟环境、缓存及压缩包。\n"]
+    parts = ["# 完整项目源码\n\n本文件由 `python scripts/export_source.py` 生成。包含项目全部文本源码、配置和文档；不包含自身、二进制 PNG、截图、虚拟环境、缓存及压缩包。演示 PNG 可由 scripts/generate_demo_assets.py 重建。\n"]
     for path in source_files():
         name = path.relative_to(ROOT).as_posix()
         language = {".py": "python", ".md": "markdown", ".yml": "yaml", ".yaml": "yaml"}.get(path.suffix, "text")
@@ -1621,6 +1893,59 @@ def main():
 
 if __name__ == "__main__":
     main()
+```
+
+## scripts/generate_demo_assets.py
+
+```python
+"""Rebuild the named programmer-art PNGs; never fetch external artwork."""
+
+import argparse
+from pathlib import Path
+import pygame
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def generate(root):
+    root = Path(root)
+    (root / "tiles").mkdir(parents=True, exist_ok=True)
+    (root / "units").mkdir(parents=True, exist_ok=True)
+    tile = pygame.Surface((64, 64), pygame.SRCALPHA)
+    tile.fill((43, 62, 72))
+    for rect in ((2, 2, 29, 29), (33, 2, 29, 29), (2, 33, 29, 29), (33, 33, 29, 29)):
+        pygame.draw.rect(tile, (51, 73, 80), rect, border_radius=3)
+        pygame.draw.line(tile, (66, 89, 94), (rect[0]+3, rect[1]+2), (rect[0]+24, rect[1]+2))
+    pygame.image.save(tile, str(root / "tiles/floor.png"))
+    for state, count in (("idle", 2), ("attack", 3), ("death", 3)):
+        for index in range(count):
+            image = pygame.Surface((64, 96), pygame.SRCALPHA)
+            body = pygame.Surface((64, 96), pygame.SRCALPHA)
+            y = -index if state == "idle" else 0
+            pygame.draw.ellipse(body, (8, 18, 24, 90), (10, 85, 44, 9))
+            pygame.draw.polygon(body, (24, 82, 130), ((17, 50+y), (47, 50+y), (54, 86), (10, 86)))
+            pygame.draw.circle(body, (69, 156, 239), (32, 64+y), 21)
+            pygame.draw.circle(body, (146, 207, 255), (32, 64+y), 21, 2)
+            pygame.draw.circle(body, (198, 222, 230), (32, 36+y), 13)
+            pygame.draw.polygon(body, (38, 100, 157), ((17, 35+y), (32, 14+y), (49, 35+y)))
+            pygame.draw.rect(body, (255, 204, 109), (21, 45+y, 23, 6), border_radius=2)
+            if state == "attack":
+                pygame.draw.arc(body, (255, 225, 144), (25-index*4, 28, 36, 49), -.9, 1.3, 3+index)
+            if state == "death":
+                size = (64-index*9, 96-index*14)
+                body = pygame.transform.smoothscale(body, size)
+                body.set_alpha(220-index*85)
+                image.blit(body, ((64-size[0])//2, 96-size[1]))
+            else:
+                image.blit(body, (0, 0))
+            pygame.image.save(image, str(root / "units" / ("scout_{}_{}.png".format(state, index))))
+    print("Generated 9 demo PNGs in " + str(root.resolve()))
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output", type=Path, default=ROOT / "assets")
+    generate(parser.parse_args().output)
 ```
 
 ## tactics/__init__.py
@@ -1651,6 +1976,250 @@ class ActionResult:
 
     def __bool__(self):
         return self.accepted
+```
+
+## tactics/asset_manifest.py
+
+```python
+"""Version-one manifest parsing and references, without Pygame or image I/O."""
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Tuple
+
+from .data_files import DataError, fields, number, read_json, rooted_path, text, version
+
+
+@dataclass(frozen=True)
+class ImageSpec:
+    asset_id: str
+    path: Path
+    display_size: Tuple[int, int]
+    pivot: Tuple[float, float]
+    optional: bool
+
+
+@dataclass(frozen=True)
+class AnimationSpec:
+    asset_id: str
+    frames: Tuple[str, ...]
+    fps: float
+    loop: bool
+
+
+@dataclass(frozen=True)
+class Manifest:
+    images: Tuple[ImageSpec, ...]
+    animations: Tuple[AnimationSpec, ...]
+    visuals: Tuple[Tuple[str, Tuple[Tuple[str, str], ...]], ...]
+    board: Tuple[Tuple[str, str], ...]
+
+
+def load_manifest(root):
+    root = Path(root)
+    path = root / "manifest.json"
+    label = str(path)
+    data = read_json(path)
+    fields(data, ("schema_version", "images", "animations", "visuals", "board"), (), label)
+    version(data, label)
+    for key in ("images", "animations", "visuals", "board"):
+        if not isinstance(data[key], dict):
+            raise DataError(label + "." + key + ": expected an object")
+    images = []
+    for asset_id, record in data["images"].items():
+        where = label + " images." + text(asset_id, label)
+        fields(record, ("path", "display_size", "pivot", "optional"), (), where)
+        image_path = rooted_path(root, record["path"], where)
+        if image_path.suffix.lower() != ".png":
+            raise DataError(where + ": only PNG files are supported")
+        size, pivot = record["display_size"], record["pivot"]
+        if not isinstance(size, list) or len(size) != 2 or not isinstance(pivot, list) or len(pivot) != 2:
+            raise DataError(where + ": display_size/pivot must be pairs")
+        for value in size:
+            number(value, where + ".display_size", minimum=1, integer=True)
+        for value in pivot:
+            if number(value, where + ".pivot") > 1:
+                raise DataError(where + ": pivot must be between 0 and 1")
+        if type(record["optional"]) is not bool:
+            raise DataError(where + ": optional must be boolean")
+        images.append(ImageSpec(asset_id, image_path, tuple(size), tuple(pivot), record["optional"]))
+    animations = []
+    for asset_id, record in data["animations"].items():
+        where = label + " animations." + text(asset_id, label)
+        if asset_id in data["images"]:
+            raise DataError(where + ": id also used by an image")
+        fields(record, ("frames", "fps", "loop"), (), where)
+        if not isinstance(record["frames"], list) or not record["frames"]:
+            raise DataError(where + ": frames must be a nonempty array")
+        for frame in record["frames"]:
+            if text(frame, where + ".frames") not in data["images"]:
+                raise DataError(where + ": unknown frame " + frame)
+        if number(record["fps"], where + ".fps") <= 0 or type(record["loop"]) is not bool:
+            raise DataError(where + ": fps must be positive and loop boolean")
+        animations.append(AnimationSpec(asset_id, tuple(record["frames"]), record["fps"], record["loop"]))
+    by_animation = {item.asset_id: item for item in animations}
+    visuals = []
+    for visual_id, record in data["visuals"].items():
+        where = label + " visuals." + text(visual_id, label)
+        fields(record, (), ("idle", "attack", "death"), where)
+        for state, asset_id in record.items():
+            text(asset_id, where + "." + state)
+            if state == "idle" and asset_id in data["images"]:
+                continue
+            clip = by_animation.get(asset_id)
+            if clip is None or clip.loop != (state == "idle"):
+                raise DataError(where + ": " + state + " needs a known " +
+                                ("looping idle animation or image" if state == "idle" else "non-looping animation"))
+        visuals.append((visual_id, tuple(record.items())))
+    fields(data["board"], (), ("floor", "obstacle"), label + ".board")
+    for state, asset_id in data["board"].items():
+        if text(asset_id, label + ".board." + state) not in data["images"]:
+            raise DataError(label + ".board: unknown image " + asset_id)
+    return Manifest(tuple(images), tuple(animations), tuple(visuals), tuple(data["board"].items()))
+```
+
+## tactics/assets.py
+
+```python
+"""PNG loading, cached display sizes, pivots and explicit-frame clips."""
+
+from dataclasses import dataclass
+import logging
+
+import pygame
+
+from .asset_manifest import load_manifest
+from .data_files import DataError, number
+
+
+@dataclass(frozen=True)
+class Sprite:
+    surface: pygame.Surface
+    pivot: tuple
+
+    def blit(self, surface, anchor):
+        width, height = self.surface.get_size()
+        surface.blit(self.surface, (round(anchor[0] - width * self.pivot[0]),
+                                    round(anchor[1] - height * self.pivot[1])))
+
+
+@dataclass(frozen=True)
+class Clip:
+    frames: tuple
+    fps: float
+    loop: bool
+
+    @property
+    def duration(self):
+        return len(self.frames) / self.fps
+
+    def finished(self, age):
+        return not self.loop and age >= self.duration
+
+    def frame_at(self, age):
+        index = int(max(0, age) * self.fps)
+        return self.frames[index % len(self.frames) if self.loop else min(index, len(self.frames) - 1)]
+
+
+@dataclass(frozen=True)
+class SpriteBody:
+    uid: str
+    cell: tuple
+    sprite: Sprite
+
+
+class AssetManager:
+    def __init__(self, root, definitions=()):
+        self.manifest = load_manifest(root)
+        self._images = {item.asset_id: item for item in self.manifest.images}
+        self._animations = {item.asset_id: item for item in self.manifest.animations}
+        self._visuals = {key: dict(states) for key, states in self.manifest.visuals}
+        self._bindings = {item.definition_id: item.visual_id for item in definitions}
+        for definition_id, visual_id in self._bindings.items():
+            if visual_id not in self._visuals:
+                raise DataError("{}: definition {}: unknown visual {}".format(root, definition_id, visual_id))
+        self.clear_cache()
+        # Validate all required files now, including unused entries.
+        self.preload()
+
+    @property
+    def issues(self):
+        return tuple(self._issues)
+
+    def clear_cache(self):
+        """Explicit development reload; no automatic filesystem checks per frame."""
+        self._originals = {}
+        self._scaled = {}
+        self._sprites = {}
+        self._clips = {}
+        self._reported = set()
+        self._issues = []
+
+    def get_image(self, asset_id, scale=1):
+        if number(scale, "image scale") <= 0:
+            raise DataError("image scale must be positive")
+        spec = self._images[asset_id]
+        size = tuple(max(1, round(value * scale)) for value in spec.display_size)
+        key = (asset_id, size)
+        if key in self._sprites:
+            return self._sprites[key]
+        if spec.path not in self._originals:
+            try:
+                if pygame.display.get_surface() is None:
+                    raise DataError("AssetManager requires an initialized display surface")
+                self._originals[spec.path] = pygame.image.load(str(spec.path)).convert_alpha()
+            except (OSError, ValueError, pygame.error) as error:
+                if isinstance(error, DataError):
+                    raise
+                self._originals[spec.path] = str(error)
+        original = self._originals[spec.path]
+        if isinstance(original, str):
+            message = "{} ({}): {}".format(asset_id, spec.path, original)
+            if not spec.optional:
+                raise DataError("required image unavailable: " + message)
+            if asset_id not in self._reported:
+                self._reported.add(asset_id)
+                self._issues.append(message)
+                logging.getLogger(__name__).warning("optional image unavailable: %s", message)
+            self._sprites[key] = None
+            return None
+        image_key = (spec.path, size)
+        if image_key not in self._scaled:
+            self._scaled[image_key] = (original if size == original.get_size()
+                                       else pygame.transform.smoothscale(original, size))
+        sprite = Sprite(self._scaled[image_key], spec.pivot)
+        self._sprites[key] = sprite
+        return sprite
+
+    def get_clip(self, asset_id, scale=1):
+        if number(scale, "clip scale") <= 0:
+            raise DataError("clip scale must be positive")
+        key = (asset_id, scale)
+        if key not in self._clips:
+            spec = self._animations[asset_id]
+            frames = tuple(self.get_image(frame, scale) for frame in spec.frames)
+            self._clips[key] = Clip(frames, spec.fps, spec.loop) if all(frames) else None
+        return self._clips[key]
+
+    def visual(self, definition_id, state, scale=1):
+        visual_id = self._bindings.get(definition_id)
+        asset_id = self._visuals.get(visual_id, {}).get(state)
+        if asset_id is None:
+            return None
+        if asset_id in self._images:
+            image = self.get_image(asset_id, scale)
+            return Clip((image,), 1, True) if image is not None else None
+        return self.get_clip(asset_id, scale)
+
+    def board_image(self, state, scale=1):
+        asset_id = dict(self.manifest.board).get(state)
+        return self.get_image(asset_id, scale) if asset_id else None
+
+    def preload(self, scale=1):
+        for asset_id in self._images:
+            self.get_image(asset_id, scale)
+        for asset_id in self._animations:
+            self.get_clip(asset_id, scale)
 ```
 
 ## tactics/battle.py
@@ -1764,6 +2333,7 @@ class Battle:
         self.pending_attack = AttackResult(
             self._next_resolution_id, actor.uid, target.uid, tuple(target.cell), target.team,
             damage, previous_hp, target.health, not target.alive,
+            actor.definition_id, target.definition_id, tuple(actor.cell),
         )
         self._next_resolution_id += 1
         self.phase = "resolving"
@@ -1886,8 +2456,10 @@ from .view_models import BoardView
 
 
 class BoardRenderer:
-    def __init__(self, geometry: BoardGeometry):
+    def __init__(self, geometry: BoardGeometry, assets=None):
         self.geometry = geometry
+        self.assets = assets
+        self.elapsed = 0
         self.scale = geometry.cell_size / 64
         self.label_font = None
 
@@ -1897,7 +2469,10 @@ class BoardRenderer:
     def _rect(self, cell):
         return pygame.Rect(self.geometry.cell_rect(cell))
 
-    def draw(self, surface, view: BoardView):
+    def update(self, elapsed):
+        self.elapsed += max(0, elapsed)
+
+    def draw(self, surface, view: BoardView, bodies=()):
         if (view.cols, view.rows) != (self.geometry.cols, self.geometry.rows):
             raise ValueError("board view and geometry dimensions do not match")
         if self.label_font is None:
@@ -1905,16 +2480,19 @@ class BoardRenderer:
         old_clip = surface.get_clip()
         surface.set_clip(old_clip.clip(pygame.Rect(self.geometry.bounds)))
         try:
-            self._draw(surface, view)
+            self._draw(surface, view, bodies)
         finally:
             surface.set_clip(old_clip)
 
-    def _draw(self, surface, view):
+    def _draw(self, surface, view, bodies):
+        floor = self.assets.board_image("floor", self.scale) if self.assets else None
         for row in range(view.rows):
             for col in range(view.cols):
                 color = (42, 55, 70) if (row + col) % 2 else (48, 63, 79)
                 rect = self._rect((col, row))
                 pygame.draw.rect(surface, color, rect)
+                if floor is not None:
+                    floor.blit(surface, rect.center)
                 pygame.draw.rect(surface, (66, 81, 97), rect, self._size(1))
 
         for cells, color in ((view.move_cells, (54, 109, 103)), (view.attack_cells, (125, 65, 74))):
@@ -1925,33 +2503,148 @@ class BoardRenderer:
             pygame.draw.rect(surface, (255, 161, 128),
                              self._rect(cell).inflate(-self._size(5), -self._size(5)), self._size(3))
 
-        for cell in view.obstacles:
-            block = self._rect(cell).inflate(-self._size(12), -self._size(12))
-            pygame.draw.rect(surface, (111, 124, 135), block, border_radius=self._size(5))
-            pygame.draw.line(surface, (146, 157, 166), block.topleft, block.bottomright, self._size(2))
-            pygame.draw.line(surface, (146, 157, 166), block.topright, block.bottomleft, self._size(2))
+        overrides = {body.uid: body for body in bodies}
+        # Feet determine overlap; all overlays are drawn after every body.
+        drawables = [(cell[1], "obstacle:{}:{}".format(*cell), "obstacle", cell) for cell in view.obstacles]
+        drawables += [(unit.cell[1], unit.uid, "unit", unit) for unit in view.units
+                      if unit.uid not in overrides]
+        drawables += [(body.cell[1], body.uid, "sprite", body) for body in bodies]
+        for _, _, kind, item in sorted(drawables, key=lambda item: item[:2]):
+            if kind == "obstacle":
+                self._draw_obstacle(surface, item)
+            elif kind == "sprite":
+                item.sprite.blit(surface, self._rect(item.cell).midbottom)
+            else:
+                self._draw_unit(surface, item)
 
         for unit in view.units:
             rect = self._rect(unit.cell)
-            if unit.team == "ally":
-                pygame.draw.circle(surface, (69, 156, 239), rect.center, self._size(21))
-                pygame.draw.circle(surface, (146, 207, 255), rect.center, self._size(21), self._size(2))
-            else:
-                block = rect.inflate(-self._size(24), -self._size(24))
-                pygame.draw.rect(surface, (231, 88, 94), block, border_radius=self._size(3))
-                pygame.draw.rect(surface, (255, 153, 146), block, self._size(2), border_radius=self._size(3))
             label = self.label_font.render(unit.uid, True, (255, 255, 255))
             surface.blit(label, label.get_rect(center=rect.center))
-            if unit.uid == view.active_uid:
-                pygame.draw.rect(surface, (255, 219, 116),
-                                 rect.inflate(-self._size(4), -self._size(4)), self._size(3))
-            if unit.uid == view.selected_uid:
-                pygame.draw.circle(surface, (246, 248, 252), rect.center, self._size(27), self._size(2))
-            bar = pygame.Rect(rect.x + self._size(10), rect.y + self._size(58), self._size(44), self._size(4))
-            pygame.draw.rect(surface, (26, 31, 39), bar)
-            fill = bar.copy()
-            fill.width = round(bar.width * min(1, unit.health / max(1, unit.max_health)))
-            pygame.draw.rect(surface, (105, 218, 153), fill)
+            self._draw_overlay(surface, view, unit, rect)
+
+    def _draw_obstacle(self, surface, cell):
+        sprite = self.assets.board_image("obstacle", self.scale) if self.assets else None
+        if sprite is not None:
+            sprite.blit(surface, self._rect(cell).midbottom)
+            return
+        block = self._rect(cell).inflate(-self._size(12), -self._size(12))
+        pygame.draw.rect(surface, (111, 124, 135), block, border_radius=self._size(5))
+        pygame.draw.line(surface, (146, 157, 166), block.topleft, block.bottomright, self._size(2))
+        pygame.draw.line(surface, (146, 157, 166), block.topright, block.bottomleft, self._size(2))
+
+    def _draw_unit(self, surface, unit):
+        rect = self._rect(unit.cell)
+        clip = self.assets.visual(unit.definition_id, "idle", self.scale) if self.assets else None
+        if clip is not None:
+            clip.frame_at(self.elapsed).blit(surface, rect.midbottom)
+            return
+        if unit.team == "ally":
+            pygame.draw.circle(surface, (69, 156, 239), rect.center, self._size(21))
+            pygame.draw.circle(surface, (146, 207, 255), rect.center, self._size(21), self._size(2))
+        else:
+            block = rect.inflate(-self._size(24), -self._size(24))
+            pygame.draw.rect(surface, (231, 88, 94), block, border_radius=self._size(3))
+            pygame.draw.rect(surface, (255, 153, 146), block, self._size(2), border_radius=self._size(3))
+
+    def _draw_overlay(self, surface, view, unit, rect):
+        if unit.uid == view.active_uid:
+            pygame.draw.rect(surface, (255, 219, 116),
+                             rect.inflate(-self._size(4), -self._size(4)), self._size(3))
+        if unit.uid == view.selected_uid:
+            pygame.draw.circle(surface, (246, 248, 252), rect.center, self._size(27), self._size(2))
+        bar = pygame.Rect(rect.x + self._size(10), rect.y + self._size(58), self._size(44), self._size(4))
+        pygame.draw.rect(surface, (26, 31, 39), bar)
+        fill = bar.copy()
+        fill.width = round(bar.width * min(1, unit.health / max(1, unit.max_health)))
+        pygame.draw.rect(surface, (105, 218, 153), fill)
+```
+
+## tactics/content.py
+
+```python
+"""Validated JSON unit definitions and scenario construction; standard library only."""
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Tuple
+
+from .data_files import DataError, PROJECT_ROOT, fields, number, read_json, rooted_path, text, version
+from .scenario import Scenario, UnitSpawn
+
+STATS = ("max_health", "attack", "defense", "speed", "movement")
+
+
+@dataclass(frozen=True)
+class UnitDefinition:
+    definition_id: str
+    name: str
+    role: str
+    max_health: int
+    attack: int
+    defense: int
+    speed: int
+    movement: int
+    visual_id: str
+
+
+@dataclass(frozen=True)
+class GameContent:
+    scenario: Scenario
+    definitions: Tuple[UnitDefinition, ...]
+
+
+def load_content(root=None, scenario_file="scenarios/training_ground.json"):
+    root = PROJECT_ROOT / "content" if root is None else Path(root)
+    unit_path = root / "units.json"
+    data = read_json(unit_path)
+    label = str(unit_path)
+    fields(data, ("schema_version", "units"), (), label)
+    version(data, label)
+    if not isinstance(data["units"], list) or not data["units"]:
+        raise DataError(label + ": units must be a nonempty array")
+    definitions = {}
+    for index, record in enumerate(data["units"]):
+        where = "{} units[{}]".format(unit_path, index)
+        fields(record, ("id", "name", "role", "visual_id") + STATS, (), where)
+        for key in ("id", "name", "role", "visual_id"):
+            text(record[key], where + "." + key)
+        for key in STATS:
+            number(record[key], where + "." + key, minimum=1 if key == "max_health" else 0, integer=True)
+        if record["id"] in definitions:
+            raise DataError(where + ": duplicate definition id " + record["id"])
+        definitions[record["id"]] = UnitDefinition(record["id"], record["name"], record["role"],
+                                                *(record[key] for key in STATS), record["visual_id"])
+    path = rooted_path(root, scenario_file, "scenario_file")
+    data = read_json(path)
+    label = str(path)
+    fields(data, ("schema_version", "id", "cols", "rows", "spawns", "obstacles"), (), label)
+    version(data, label)
+    if not isinstance(data["spawns"], list) or not isinstance(data["obstacles"], list):
+        raise DataError(label + ": spawns and obstacles must be arrays")
+    spawns = []
+    for index, record in enumerate(data["spawns"]):
+        where = "{} spawns[{}]".format(path, index)
+        fields(record, ("uid", "definition_id", "team", "cell"), ("overrides",), where)
+        definition_id = text(record["definition_id"], where + ".definition_id")
+        if definition_id not in definitions:
+            raise DataError(where + ": unknown definition " + definition_id)
+        definition = definitions[definition_id]
+        overrides = record.get("overrides", {})
+        fields(overrides, (), ("name", "health") + STATS, where + ".overrides")
+        values = {key: getattr(definition, key) for key in ("name", "role") + STATS}
+        values["health"] = overrides.get("max_health", definition.max_health)
+        values.update(overrides)
+        try:
+            spawns.append(UnitSpawn(record["uid"], team=record["team"], cell=record["cell"],
+                                    definition_id=definition_id, **values))
+        except (TypeError, ValueError) as error:
+            raise DataError(where + ": " + str(error)) from error
+    try:
+        scenario = Scenario(data["id"], data["cols"], data["rows"], tuple(spawns), data["obstacles"])
+    except (TypeError, ValueError) as error:
+        raise DataError(label + ": " + str(error)) from error
+    return GameContent(scenario, tuple(definitions.values()))
 ```
 
 ## tactics/controller.py
@@ -2101,6 +2794,78 @@ class Controller:
             self.complete_presentation(token)
 ```
 
+## tactics/data_files.py
+
+```python
+"""Small strict JSON helpers shared by content and asset-manifest loaders."""
+
+import json
+import math
+from pathlib import Path, PureWindowsPath
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+class DataError(ValueError):
+    pass
+
+
+def read_json(path):
+    path = Path(path)
+
+    def unique(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise DataError("duplicate key: " + key)
+            result[key] = value
+        return result
+
+    try:
+        return json.loads(path.read_text(encoding="utf-8-sig"), object_pairs_hook=unique)
+    except (OSError, ValueError) as error:
+        raise DataError("{}: {}".format(path, error)) from error
+
+
+def fields(value, required, optional, label):
+    if not isinstance(value, dict):
+        raise DataError(label + ": expected an object")
+    missing = set(required) - value.keys()
+    unknown = value.keys() - set(required) - set(optional)
+    if missing or unknown:
+        raise DataError("{}: missing {}, unknown {}".format(label, sorted(missing), sorted(unknown)))
+    return value
+
+
+def text(value, label):
+    if not isinstance(value, str) or not value.strip():
+        raise DataError(label + ": expected a nonempty string")
+    return value
+
+
+def number(value, label, minimum=0, integer=False):
+    valid = type(value) is int if integer else type(value) in (int, float)
+    if not valid or (type(value) is float and not math.isfinite(value)) or value < minimum:
+        raise DataError(label + ": invalid number")
+    return value
+
+
+def version(data, label):
+    if type(data["schema_version"]) is not int or data["schema_version"] != 1:
+        raise DataError(label + ": schema_version must be 1")
+
+
+def rooted_path(root, value, label):
+    text(value, label)
+    if "\\" in value or PureWindowsPath(value).drive or Path(value).is_absolute():
+        raise DataError(label + ": expected a relative forward-slash path")
+    root = Path(root).resolve()
+    path = (root / value).resolve()
+    if not path.is_relative_to(root):
+        raise DataError(label + ": path escapes root: " + value)
+    return path
+```
+
 ## tactics/effects.py
 
 ```python
@@ -2112,6 +2877,7 @@ from dataclasses import dataclass
 import pygame
 
 from .geometry import BoardGeometry
+from .assets import Clip, SpriteBody
 from .view_models import AttackPresentation
 
 DAMAGE_DURATION = 0.9
@@ -2133,9 +2899,19 @@ class DeathEffect:
     age: float = 0.0
 
 
+@dataclass
+class SpriteEffect:
+    uid: str
+    cell: tuple
+    clip: Clip
+    age: float = 0.0
+
+
 class CombatEffects:
-    def __init__(self, geometry: BoardGeometry):
+    def __init__(self, geometry: BoardGeometry, assets=None):
         self.geometry = geometry
+        self.assets = assets
+        self.sprites = []
         self.damage_texts = []
         self.deaths = []
         self._pending_token = None
@@ -2144,30 +2920,44 @@ class CombatEffects:
 
     @property
     def busy(self):
-        return bool(self.damage_texts or self.deaths)
+        return bool(self.damage_texts or self.deaths or self.sprites)
 
     def play_attack(self, event: AttackPresentation):
         self.clear()
         self._pending_token = event.token
         result = event.result
+        scale = self.geometry.cell_size / 64
+        attack = self.assets.visual(result.actor_definition_id, "attack", scale) if self.assets else None
+        if attack is not None:
+            self.sprites.append(SpriteEffect(result.actor_uid, result.actor_cell, attack))
         self.damage_texts.append(DamageText(result.target_cell, result.damage))
         if result.killed:
-            self.deaths.append(DeathEffect(result.target_cell, result.target_team, result.target_uid))
+            death = self.assets.visual(result.target_definition_id, "death", scale) if self.assets else None
+            if death is not None:
+                self.sprites.append(SpriteEffect(result.target_uid, result.target_cell, death))
+            else:
+                self.deaths.append(DeathEffect(result.target_cell, result.target_team, result.target_uid))
 
     def clear(self):
         self.damage_texts.clear()
         self.deaths.clear()
+        self.sprites.clear()
         self._pending_token = None
 
     def update(self, elapsed):
-        for effect in self.damage_texts + self.deaths:
+        for effect in self.damage_texts + self.deaths + self.sprites:
             effect.age += max(0, elapsed)
         self.damage_texts = [effect for effect in self.damage_texts if effect.age < DAMAGE_DURATION]
         self.deaths = [effect for effect in self.deaths if effect.age < DEATH_DURATION]
+        self.sprites = [effect for effect in self.sprites if not effect.clip.finished(effect.age)]
         if self._pending_token is not None and not self.busy:
             token, self._pending_token = self._pending_token, None
             return (token,)
         return ()
+
+    def body_views(self):
+        return tuple(SpriteBody(effect.uid, effect.cell, effect.clip.frame_at(effect.age))
+                     for effect in self.sprites)
 
     def draw(self, surface):
         old_clip = surface.get_clip()
@@ -2224,18 +3014,22 @@ class CombatEffects:
 import pygame
 
 from .actions import UIAction
+from .assets import AssetManager
 from .board_renderer import BoardRenderer
 from .controller import Controller
 from .effects import CombatEffects
 from .geometry import BoardGeometry
 from .panel import InfoPanel
-from .scenario import default_scenario
+from .content import load_content
+from .data_files import PROJECT_ROOT
 from .settings import CELL_SIZE, FPS, MIN_WINDOW_HEIGHT, PANEL_WIDTH
 
 
 class Game:
-    def __init__(self, scenario=None):
-        scenario = default_scenario() if scenario is None else scenario
+    def __init__(self, scenario=None, *, content_root=None, scenario_file="scenarios/training_ground.json",
+                 asset_root=None, geometric=False):
+        content = load_content(content_root, scenario_file)
+        scenario = content.scenario if scenario is None else scenario
         self.geometry = BoardGeometry(scenario.cols, scenario.rows, CELL_SIZE)
         window_size = (self.geometry.width + PANEL_WIDTH, max(MIN_WINDOW_HEIGHT, self.geometry.height))
         # The prototype needs only display and fonts, so do not initialize audio.
@@ -2244,9 +3038,17 @@ class Game:
         self.screen = pygame.display.set_mode(window_size)
         pygame.display.set_caption("Grid Tactics - Battle Prototype")
         self.clock = pygame.time.Clock()
-        self.renderer = BoardRenderer(self.geometry)
+        try:
+            self.assets = None if geometric else AssetManager(
+                PROJECT_ROOT / "assets" if asset_root is None else asset_root, content.definitions)
+            if self.assets is not None:
+                self.assets.preload(CELL_SIZE / 64)
+        except Exception:
+            pygame.quit()
+            raise
+        self.renderer = BoardRenderer(self.geometry, self.assets)
         self.panel = InfoPanel(self.geometry.width, window_size[1])
-        self.effects = CombatEffects(self.geometry)
+        self.effects = CombatEffects(self.geometry, self.assets)
         self.controller = Controller(scenario, self.effects)
         self.running = True
 
@@ -2267,12 +3069,13 @@ class Game:
                 self.controller.click_cell(self.geometry.cell_at(event.pos))
 
     def update(self, elapsed):
+        self.renderer.update(elapsed)
         self.controller.update(elapsed)
 
     def draw(self):
         self.screen.fill((21, 30, 42))
         view = self.controller.get_view_state()
-        self.renderer.draw(self.screen, view.board)
+        self.renderer.draw(self.screen, view.board, self.effects.body_views())
         self.effects.draw(self.screen)
         self.panel.draw(self.screen, view)
         pygame.display.flip()
@@ -2371,6 +3174,7 @@ class Unit:
     defense: int = 5
     speed: int = 10
     movement: int = 3
+    definition_id: str = ""
 
     @property
     def alive(self):
@@ -2392,6 +3196,7 @@ class UnitSnapshot:
     defense: int
     speed: int
     movement: int
+    definition_id: str
 
     @classmethod
     def capture(cls, unit):
@@ -2414,6 +3219,9 @@ class AttackResult:
     previous_hp: int
     current_hp: int
     killed: bool
+    actor_definition_id: str = ""
+    target_definition_id: str = ""
+    actor_cell: Cell = (0, 0)
 ```
 
 ## tactics/panel.py
@@ -2591,6 +3399,7 @@ class UnitSpawn:
     defense: int = 5
     speed: int = 10
     movement: int = 3
+    definition_id: str = ""
 
     def __post_init__(self):
         object.__setattr__(self, "cell", _cell(self.cell, "unit {} cell".format(self.uid)))
@@ -2619,6 +3428,8 @@ class Scenario:
         for spawn in self.units:
             if not isinstance(spawn, UnitSpawn):
                 raise ValueError("scenario units must be immutable UnitSpawn values")
+            if not isinstance(spawn.definition_id, str):
+                raise ValueError("unit definition_id must be a string")
             for name in ("uid", "name", "role"):
                 value = getattr(spawn, name)
                 if not isinstance(value, str) or not value.strip():
@@ -2652,18 +3463,9 @@ class Scenario:
 
 
 def default_scenario():
-    return Scenario(
-        "training_ground", 8, 8,
-        (
-            UnitSpawn("A1", "先锋", "ally", "近卫", (1, 1), speed=12),
-            UnitSpawn("A2", "斥候", "ally", "侦察", (1, 3), health=80, speed=14, movement=4),
-            UnitSpawn("A3", "卫士", "ally", "守备", (2, 6), health=120, max_health=120, speed=10, movement=2),
-            UnitSpawn("D1", "木桩1", "enemy", "训练木桩", (6, 1), speed=11),
-            UnitSpawn("D2", "木桩2", "enemy", "训练木桩", (5, 4), speed=9),
-            UnitSpawn("D3", "木桩3", "enemy", "训练木桩", (6, 6), speed=8),
-        ),
-        frozenset(((3, 1), (3, 2), (3, 3), (4, 5), (4, 6))),
-    )
+    # Local import keeps the public factory while content imports these data types.
+    from .content import load_content
+    return load_content().scenario
 ```
 
 ## tactics/settings.py
@@ -2695,6 +3497,7 @@ class BoardUnitView:
     cell: Cell
     health: int
     max_health: int
+    definition_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -2723,6 +3526,7 @@ class UnitView:
     defense: int
     speed: int
     movement: int
+    definition_id: str = ""
 
     @property
     def alive(self):
@@ -2778,7 +3582,7 @@ def build_board_view(board, battle, selected):
             target_cells = frozenset(unit.cell for unit in battle.attack_targets())
     return BoardView(
         board.cols, board.rows, frozenset(board.obstacles),
-        tuple(BoardUnitView(unit.uid, unit.team, tuple(unit.cell), unit.health, unit.max_health)
+        tuple(BoardUnitView(unit.uid, unit.team, tuple(unit.cell), unit.health, unit.max_health, unit.definition_id)
               for unit in board.living_units),
         active.uid if active is not None else None,
         selected.uid if selected is not None else None,
@@ -2791,6 +3595,7 @@ def build_battle_view(board, battle, selected, presentation_generation, pending_
     units = tuple(UnitView(
         unit.uid, unit.name, unit.team, unit.role, tuple(unit.cell),
         unit.health, unit.max_health, unit.attack, unit.defense, unit.speed, unit.movement,
+        unit.definition_id,
     ) for unit in board.units)
     by_uid = {unit.uid: unit for unit in units}
     actor = battle.active_unit
@@ -2805,6 +3610,272 @@ def build_battle_view(board, battle, selected, presentation_generation, pending_
         battle.can_undo, can_act, can_act, battle.phase == "resolving",
         presentation_generation, pending_resolution,
     )
+```
+
+## tests/test_assets.py
+
+```python
+"""Real PNG cache, fallback, layering and M3 animation handoff checks."""
+
+from dataclasses import replace
+import json
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import patch
+
+import pygame
+
+from tactics.assets import AssetManager
+from tactics.content import load_content
+from tactics.data_files import DataError
+from tactics.game import Game
+from tactics.scenario import Scenario, UnitSpawn, default_scenario
+
+
+class AssetChecks(unittest.TestCase):
+    def setUp(self):
+        pygame.display.init()
+        pygame.font.init()
+        pygame.display.set_mode((128, 128))
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.addCleanup(pygame.quit)
+        self.root = Path(self.temp.name)
+        for name, color in (("one", (0, 200, 210)), ("two", (205, 40, 180)), ("floor", (18, 34, 58))):
+            image = pygame.Surface((8, 12), pygame.SRCALPHA)
+            image.fill(color if name == "floor" else (0, 0, 0, 0))
+            if name != "floor":pygame.draw.rect(image, color, (1, 2, 6, 10))
+            pygame.image.save(image, str(self.root / (name + ".png")))
+        self.data = {
+            "schema_version":1,
+            "images":{key:{"path":path, "display_size":size, "pivot":[.5, 1] if key != "floor" else [.5,.5],
+                           "optional":True}
+                      for key, path, size in (("idle0","one.png",[64,96]), ("idle1","two.png",[64,96]),
+                                               ("floor","floor.png",[64,64]), ("alias","one.png",[64,96]))},
+            "animations":{
+                "idle":{"frames":["idle0","idle1"], "fps":2, "loop":True},
+                "attack":{"frames":["idle0","idle1"], "fps":4, "loop":False},
+                "death":{"frames":["idle1","idle0"], "fps":2, "loop":False}},
+            "visuals":{"unit.scout":{"idle":"idle", "attack":"attack", "death":"death"},
+                       "unit.vanguard":{}, "unit.guard":{}, "unit.dummy":{}},
+            "board":{"floor":"floor"}}
+        self.write()
+
+    def write(self):
+        (self.root / "manifest.json").write_text(json.dumps(self.data), encoding="utf-8")
+
+    def manager(self):
+        self.write()
+        return AssetManager(self.root, load_content().definitions)
+
+    def game(self, scenario=None, **kwargs):
+        self.write()
+        return Game(scenario, asset_root=self.root, **kwargs)
+
+    def test_original_and_scaled_images_are_cached_across_aliases_and_sizes(self):
+        with patch("tactics.assets.pygame.image.load", wraps=pygame.image.load) as load, \
+             patch("tactics.assets.pygame.transform.smoothscale", wraps=pygame.transform.smoothscale) as scale:
+            manager = self.manager()
+            first = manager.get_image("idle0")
+            self.assertIs(first.surface, manager.get_image("alias").surface)
+            count = scale.call_count
+            half = manager.get_image("idle0", .5)
+            self.assertEqual(half.surface.get_size(), (32, 48))
+            self.assertIs(half, manager.get_image("idle0", .5))
+            self.assertEqual(scale.call_count, count + 1)
+            self.assertEqual(sum(Path(call.args[0]).name == "one.png" for call in load.call_args_list), 1)
+
+    def test_optional_missing_is_negative_cached_reported_once_and_reload_is_explicit(self):
+        (self.root / "one.png").unlink()
+        with self.assertLogs("tactics.assets", level="WARNING"):
+            manager = self.manager()
+        issues = manager.issues
+        with patch("tactics.assets.pygame.image.load", side_effect=AssertionError("retried missing file")):
+            self.assertIsNone(manager.get_image("idle0", .5))
+            self.assertIsNone(manager.get_clip("attack"))
+        self.assertEqual(manager.issues, issues)
+        image = pygame.Surface((8, 12), pygame.SRCALPHA)
+        pygame.image.save(image, str(self.root / "one.png"))
+        self.assertIsNone(manager.get_image("idle0"))
+        manager.clear_cache()
+        manager.preload()
+        self.assertIsNotNone(manager.get_image("idle0"))
+
+    def test_corrupt_optional_image_falls_back_and_required_image_fails_at_startup(self):
+        (self.root / "one.png").write_bytes(b"broken PNG")
+        with self.assertLogs("tactics.assets", level="WARNING"):
+            self.assertIsNone(self.manager().visual("scout", "idle"))
+        self.data["images"]["idle0"]["optional"] = False
+        self.write()
+        with self.assertRaisesRegex(DataError, "required image unavailable.*idle0"):
+            Game(asset_root=self.root)
+        self.assertFalse(pygame.display.get_init())
+
+    def test_unused_required_entry_is_validated_even_after_optional_alias_failed(self):
+        self.data["images"]["optional"] = dict(self.data["images"]["idle0"], path="missing.png")
+        self.data["images"]["required"] = dict(self.data["images"]["optional"], optional=False)
+        with self.assertLogs("tactics.assets", level="WARNING"), \
+             self.assertRaisesRegex(DataError, "required image unavailable.*required"):
+            self.manager()
+
+    def test_unknown_visual_binding_is_a_clear_initialization_error(self):
+        content = load_content()
+        definitions = (replace(content.definitions[0], visual_id="unknown"),)
+        with self.assertRaisesRegex(DataError, "vanguard.*unknown visual"):
+            AssetManager(self.root, definitions)
+
+    def test_asset_loading_requires_initialized_display(self):
+        pygame.quit()
+        with self.assertRaisesRegex(DataError, "initialized display"):
+            self.manager()
+
+    def test_frame_selection_loop_and_completion_are_independent_of_global_busy(self):
+        manager = self.manager()
+        idle = manager.visual("scout", "idle")
+        self.assertIs(idle.frame_at(0), idle.frame_at(1))
+        self.assertIsNot(idle.frame_at(0), idle.frame_at(.5))
+        self.assertFalse(idle.finished(1000))
+        attack = manager.visual("scout", "attack")
+        self.assertFalse(attack.finished(.49))
+        self.assertTrue(attack.finished(.5))
+        self.assertIs(attack.frame_at(100), attack.frames[-1])
+        self.assertIsNone(manager.visual("unknown", "idle"))
+
+    def test_pivot_transparency_and_requested_sizes_are_preserved(self):
+        sprite = self.manager().get_image("idle0")
+        surface = pygame.Surface((100, 120))
+        surface.fill("white")
+        sprite.blit(surface, (50, 110))
+        self.assertEqual(tuple(surface.get_at((18, 14)))[:3], (255, 255, 255))
+        self.assertEqual(tuple(surface.get_at((50, 80)))[:3], (0, 200, 210))
+        self.assertEqual(sprite.surface.get_at((0, 0)).a, 0)
+        for value in (True, 0, -1, float("nan")):
+            with self.subTest(value=value), self.assertRaises(DataError):
+                self.manager().get_clip("attack", value)
+
+    def test_game_default_render_chain_uses_supplied_floor_and_unit_images(self):
+        game = self.game()
+        game.draw()
+        self.assertEqual(tuple(game.screen.get_at((470, 470)))[:3], (18, 34, 58))
+        self.assertEqual(tuple(game.screen.get_at((85, 185)))[:3], (0, 200, 210))
+        self.assertEqual(game.geometry.cell_at((85, 185)), (1, 2))  # Tall art does not move the unit.
+        self.assertEqual(game.controller.get_view_state().active.cell, (1, 3))
+
+    def test_repeated_draws_and_idle_updates_do_not_load_scale_or_change_rule_state(self):
+        game = self.game()
+        before = game.controller.get_view_state()
+        with patch("tactics.assets.pygame.image.load", side_effect=AssertionError("per-frame load")), \
+             patch("tactics.assets.pygame.transform.smoothscale", side_effect=AssertionError("per-frame scale")):
+            for _ in range(5):
+                game.update(.5)
+                game.draw()
+            self.assertEqual(game.controller.get_view_state(), before)
+            game.controller.move_to((4, 4))
+            game.controller.attack("D2")
+            self.assertEqual(tuple(body.uid for body in game.effects.body_views()), ("A2",))
+            game.update(.1)
+            game.draw()
+            game.update(.81)
+            self.assertEqual(game.controller.get_view_state().active.uid, "A1")
+
+    def test_geometry_and_images_produce_identical_move_attack_and_undo_state(self):
+        views = []
+        for geometric in (True, False):
+            game = self.game(geometric=geometric)
+            game.controller.move_to((4, 4))
+            game.controller.attack("D2")
+            game.update(2)
+            after = game.controller.get_view_state()
+            game.controller.undo()
+            views.append((after, game.controller.get_view_state()))
+        self.assertEqual(*views)
+
+    def test_sprite_death_waits_hides_and_undo_restores_without_old_callback(self):
+        scenario = Scenario("death", 3, 3, (
+            UnitSpawn("blue", "Blue", "ally", "test", (0, 1), speed=20, definition_id="vanguard"),
+            UnitSpawn("red", "Red", "enemy", "test", (2, 1), health=5, definition_id="scout")))
+        game = self.game(scenario)
+        game.controller.move_to((1, 1))
+        game.controller.attack("red")
+        token = game.controller.get_view_state().pending_resolution
+        self.assertEqual(tuple(body.uid for body in game.effects.body_views()), ("red",))
+        game.update(.91)
+        self.assertTrue(game.controller.get_view_state().input_locked)
+        game.draw()
+        game.update(.1)
+        self.assertFalse(game.effects.body_views())
+        self.assertEqual(game.controller.get_view_state().winner, "ally")
+        self.assertFalse(game.controller.complete_presentation(token))
+        game.draw()
+        self.assertEqual(tuple(game.screen.get_at(game.geometry.cell_center((2, 1))))[:3], (18, 34, 58))
+        game.controller.undo()
+        self.assertFalse(game.effects.busy)
+        self.assertFalse(game.controller.complete_presentation(token))
+        self.assertEqual(len(game.controller.get_view_state().board.units), 2)
+        game.draw()
+
+    def test_missing_all_optional_pngs_matches_geometry_pixels_and_attack_fallback(self):
+        for path in self.root.glob("*.png"):path.unlink()
+        with self.assertLogs("tactics.assets", level="WARNING"):
+            game = self.game()
+        game.draw()
+        image = pygame.image.tostring(game.screen, "RGBA")
+        game.controller.move_to((4, 4))
+        game.controller.attack("D2")
+        self.assertFalse(game.effects.sprites)
+        game.update(1)
+        self.assertEqual(game.controller.get_view_state().active.uid, "A1")
+        geometric = self.game(geometric=True)
+        geometric.draw()
+        self.assertEqual(image, pygame.image.tostring(geometric.screen, "RGBA"))
+        scenario = Scenario("fallback_death", 3, 3, (
+            UnitSpawn("blue", "Blue", "ally", "test", (2, 1), health=5, speed=5, definition_id="scout"),
+            UnitSpawn("red", "Red", "enemy", "test", (0, 1), speed=20, definition_id="dummy")))
+        with self.assertLogs("tactics.assets", level="WARNING"):
+            death = self.game(scenario)
+        death.controller.move_to((1, 1))
+        death.controller.attack("blue")
+        self.assertEqual(len(death.effects.deaths), 1)
+        self.assertFalse(death.effects.sprites)
+        death.update(1)
+        self.assertEqual(death.controller.get_view_state().winner, "enemy")
+        self.assertTrue(death.controller.undo())
+
+    def test_manifest_only_replacement_changes_art_without_changing_rule_values(self):
+        game = self.game()
+        game.draw()
+        pixel = tuple(game.screen.get_at((85, 185)))
+        before = game.controller.get_view_state()
+        self.data["visuals"]["unit.scout"]["idle"] = "idle1"
+        replacement = self.game()
+        replacement.draw()
+        self.assertNotEqual(tuple(replacement.screen.get_at((85, 185))), pixel)
+        self.assertEqual(replacement.controller.get_view_state(), before)
+
+    def test_all_overlays_remain_above_tall_sprites_and_clip_is_restored(self):
+        scenario = Scenario("layers", 3, 3, (
+            UnitSpawn("blue", "Blue", "ally", "test", (1, 1), speed=20, definition_id="vanguard"),
+            UnitSpawn("red", "Red", "enemy", "test", (1, 2), definition_id="scout")))
+        game = self.game(scenario)
+        game.draw()
+        self.assertEqual(tuple(game.screen.get_at((76, 122)))[:3], (105, 218, 153))
+        surface = pygame.Surface((250, 250))
+        surface.fill("magenta")
+        surface.set_clip((10, 10, 220, 220))
+        before = surface.get_clip()
+        game.renderer.draw(surface, game.controller.get_view_state().board)
+        self.assertEqual(surface.get_clip(), before)
+        self.assertEqual(tuple(surface.get_at((200, 200)))[:3], (255, 0, 255))
+
+    def test_geometric_mode_does_not_need_manifest_or_image_directory(self):
+        game = Game(asset_root=self.root / "absent", geometric=True)
+        self.assertIsNone(game.assets)
+        game.draw()
+
+
+if __name__ == "__main__":
+    unittest.main()
 ```
 
 ## tests/test_battle.py
@@ -2943,6 +4014,204 @@ class BattleChecks(unittest.TestCase):
         self.assertEqual(target.health, health - enemy.attack)
         self.battle.finish_attack(self.battle.pending_attack.resolution_id)
         self.assertEqual(self.battle.index, 3)
+
+
+if __name__ == "__main__":
+    unittest.main()
+```
+
+## tests/test_content.py
+
+```python
+"""M4 file formats and portable paths, runnable before installing Pygame."""
+
+from dataclasses import asdict, replace
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import unittest
+
+from tactics.asset_manifest import load_manifest
+from tactics.content import load_content
+from tactics.data_files import DataError, PROJECT_ROOT, rooted_path
+from tactics.scenario import default_scenario
+
+
+class ContentChecks(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        (self.root / "scenarios").mkdir()
+        self.units = json.loads((PROJECT_ROOT / "content/units.json").read_text(encoding="utf-8"))
+        self.scene = json.loads((PROJECT_ROOT / "content/scenarios/training_ground.json").read_text(encoding="utf-8"))
+
+    def write(self):
+        (self.root / "units.json").write_text(json.dumps(self.units), encoding="utf-8")
+        (self.root / "scenarios/training_ground.json").write_text(json.dumps(self.scene), encoding="utf-8")
+
+    def test_default_json_preserves_scenario_and_definition_identity(self):
+        content = load_content()
+        self.assertEqual(content.scenario, default_scenario())
+        self.assertEqual(tuple(unit.definition_id for unit in content.scenario.units),
+                         ("vanguard", "scout", "guard", "dummy", "dummy", "dummy"))
+        self.assertEqual(content.definitions[1].visual_id, "unit.scout")
+        self.assertEqual(content.scenario.units[1].health, 80)
+        self.assertEqual(content.scenario.units[-1].speed, 8)
+
+    def test_alternate_scenario_uses_same_definitions_without_rule_changes(self):
+        self.scene.update(id="small", cols=5, rows=4, obstacles=[[1, 0]], spawns=[
+            {"uid":"blue", "definition_id":"scout", "team":"ally", "cell":[0,0]},
+            {"uid":"red", "definition_id":"dummy", "team":"enemy", "cell":[3,0],
+             "overrides":{"max_health":50, "attack":17}},
+        ])
+        self.write()
+        content = load_content(self.root)
+        self.assertEqual((content.scenario.cols, content.scenario.rows), (5, 4))
+        self.assertEqual((content.scenario.units[-1].health, content.scenario.units[-1].max_health), (50, 50))
+        from tactics.controller import Controller
+        controller = Controller(content.scenario)
+        self.assertTrue(controller.move_to((2, 0)))
+        self.assertTrue(controller.attack("red"))
+        controller.update(0)
+        self.assertTrue(controller.undo())
+        self.assertEqual(controller.get_view_state().active.definition_id, "scout")
+
+    def test_unknown_definition_and_unknown_fields_are_located(self):
+        for change, expected in (({"definition_id":"missing"}, "unknown definition"),
+                                 ({"typo":1}, "unknown")):
+            with self.subTest(change=change):
+                record = dict(self.scene["spawns"][0])
+                self.scene["spawns"][0].update(change)
+                self.write()
+                with self.assertRaisesRegex(DataError, expected):
+                    load_content(self.root)
+                self.scene["spawns"][0] = record
+
+    def test_duplicate_definition_ids_and_json_keys_are_rejected(self):
+        self.units["units"].append(self.units["units"][0])
+        self.write()
+        with self.assertRaisesRegex(DataError, "duplicate definition"):
+            load_content(self.root)
+        (self.root / "units.json").write_text('{"schema_version":1,"schema_version":1}', encoding="utf-8")
+        with self.assertRaisesRegex(DataError, "units.json.*duplicate key"):
+            load_content(self.root)
+
+    def test_definition_numbers_and_versions_are_strict(self):
+        for key, value in (("speed", True), ("movement", -1), ("attack", 1.5), ("max_health", 0),
+                           ("defense", float("nan"))):
+            with self.subTest(key=key):
+                old = self.units["units"][0][key]
+                self.units["units"][0][key] = value
+                self.write()
+                with self.assertRaises(DataError):load_content(self.root)
+                self.units["units"][0][key] = old
+        self.units["schema_version"] = True
+        self.write()
+        with self.assertRaisesRegex(DataError, "schema_version"):
+            load_content(self.root)
+
+    def test_invalid_spawn_configuration_is_rejected_by_existing_scenario_validator(self):
+        for changes in ({"cell":[8, 0]}, {"cell":[3, 1]}, {"uid":"D1"},
+                        {"team":"other"}, {"overrides":{"health":0}}, {"overrides":{"health":101}}):
+            old = dict(self.scene["spawns"][0])
+            self.scene["spawns"][0].update(changes)
+            self.write()
+            with self.subTest(changes=changes), self.assertRaises(DataError):
+                load_content(self.root)
+            self.scene["spawns"][0] = old
+
+    def test_rooted_paths_reject_absolute_windows_and_traversal_inputs(self):
+        for value in ("../outside.png", "/outside.png", "C:/outside.png", "C:outside.png",
+                      "\\\\server\\file.png", "units\\file.png"):
+            with self.subTest(value=value), self.assertRaises(DataError):
+                rooted_path(self.root, value, "asset")
+        self.assertEqual(rooted_path(self.root, "units/../ok.png", "asset"), (self.root / "ok.png").resolve())
+
+    def test_symlink_escape_is_rejected_when_os_permits_symlinks(self):
+        with tempfile.TemporaryDirectory() as outside:
+            try:
+                (self.root / "escape").symlink_to(outside, target_is_directory=True)
+            except OSError:
+                self.skipTest("OS does not permit creating symlinks")
+            with self.assertRaisesRegex(DataError, "escapes root"):
+                rooted_path(self.root, "escape/file.png", "asset")
+
+    def test_missing_and_malformed_json_have_file_context(self):
+        with self.assertRaisesRegex(DataError, "units.json"):
+            load_content(self.root)
+        (self.root / "units.json").write_text("{broken", encoding="utf-8")
+        with self.assertRaisesRegex(DataError, "units.json"):
+            load_content(self.root)
+
+    def test_content_and_manifest_work_from_other_cwd_with_pygame_blocked(self):
+        script = """
+import importlib.abc,sys
+class Block(importlib.abc.MetaPathFinder):
+ def find_spec(self, fullname, path=None, target=None):
+  if fullname == 'pygame' or fullname.startswith('pygame.'):
+   raise AssertionError('Pygame import in data loader')
+sys.meta_path.insert(0,Block())
+from tactics.content import load_content
+from tactics.asset_manifest import load_manifest
+from tactics.data_files import PROJECT_ROOT
+from tactics.controller import Controller
+content=load_content()
+manifest=load_manifest(PROJECT_ROOT/'assets')
+controller=Controller(content.scenario)
+assert controller.move_to((4,4)) and controller.attack('D2')
+controller.update(0)
+assert controller.undo()
+assert controller.get_view_state().active.definition_id=='scout'
+assert len(manifest.images)==9 and 'pygame' not in sys.modules
+"""
+        result = subprocess.run([sys.executable, "-S", "-c", script], cwd=self.root,
+                                env={**os.environ, "PYTHONPATH":str(PROJECT_ROOT)},
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+
+class ManifestChecks(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.data = json.loads((PROJECT_ROOT / "assets/manifest.json").read_text(encoding="utf-8"))
+
+    def load(self):
+        (self.root / "manifest.json").write_text(json.dumps(self.data), encoding="utf-8")
+        return load_manifest(self.root)
+
+    def test_dimensions_pivots_paths_and_boolean_fields_are_validated(self):
+        for changes in ({"display_size":[0, 64]}, {"display_size":[True, 64]}, {"pivot":[1.1, 0]},
+                        {"pivot":[float("nan"), 0]}, {"optional":"yes"}, {"path":"../x.png"},
+                        {"path":"tile.jpg"}, {"typo":0}):
+            old = dict(self.data["images"]["tile.floor"])
+            self.data["images"]["tile.floor"].update(changes)
+            with self.subTest(changes=changes), self.assertRaises(DataError):self.load()
+            self.data["images"]["tile.floor"] = old
+
+    def test_animation_references_rates_and_loop_policies_are_validated(self):
+        for changes in ({"frames":[]}, {"frames":["unknown"]}, {"fps":0}, {"fps":float("inf")},
+                        {"loop":True}, {"loop":1}):
+            old = dict(self.data["animations"]["scout.attack"])
+            self.data["animations"]["scout.attack"].update(changes)
+            with self.subTest(changes=changes), self.assertRaises(DataError):self.load()
+            self.data["animations"]["scout.attack"] = old
+
+    def test_visual_board_and_duplicate_cross_kind_references_are_rejected(self):
+        self.data["visuals"]["unit.scout"]["idle"] = "unknown"
+        with self.assertRaises(DataError):self.load()
+        self.data["visuals"]["unit.scout"] = {}
+        self.data["board"]["floor"] = "unknown"
+        with self.assertRaises(DataError):self.load()
+        self.data["board"] = {}
+        self.data["animations"]["tile.floor"] = self.data["animations"]["scout.attack"]
+        with self.assertRaisesRegex(DataError, "also used"):
+            self.load()
 
 
 if __name__ == "__main__":
@@ -3448,7 +4717,7 @@ from tactics.game import Game
 
 class CombatInteractionChecks(unittest.TestCase):
     def setUp(self):
-        self.game = Game()
+        self.game = Game(geometric=True)
 
     @property
     def view(self):
@@ -3475,7 +4744,7 @@ class CombatInteractionChecks(unittest.TestCase):
                           for unit in scenario.units)
             if final:
                 units = tuple(unit for unit in units if unit.uid in ("A2", "D2"))
-            self.game = Game(replace(scenario, units=units))
+            self.game = Game(replace(scenario, units=units), geometric=True)
         self.click(self.game.geometry.cell_center((4, 4)))
         self.click(self.game.geometry.cell_center(self.target.cell))
 
@@ -3555,7 +4824,7 @@ class CombatInteractionChecks(unittest.TestCase):
         scenario = default_scenario()
         self.game = Game(replace(scenario, units=tuple(
             replace(unit, health=800, max_health=1000) if unit.uid == "A2" else unit
-            for unit in scenario.units)))
+            for unit in scenario.units)), geometric=True)
         with patch.object(self.game.panel, "text", wraps=self.game.panel.text) as draw_text:
             self.game.draw()
         expected = "生命: 800/1000" if self.game.panel.chinese else "HP: 800/1000"
