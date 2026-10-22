@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "id": "river_crossing",
+  "cols": 6,
+  "rows": 5,
+  "obstacles": [[2,0],[2,1],[3,3],[0,4]],
+  "spawns": [
+    {"uid":"A2","definition_id":"scout","team":"ally","cell":[1,2],"overrides":{"health":80}},
+    {"uid":"A1","definition_id":"guard","team":"ally","cell":[0,3]},
+    {"uid":"R1","definition_id":"dummy","team":"enemy","cell":[4,2],"overrides":{"name":"桥头木桩","health":5}},
+    {"uid":"R2","definition_id":"dummy","team":"enemy","cell":[5,4],"overrides":{"name":"后卫木桩","health":10,"speed":8}}
+  ]
+}

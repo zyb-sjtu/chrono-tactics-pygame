@@ -3,6 +3,7 @@ name: Tests
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -43,3 +44,7 @@ jobs:
         run: python scripts/export_source.py --check
       - name: Run regression tests
         run: python -m unittest discover -s tests -v
+      - name: Build committed source release
+        run: python scripts/build_release.py
+      - name: Verify extracted release offline
+        run: python scripts/verify_release.py --expected-commit ${{ github.sha }}

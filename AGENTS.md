@@ -2,7 +2,7 @@
 
 ## 先确认实际状态
 
-- 最近发布版本是 v0.1.0，开发代码已完成 M1–M4：规则/表现分离、纯数据回溯与结算确认，以及 JSON 内容、资源缓存和图片/动画链路。M5 尚未实施；以 `TASKS.md` 区分现有能力和规划。
+- 阶段版本是 v0.2.0，M1–M5 已实施：规则/表现分离、纯数据回溯与结算确认、JSON/PNG 链路、第二场景/外观与开发模板。发布状态以 tag/Release 为准；以 `TASKS.md` 区分现有能力和规划。
 - 修改玩法、结构或资源入口前，阅读 [整体架构](docs/ARCHITECTURE.md)、[实施路线](docs/ROADMAP.md) 与 [功能开发规范](docs/FEATURE_DEVELOPMENT.md)。接入美术时同时遵守 [资源规范](docs/ASSET_GUIDE.md)。用户提供的原始报告是评审材料，当前开发决策以这些评审后文档为准。
 
 ## 开发边界
@@ -34,4 +34,5 @@
 - 修改内容或清单后，另运行 `python -S -m unittest discover -s tests -p test_content.py -v`，CI 安装依赖前合计 57 项；原图/缩放缓存和实际资源链路由 `test_assets.py` 及真实窗口检查。Windows 无创建符号链接权限时该项可明确跳过，路径越界等其他检查仍须通过。
 - 保留原有行为覆盖；接口迁移时可调整测试夹具，不为保留旧字段访问而保留架构漏洞。新增架构边界在相应阶段就加入检查，不推迟到最终验收。
 - 使用 `python scripts/export_source.py` 更新 `SOURCE.md`，再用 `python scripts/export_source.py --check` 检查一致性。
+- 后续需求参考 `docs/templates/FEATURE_TEMPLATE.md`；换场景/外观参考 `docs/EXTENSION_EXERCISE.md`。新增内容要补真实集成，不能只验证文件存在。阶段发布按 `docs/RELEASE.md` 从确切提交打包并验证解压产物。
 - 不提交虚拟环境、缓存、安装器、凭据或 `dist/`、`.delivery/` 中的生成文件。`artifacts/*.png` 是随文档交付的运行截图。
