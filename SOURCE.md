@@ -46,6 +46,8 @@ jobs:
           cache: pip
       - name: Verify core without site packages
         run: python -S -m unittest discover -s tests -p test_core.py -v
+      - name: Verify controller without site packages
+        run: python -S -m unittest discover -s tests -p test_controller.py -v
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
       - name: Check source bundle
@@ -82,13 +84,16 @@ htmlcov/
 
 ## 先确认实际状态
 
-- 最近发布版本是 v0.1.0，开发代码已完成 M1：场景注入、纯逻辑 Board、Geometry、BoardRenderer 与最小只读棋盘视图。M2–M5 尚未实施；以 `TASKS.md` 区分现有能力和规划。
+- 最近发布版本是 v0.1.0，开发代码已完成 M1、M2：场景注入、纯逻辑地图、独立渲染、Controller、完整只读视图与 UIAction。M3–M5 尚未实施；以 `TASKS.md` 区分现有能力和规划。
 - 修改玩法、结构或资源入口前，阅读 [整体架构](docs/ARCHITECTURE.md)、[实施路线](docs/ROADMAP.md) 与 [功能开发规范](docs/FEATURE_DEVELOPMENT.md)。接入美术时同时遵守 [资源规范](docs/ASSET_GUIDE.md)。用户提供的原始报告是评审材料，当前开发决策以这些评审后文档为准。
 
 ## 开发边界
 
 - 这是离线 Python/Pygame 战棋原型。保留几何绘制作为无素材时的默认回退，后续美术通过统一资源与渲染层接入；具体玩法按用户需求推进。
-- 业务规则放在 `tactics/battle.py`，空间与路径规则放在 `tactics/board.py`。Board 显式接收 Scenario，不恢复像素坐标或绘图入口；坐标由 Geometry 转换，绘制由 BoardRenderer 读取 BoardView 完成。M2–M4 继续迁移协调与资源职责。
+- 业务规则放在 `tactics/battle.py`，空间与路径规则放在 `tactics/board.py`。Board 显式接收 Scenario，不恢复像素坐标或绘图入口；坐标由 Geometry 转换，绘制由 BoardRenderer 读取 BoardView 完成。
+- 应用操作统一经过 `Controller`，通过 `get_view_state()` 查询独立的 BattleView；不向 Game、Panel、Renderer、Effects 暴露活动 Unit/Board/Battle。Game 只做组装、输入适配、循环与清理；Panel 用 `hit_test(position)` 返回 UIAction，按钮矩形保持内部实现。
+- `move_to/attack` 对当前行动者提交指令，与查看谁的属性无关；鼠标通过 `click_cell` 保留“先选回行动者再操作”的交互。不要让未来 AI 模拟像素点击，也不以重建 Game 内部字段作为测试夹具；用 Scenario 构建局面。
+- M2 使用小型表现接口（play_attack/update/busy/clear）和独立 AttackPresentation；规则内部结果与快照的实体引用、结算编号和表现代次仍待 M3，资源加载待 M4。
 - 后续功能必须建立在可扩展边界上：先明确规则入口、数据归属、回溯策略、表现/资源接入和验收证据。前置能力缺失时先补齐最小必要部分，与需求一并交付；不能以架构未完成为由无限延后任务，也不为每个小改动制造额外批准流程。
 - 新增规则代码不依赖 Pygame；渲染、UI、动画和未来 AI 不直接改战斗状态。UI/AI 共用合法性校验和指令入口，避免复制规则。
 - 新增运行状态必须明确快照与恢复行为；新增资源、图片、字体、动画进度不得进入规则快照。对外视图和结算结果使用独立数据与稳定 ID，不向表现层泄露可变实体。
@@ -101,6 +106,7 @@ htmlcov/
 - 保留直接读取字体文件和字体扫描异常的回退逻辑，避免启动时再次因 Windows 字体注册表异常崩溃。
 - 完成修改后运行 `python -m unittest discover -s tests -v`，并说明真实窗口与无窗口测试的验证边界。
 - 修改规则、场景、几何或棋盘视图后，另运行 `python -S -m unittest discover -s tests -p test_core.py -v`，保证无第三方包时仍可运行。不要为兼容旧测试把 Pygame 加回核心。
+- 修改协调、动作或完整视图后，另运行 `python -S -m unittest discover -s tests -p test_controller.py -v`。CI 在安装依赖前执行这两组检查。
 - 保留原有行为覆盖；接口迁移时可调整测试夹具，不为保留旧字段访问而保留架构漏洞。新增架构边界在相应阶段就加入检查，不推迟到最终验收。
 - 使用 `python scripts/export_source.py` 更新 `SOURCE.md`，再用 `python scripts/export_source.py --check` 检查一致性。
 - 不提交虚拟环境、缓存、安装器、凭据或 `dist/`、`.delivery/` 中的生成文件。`artifacts/*.png` 是随文档交付的运行截图。
@@ -112,6 +118,16 @@ htmlcov/
 # 更新记录
 
 ## 未发布
+
+### M2 · 操作协调与完整界面视图
+
+- 新增无 Pygame 的 Controller，统一选择、移动、按 UID 攻击、跳过、结束与回溯；返回成功/失败及原因，沿用 Battle 的唯一规则实现。
+- 新增不可变 BattleView/UnitView，覆盖完整属性、棋盘范围、选中/行动者、队列、双语日志、结束状态和按钮可用状态。
+- InfoPanel 只读取视图，通过 UIAction 命中接口返回意图；Game 缩减为组装、键鼠适配、更新/绘制调度与退出，不保留可变规则对象兼容字段。
+- Controller 接管输入锁定与动画结束交接，Effects 只接收独立 AttackPresentation；击杀、动画时长、100% 攻击伤害与上一行动回溯语义保持不变。
+- 迁移测试夹具为 Scenario，保留原 57 项覆盖，新增 18 项协调、只读数据、按钮边界与依赖检查，共 75 项通过；28 项可在 `python -S` 下运行并纳入 CI 安装依赖前步骤。
+- Windows 实际窗口自动交互验证通过；13 个关键画面与 M1 逐像素一致，包含查看、英文界面、敌方行动、击杀、回溯和战斗结束。
+- M3 内部结果/快照 ID 化与结算协议、M4 资源接入仍未实施。
 
 ### M1 · 规则与渲染职责分离
 
@@ -152,7 +168,7 @@ htmlcov/
 ````markdown
 # Chrono Tactics · 离线回溯战棋
 
-仓库名称：`chrono-tactics-pygame`，最近发布版本：`0.1.0`；当前开发代码已完成 M1（未发布）。
+仓库名称：`chrono-tactics-pygame`，最近发布版本：`0.1.0`；当前开发代码已完成 M1、M2（未发布）。
 
 项目仓库：[zyb-sjtu/chrono-tactics-pygame](https://github.com/zyb-sjtu/chrono-tactics-pygame)。这是私有仓库，需要登录有权限的 GitHub 账号访问。
 
@@ -160,7 +176,7 @@ htmlcov/
 
 ## 整体规划与后续开发
 
-已完成评审与 M1：默认场景提取、纯逻辑 Board、纯数值 Geometry、独立 BoardRenderer 和最小只读棋盘视图。完整控制器、侧栏视图、ID 快照与资源管理仍属于 M2–M4，未提前标记完成。
+已完成评审、M1 与 M2：场景注入、纯逻辑地图、独立渲染、Controller 操作入口、完整只读视图和 UIAction。主循环只组装与适配输入，侧栏和动画接收独立值。规则内部 ID 结果/快照和资源管理仍属于 M3–M4。
 
 | 文档 | 内容 |
 | --- | --- |
@@ -169,9 +185,10 @@ htmlcov/
 | [实施路线](docs/ROADMAP.md) | M0–M5、前置能力、小批次提交与验收标准 |
 | [美术资源规范](docs/ASSET_GUIDE.md) | 路径、清单、缓存、透明图片、锚点、图层和动画 |
 | [功能开发规范](docs/FEATURE_DEVELOPMENT.md) | 新功能的数据归属、回溯方案、扩展边界与完成条件 |
-| [M1 实施与验收](docs/M1_IMPLEMENTATION.md) | 当前模块接口、场景示例、57 项检查与 8 帧像素对照 |
+| [M1 实施与验收](docs/M1_IMPLEMENTATION.md) | M1 模块接口、场景示例、57 项检查与 8 帧像素对照 |
+| [M2 实施与验收](docs/M2_IMPLEMENTATION.md) | Controller 接口、完整视图、75 项检查与 13 帧像素对照 |
 
-下一任务是 **ARCH-02 / M2**。后续功能需要先具备对应的最小架构边界；新增状态必须能回溯，新增美术通过资源与渲染入口接入。约束同时写入 [AGENTS.md](AGENTS.md)，实现进度见 [TASKS.md](TASKS.md)。
+下一任务是 **ARCH-03 / M3**。后续功能需要先具备对应的最小架构边界；新增状态必须能回溯，新增美术通过资源与渲染入口接入。约束同时写入 [AGENTS.md](AGENTS.md)，实现进度见 [TASKS.md](TASKS.md)。
 
 ## 运行
 
@@ -249,8 +266,9 @@ E:\gamedesign\
 ├── scripts/export_source.py # 源码汇总生成与一致性检查
 ├── docs/
 │   ├── ARCHITECTURE_REVIEW.md # 对原整改报告的源码核对与评审
-│   ├── ARCHITECTURE.md      # M1 已实施，其余为目标架构
+│   ├── ARCHITECTURE.md      # M1/M2 已实施，其余为目标架构
 │   ├── M1_IMPLEMENTATION.md # M1 接口与验证记录
+│   ├── M2_IMPLEMENTATION.md # M2 指令、视图与验证记录
 │   ├── ROADMAP.md           # 阶段、前置与验收
 │   ├── ASSET_GUIDE.md       # 美术资源与动画规范
 │   ├── FEATURE_DEVELOPMENT.md # 后续开发约束
@@ -262,18 +280,21 @@ E:\gamedesign\
 │   ├── scenario.py          # 不可变场景、验证、默认阵容
 │   ├── board.py             # 纯逻辑地图、空间查询与 BFS
 │   ├── geometry.py          # 不依赖 Pygame 的坐标转换
-│   ├── view_models.py       # 最小只读棋盘视图
+│   ├── actions.py           # UIAction 与操作结果
+│   ├── controller.py        # 统一操作、选中 UID、动画交接和回溯清理
+│   ├── view_models.py       # 完整只读视图与独立表现数据
 │   ├── board_renderer.py    # 只读视图驱动的棋盘绘制
 │   ├── battle.py            # 伤害、击杀、速度队列、回合快照与回溯
 │   ├── effects.py           # 伤害跳字、几何击杀动画、逐帧更新
-│   ├── panel.py             # 字体回退、属性栏、按钮、日志和队列
+│   ├── panel.py             # 字体回退、只读侧栏与动作命中
 │   └── game.py              # 鼠标/键盘事件、主循环、退出清理
 ├── tests\
 │   ├── test_battle.py       # 11 项战斗规则检查，无需创建窗口
 │   ├── test_game.py         # 11 项窗口交互、绘制与字体检查
 │   ├── test_effects.py      # 7 项动画、按键、血量显示和退出检查
 │   ├── test_core.py         # 12 项无第三方包的 M1 核心检查
-│   ├── test_rendering.py    # 4 项只读视图、渲染和场景注入检查
+│   ├── test_controller.py   # 16 项无第三方包的协调与数据边界检查
+│   ├── test_rendering.py    # 6 项只读视图、渲染、按钮和场景注入检查
 │   └── test_rewind.py       # 12 项回溯、击杀及行动顺序检查
 ├── artifacts\               # 实际运行截图，不是游戏资源
 │   ├── initial.png          # 开局移动范围
@@ -310,10 +331,11 @@ git archive --format=zip --prefix=chrono-tactics-pygame/ --output=dist/chrono-ta
 
 ## 验证记录
 
-M1 开发版本目前共 **57 项检查通过**，其中 **12 项可在无第三方包环境执行**。原 41 项行为覆盖保留，8 个默认场景关键画面与重构前逐像素一致；另在 Windows 实际窗口验证了 5×4 场景。详情见 [M1 实施记录](docs/M1_IMPLEMENTATION.md)。
+M2 开发版本目前共 **75 项检查通过**，其中 **28 项可在无第三方包环境执行**。原有行为覆盖保留；Windows 实际窗口的 13 个状态画面与 M1 逐像素一致，包含查看、英文界面、伤害、击杀、回溯和战斗结束。完整检查分别在 dummy 与 Windows 显示驱动下通过，5×4 场景继续通过交互检查。详情见 [M2 实施记录](docs/M2_IMPLEMENTATION.md)。
 
 ```powershell
 .\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_core.py -v
+.\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_controller.py -v
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
@@ -337,7 +359,7 @@ v0.1.0 基线记录：2026-10-22，本机 Python 3.9.1 / Pygame 2.6.1 / SDL 2.28
 ````markdown
 # 项目进度
 
-最近发布版本：`0.1.0`。开发代码已完成 M1（未发布）；已实现能力与后续规划分开记录。
+最近发布版本：`0.1.0`。开发代码已完成 M1、M2（未发布）；已实现能力与后续规划分开记录。
 
 ## 已实现能力
 
@@ -350,7 +372,7 @@ v0.1.0 基线记录：2026-10-22，本机 Python 3.9.1 / Pygame 2.6.1 / SDL 2.28
 | COMBAT-02 | 已完成 | 击杀动画、消失、死亡单位退出队列、一方全灭结束战斗 |
 | REWIND-01 | 已完成 | 回溯上一单位行动开始前、连续回溯、恢复死亡单位和战斗状态 |
 | FIX-01 | 已完成 | Windows 系统字体扫描异常回退，保留英文降级界面 |
-| QA-01 | 已完成 | 57 项回归检查，其中 12 项无第三方包；Windows 8 帧逐像素对照与第二场景实测 |
+| QA-01 | 已完成 | 75 项回归检查，其中 28 项无第三方包；M2 Windows 13 帧与 M1 逐像素一致，保留第二场景验收 |
 | DELIVERY-01 | 已完成 | 运行文档、源码汇总生成脚本、忽略规则和自动测试配置 |
 
 CI 配置覆盖 Windows / Linux 与 Python 3.9 / 3.12。远程执行结果以 GitHub Actions 为准，配置存在不代表运行已通过。
@@ -363,12 +385,12 @@ CI 配置覆盖 Windows / Linux 与 Python 3.9 / 3.12。远程执行结果以 Gi
 | --- | --- | --- | --- |
 | ARCH-00 | M0 | 已完成 | 评审用户意见、整体架构、资源与功能开发规范、分阶段路线；后续约束写入 AGENTS |
 | ARCH-01 | M1 | 已完成 | 场景注入、纯逻辑 Board、Geometry、BoardRenderer 与最小 BoardView；57 项检查及 8 帧一致性验收 |
-| ARCH-02 | M2 | 未开始 | Controller、只读 View、UIAction；输入适配与业务协调分开 |
+| ARCH-02 | M2 | 已完成 | Controller 统一操作与动画交接、完整只读 View、UIAction 命中；Game/表现不持有可变战斗对象，75 项检查及 13 帧一致性验收 |
 | ARCH-03 | M3 | 未开始 | 稳定 ID 结果、纯数据快照、结算编号与表现代次，可靠回溯和完成确认 |
 | ARCH-04 | M4 | 未开始 | 内容/资源清单与验证、加载缓存、图片/动画真实接入、无素材回退 |
 | ARCH-05 | M5 | 未开始 | 场景与外观扩展演练、完整回归、真实窗口与跨平台验收 |
 
-M1 实现与验证详见 [M1_IMPLEMENTATION](docs/M1_IMPLEMENTATION.md)。下一实施任务为 **ARCH-02 / M2**：Controller、完整 UI 只读视图及 UIAction。当前只有棋盘视图是独立数据；Panel 和战斗动画协调仍使用既有接口，不宣称已完成 M2/M3。
+实现与验证见 [M1_IMPLEMENTATION](docs/M1_IMPLEMENTATION.md) 和 [M2_IMPLEMENTATION](docs/M2_IMPLEMENTATION.md)。下一实施任务为 **ARCH-03 / M3**：规则内部结果 ID 化、纯数据快照、结算编号与表现代次。M2 已切断表现层的活动实体引用；不代表内部 AttackResult/TurnSnapshot 已完成 M3 迁移。
 
 阶段依赖、提交拆分和完成条件见 [ROADMAP](docs/ROADMAP.md)，技术边界见 [ARCHITECTURE](docs/ARCHITECTURE.md)。每个阶段同步增加所需边界测试，不等全部迁移后才测试。
 
@@ -380,13 +402,13 @@ M1 实现与验证详见 [M1_IMPLEMENTATION](docs/M1_IMPLEMENTATION.md)。下一
 ````markdown
 # 整体架构与扩展边界
 
-状态：M1 已实施；M2–M5 仍为目标架构。M1 增加 Scenario、Geometry、BoardRenderer 和最小 BoardView，核心已不依赖 Pygame。完整进度以 [TASKS.md](../TASKS.md) 为准，实现细节见 [M1 验收记录](M1_IMPLEMENTATION.md)。
+状态：M1、M2 已实施；M3–M5 仍为目标架构。规则与 Controller 已不依赖 Pygame，界面和动画读取独立数据。完整进度以 [TASKS.md](../TASKS.md) 为准，实现细节见 [M1](M1_IMPLEMENTATION.md) 和 [M2 验收记录](M2_IMPLEMENTATION.md)。
 
 最简单的划分：规则决定“能做什么、结果是什么”；协调层决定“接收哪次操作、何时继续”；表现层负责“输入来自哪里、画面怎样显示”。替换图片不应影响伤害，增加技能不应要求改写主循环。
 
 ## 现状与目标
 
-现状：`models` 只存放运行单位状态；`scenario` 定义并验证初始阵容和障碍；`Board` 只管理逻辑地图；`Geometry` 转换坐标；`BoardRenderer` 读取独立的 BoardView 绘制。`Battle` 仍管理战斗与内存回溯；`Game` 仍协调输入与动画，Panel 仍读取运行对象，这些留给 M2/M3。
+现状：`models` 存放运行单位状态；`scenario` 验证初始阵容和障碍；`Board` 管理逻辑地图；`Geometry` 转换坐标；`BoardRenderer`/`Panel` 读取只读视图。`Controller` 统一操作、选中 UID 和动画交接，向 Effects 提交独立 AttackPresentation。`Game` 只组装模块、转换键鼠输入并调度循环。`Battle` 仍管理战斗与内存回溯，其内部结果与快照引用留给 M3。
 
 目标仍使用 Python/Pygame，先维持当前平铺模块结构。模块职责稳定后才考虑按包分组，避免为目录美观改动所有导入。
 
@@ -406,7 +428,7 @@ tactics/
   game.py            初始化、组装、事件循环与退出
 ```
 
-这是分阶段职责图。scenario、geometry、board_renderer 及 view_models 中的棋盘子集已在 M1 落地；controller、完整 UI 视图与 assets 尚未实现，不提前创建空模块。
+这是分阶段职责图。scenario、geometry、board_renderer 在 M1 落地；controller、完整 UI 视图及 actions.py 的 UIAction/ActionResult 在 M2 落地；assets 尚未实现，不提前创建空模块。
 
 ## 依赖方向
 
@@ -436,7 +458,7 @@ flowchart TD
 | renderer / panel / effects / assets | Pygame、只读视图、资源与布局 | 改写 Unit/Battle、自己计算第二套移动或攻击规则 |
 | game | 组装上述模块、适配操作系统输入 | 重复实现指令校验、伤害或回溯 |
 
-M1 的规则、场景、几何与棋盘渲染边界已有测试。其余是后续迁移目标，不把尚未迁移的 Panel、Game 和动画结果声称为完全解耦。
+M1/M2 的规则、场景、几何、棋盘渲染、侧栏与协调边界已有测试；核心与控制器可在无第三方包的环境运行。M3 的内部快照和结算协议、M4 的资源加载仍为后续目标。
 
 ## 数据模型
 
@@ -486,6 +508,10 @@ AttackResolved
 
 DTO 不保留可变 Unit/Battle 引用；嵌套集合也使用只读形式或独立副本。`frozen` 数据类中的可变对象不会自动变为只读。Renderer 只显示计算好的可达格与目标格，不调用 Battle 查询合法性。
 
+M2 实际接口：`get_view_state()` 返回 BattleView，其中 `board` 是既有 BoardView，`units` 是完整阵容（含死亡单位）的 UnitView 元组，`active/selected` 是独立 UnitView，`order` 仅包含存活单位。日志使用双语元组，按钮提供 `can_undo/can_skip/can_end_turn`，另有 `input_locked`。结算编号、表现代次和 visual_id 尚未加入。
+
+Controller 的 `select/move_to/attack/click_cell/handle_action/undo` 返回 ActionResult，包含 `accepted` 与失败 `reason`，支持布尔判断。显式移动/攻击提交给当前行动者，不依赖查看对象；鼠标 `click_cell` 额外保留“查看行动者时才尝试移动/攻击”的交互策略。二者最终调用同一 Battle 校验。UIAction 仅包括跳过阶段、结束行动、回溯。
+
 初期不用全局消息总线。普通函数调用、返回值和一个有明确消费位置的事件列表即可。日志最终可从结构化结果格式化，避免规则到处拼接界面文字；第一轮迁移保留现有双语显示行为。
 
 ## 动画与结算协议
@@ -493,6 +519,8 @@ DTO 不保留可变 Unit/Battle 引用；嵌套集合也使用只读形式或独
 保持现有语义：合法攻击立即计算生命和击杀，进入 resolving；表现层根据结果绘制跳字与死亡形体；协调层收到有效完成通知后调用规则交接一次。
 
 Game 在启动时将表现适配器交给 Controller。该接口只需要“播放结果、逐帧更新、报告完成、清除旧代次”几种操作；规则不导入适配器，协调层不导入 Pygame。纯逻辑测试使用立即完成的测试适配器，不依赖真实时间或窗口。
+
+M2 实际使用 `play_attack(AttackPresentation)/update(elapsed)/busy/clear()`；Controller 在每次 update 后检查 resolving 与 busy，结束时交接一次。未传适配器时使用 NullPresentation，攻击仍先进入 resolving，再在下一次 update 交接。以下编号与代次约束由 M3 实施，不将 busy 轮询视为完整异步通知协议。
 
 每次结算有编号，每次回溯/重开场景提升表现代次。只有当前代次、当前结算的完成通知有效，重复通知无效。动画播放不改变已结算的伤害；待机循环和环境特效不是阻塞任务，不参与行动交接的等待。
 
@@ -532,7 +560,7 @@ Game 在启动时将表现适配器交给 Controller。该接口只需要“播�
 ````markdown
 # 架构整改意见评审
 
-状态：M0 历史评审，基线为 `ff67755` / `v0.1.0`。下文源码事实对应评审时的结构；后续 M1 已实施，当前进度与验证见 [M1 实施记录](M1_IMPLEMENTATION.md) 和 TASKS。
+状态：M0 历史评审，基线为 `ff67755` / `v0.1.0`。下文源码事实对应评审时的结构；后续 M1、M2 已实施，当前进度与验证见 [M1](M1_IMPLEMENTATION.md)、[M2 实施记录](M2_IMPLEMENTATION.md) 和 TASKS。
 
 评审材料：[用户提供的原报告](references/architecture_proposal.md)。本文将原报告中的建议与已经实现的能力分开记录。
 
@@ -540,7 +568,7 @@ Game 在启动时将表现适配器交给 Controller。该接口只需要“播�
 
 原报告的主要判断准确，适合作为渐进重构的起点。建议采纳“规则、应用协调、表现与资源分离”的方向，并补齐数据身份、回溯与动画协议、资源制作规范、功能开发准入和逐阶段验收。当前原型无需推翻，也不需要先建设通用游戏引擎。
 
-M0 交付的是整体规划和后续开发约束，当时不包括运行代码重构。后续 M1 已完成 scenario、geometry、board_renderer 与最小棋盘视图；controller、assets 等仍为规划模块，不能标记为已实现。
+M0 交付的是整体规划和后续开发约束，当时不包括运行代码重构。后续 M1 已完成场景、几何与棋盘渲染分离；M2 已完成 Controller、完整只读视图与 UIAction。规则内部快照/结算协议及 assets 仍待 M3/M4，不将规划当成现成能力。
 
 ## 对照源码的判断
 
@@ -803,6 +831,8 @@ CI 能自动检查的边界在相应迁移阶段加入，不宣称现在已有�
 
 状态：代码和本机验收完成。评审前基线为 `b072548`；实施分支为 `refactor/m1-rule-render-separation`。远程结果以对应 PR / Actions 为准，任务状态见 [TASKS](../TASKS.md)。
 
+本文件保留 M1 完成时的接口与验收记录。后续 Controller、完整视图与 UIAction 已在 M2 实施，当前调用方式见 [M2 记录](M2_IMPLEMENTATION.md)；下文的“留给 M2”描述属于当时阶段边界。
+
 ## 范围和结果
 
 本阶段完成场景、逻辑地图、数值几何和棋盘绘制分离，没有增加玩法，没有改动 Battle 的伤害、行动顺序或回溯算法。默认 8×8、64 像素、6 名单位与 5 个障碍保持原样。
@@ -910,12 +940,116 @@ CI 在安装 requirements 之前执行上述 `-S` 核心检查，再安装 Pygam
 
 ![M1 注入的第二场景](../artifacts/m1_custom_scenario.png)
 
-## 尚未实施
+## M1 完成时留给后续的内容
 
-- M2：Controller、完整 UI 视图、UIAction 命中封装。
+- M2：Controller、完整 UI 视图、UIAction 命中封装（现已完成，见 M2 记录）。
 - M3：ID 化结算结果、纯数据快照和结算/表现代次协议。
 - M4：外部 JSON 内容、AssetManager、图片/动画素材加载。
 - M5：完整的后续扩展与资源交付演练。
+````
+
+## docs/M2_IMPLEMENTATION.md
+
+````markdown
+# M2 实施与验收记录
+
+状态：代码与本机验收完成，2026-10-22。基线为 M1 合并提交 `431b403`，实施分支为 `refactor/m2-controller-view-separation`。远程执行结果以对应 PR / Actions 为准，任务状态见 [TASKS](../TASKS.md)。
+
+## 范围与数据归属
+
+本阶段只重整操作协调和表现边界，玩家操作、速度顺序、移动范围、100% 攻击伤害、击杀动画及回溯语义保持一致。没有增加技能、AI、存档、图片或新玩法。
+
+| 模块 | M2 实际职责 |
+| --- | --- |
+| controller.py | 私有持有 Board/Battle、选中 UID；接收操作，协调动画锁定、完成交接和回溯清理 |
+| actions.py | UIAction 动作标识；不可变 ActionResult，提供 accepted、失败 reason 和布尔判断 |
+| view_models.py | 保留 BoardView，增加完整 UnitView/BattleView 和独立 AttackPresentation |
+| panel.py | 只读 BattleView；内部维护按钮矩形，对外 hit_test 返回 UIAction |
+| effects.py | 只读 AttackPresentation 的 UID、位置、阵营、伤害、击杀值，维护临时动画 |
+| game.py | 场景与模块组装、键鼠到逻辑操作的转换、更新/绘制循环和退出清理 |
+| board.py / battle.py | 沿用 M1 代码与唯一规则实现，本阶段没有修改 |
+
+选中状态不进入规则快照；回溯或行动交接后重置到当前行动者。Game 不再提供 board/battle/selected 可变字段，也没有为旧测试保留兼容入口。
+
+## 实际调用链
+
+```text
+鼠标像素 ── Geometry.cell_at ── Controller.click_cell
+侧栏点击 ── Panel.hit_test ── UIAction ── Controller.handle_action
+键盘按键 ── UIAction ────────────────── Controller.handle_action
+                                              ↓
+                                        Battle / Board
+                                              ↓
+                           BattleView / AttackPresentation（独立值）
+                                              ↓
+                              BoardRenderer / Panel / Effects
+```
+
+`Controller(scenario, presentation=None)` 显式接收已验证场景。后续 AI、脚本或测试可直接使用逻辑指令，不需要窗口、像素或模拟点击：
+
+```python
+from tactics.actions import UIAction
+from tactics.controller import Controller
+from tactics.scenario import default_scenario
+
+controller = Controller(default_scenario())
+assert controller.move_to((4, 4))
+assert controller.attack("D2")
+assert controller.get_view_state().input_locked
+controller.update(0)  # 无窗口适配器在下一次更新完成表现交接
+assert controller.get_view_state().active.uid == "A1"
+assert controller.handle_action(UIAction.UNDO)
+assert controller.get_view_state().active.cell == (1, 3)
+```
+
+`select(uid)` 只改变查看对象。显式 `move_to/attack` 始终对当前行动者发指令，合法性由 Battle 校验；鼠标 `click_cell` 保留“先选回当前行动者，再点格子移动/攻击”的原有交互。失败返回 ActionResult(False, reason)，不会消耗行动或创建动画。结束状态下仍能查看存活单位和回溯，已禁用的跳过/结束操作不改变查看对象。
+
+## 只读视图与表现接口
+
+BattleView 一次性构建同一局面的独立值，包含：
+
+- board：尺寸、障碍、存活单位显示值、行动/选中 UID 及合法范围；继续供既有 Renderer 使用。
+- units：完整阵容的 UnitView 元组，包含所有属性与位置，保留死亡单位以便查询结算与恢复。
+- active/selected：独立 UnitView 或 None；order 仅包含存活单位。
+- phase、round_number、winner、双语 log 元组，以及 can_undo/can_skip/can_end_turn/input_locked。
+
+所有视图数据类均 frozen，嵌套集合使用 tuple/frozenset，坐标和日志复制成元组。旧视图不会随移动、扣血、交接或回溯改变；按 UID 比较身份，不要求对象引用相同。Panel 和 Renderer 不接收规则对象，也不自行计算合法范围。
+
+Game 启动时将 CombatEffects 交给 Controller。小型表现接口只有 `play_attack(values)`、`update(elapsed)`、`busy` 和 `clear()`，通过普通对象注入，没有消息总线或空注册框架。Controller 将内部 AttackResult 转成只含值的 AttackPresentation；Effects 从此不再拿到活动 Unit。
+
+合法攻击立即扣血，进入 resolving；所有操作入口在此阶段均被规则/协调层拒绝，QUIT 由 Game 独立处理。Controller.update 更新表现，busy 为假后调用 finish_attack 并选中新行动者；后续重复 update 不再次交接。回溯成功后清空表现并重置选中 UID，失败不清空表现。
+
+未传表现对象时使用 NullPresentation，支持无窗口调用；攻击仍先进入 resolving，在下一次 update 完成。测试另注入可手动保持 busy 的适配器，验证任意长时间都不能越过未结束的表现。
+
+## 迁移与后续开发
+
+测试通过 Scenario/UnitSpawn 构造低血量、最终击杀和 800/1000 生命局面，不再任意改写 Game 内部 Board/Battle。旧 Game.board_click/undo 入口已删除，调用方改为 controller.click_cell/undo；旧 Panel 按钮 Rect 改为 hit_test。
+
+M2 的 AttackPresentation 是当前规则到表现的边界转换。规则内部 AttackResult、TurnSnapshot 仍含实体引用；没有结算编号、表现代次或异步完成通知。下一阶段 M3 在此入口继续迁移内部结果与快照，加入重复/过期通知校验。当前只验证 busy 轮询的单次交接，不宣称已解决未来异步通知协议。
+
+新增操作时先在 Controller 建入口，调用 Battle 的同一合法性校验；新增显示值在 View 构建处复制。新增按钮只改 Panel 布局与 UIAction 映射，不在 Game 中加入玩法分支。图片、字体与动画帧继续只属于表现层，资源清单和缓存留给 M4。
+
+## 自动化验收
+
+本机 Python 3.9.1 / Pygame 2.6.1 / SDL 2.28.4：**75 项检查通过，退出码 0**。原 57 项行为覆盖保留，新增 16 项控制器检查与 2 项侧栏边界检查。
+
+```powershell
+.\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_core.py -v
+.\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_controller.py -v
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+```
+
+前两组共 **28 项**，无需第三方包或窗口。核心独立子进程禁止导入 Pygame，实际跑通 Controller 移动、攻击、锁定、交接和回溯；CI 在安装依赖前执行两组检查。新增覆盖深层不可变、旧视图独立、按 UID 操作、非法指令无副作用、全部入口锁定、重复更新单次交接、表现清理、最终击杀恢复、跨轮与双方操作、按钮半开区间及自定义棋盘宽度。导入检查约束 Game/表现模块不直接依赖可变规则对象。
+
+完整 75 项分别通过 dummy 显示驱动和本机 Windows 实际窗口运行。CI 配置覆盖 Windows/Linux × Python 3.9/3.12，远程结果需以 Actions 实际结论为准。
+
+## Windows 画面对照
+
+改动前后使用 `windows` 显示驱动，以相同场景、输入和固定动画时间捕获 RGBA 字节。以下 **13 帧逐像素一致**：开局、查看其他单位、移动后、伤害跳字、下一单位、回溯、敌方回合、英文界面、击杀动画、击杀后消失、回溯复活、战斗结束、结束后回溯。
+
+另外验证攻击结算时 QUIT 正常释放 display/font；5×4 注入场景继续通过真实窗口的点击、攻击 17、生命 50→33、回溯及绘制检查。查看了默认伤害画面，侧栏与禁用按钮布局正常。上述为自动事件和程序调用验证，并非人工逐次鼠标操作。像素基线保存在本机忽略目录 `.delivery/m2-before`、`.delivery/m2-after`，不作为游戏资源提交。
+
+像素一致性只用于本次保行为重构验收，不限制将来更换美术，也不要求不同系统字体产生相同像素。
 ````
 
 ## docs/ROADMAP.md
@@ -923,7 +1057,7 @@ CI 在安装 requirements 之前执行上述 `-S` 核心检查，再安装 Pygam
 ````markdown
 # 架构实施路线与验收
 
-状态：M0、M1 已完成；M2–M5 未开始。最近发布仍为 `v0.1.0`，M1 属于未发布的开发变更；不将本阶段称为“完整应用解耦”或“已经支持美术资源”。
+状态：M0、M1、M2 已完成；M3–M5 未开始。最近发布仍为 `v0.1.0`，M1/M2 属于未发布的开发变更；当前未实现资源加载，也未完成内部快照与结算协议迁移。
 
 本路线以当前 41 项行为检查为迁移基线。测试数量可增加，导入和夹具可随接口迁移，关键行为不能丢失。每个阶段在专用分支完成小批次提交，先验证、再审查差异并合并；不在一次提交中同时迁移架构和改动玩法。
 
@@ -933,7 +1067,7 @@ CI 在安装 requirements 之前执行上述 `-S` 核心检查，再安装 Pygam
 | --- | --- | --- | --- |
 | M0 / ARCH-00 | v0.1.0 | 意见评审、整体架构、资源规范、开发约束、路线与状态记录 | 本次文档、源码汇总一致；原游戏回归通过 |
 | M1 / ARCH-01（已完成） | M0 | Scenario 纯数据初始化；Board 去除 Pygame；Geometry、BoardRenderer 和最小 BoardView 实际接管旧绘制 | 57 项检查通过；12 项无第三方包；8 帧逐像素一致；5×4 场景实际窗口验收，详见 M1 实施记录 |
-| M2 / ARCH-02 | M1 | Controller 操作入口、只读 View、UIAction 命中接口；Game 缩减为组装与循环 | UI/renderer 不再修改或拿到可变战斗对象；规则无重复实现；移动、攻击、选择、按钮、输入锁定和退出通过集成检查 |
+| M2 / ARCH-02（已完成） | M1 | Controller 操作入口、完整只读 View、UIAction 命中接口；Game 缩减为组装与循环 | 75 项检查通过，28 项无第三方包；13 帧与 M1 一致；完整交互与输入锁定通过，详见 M2 实施记录 |
 | M3 / ARCH-03 | M2 | ID 化的结算结果、纯数据快照、结算编号与表现代次；回溯清除旧表现 | 伤害与回溯行为不变；死亡及跨轮恢复一致；重复/过期完成通知不能推进回合；快照不含 Surface、Font 或活动实体引用 |
 | M4 / ARCH-04 | M3 | 外部内容/资源清单、验证、图片和缩放缓存；一条真实素材替换链路 | 替换单位和地砖只修改清单/素材；相同文件只加载一次；不同尺寸缓存正确；缺失可定位并按策略回退；场景/定义错误明确拒绝 |
 | M5 / ARCH-05 | M1–M4 | 扩展演练、开发模板、完整 CI 与真实窗口验收、阶段版本交付 | 新场景与第二套外观分别通过数据接入；现有流程、动画、击杀和回溯全部通过；发布文件和文档对应同一提交 |
@@ -1012,9 +1146,9 @@ M1–M4 可以继续细分为下列小提交，不以“文件已经创建”作
 
 ## 当前下一步
 
-M1 已达到“原画面与玩法保持一致，Board 与 Battle 可以不安装 Pygame 独立运行”，见 [M1 实施与验收](M1_IMPLEMENTATION.md)。
+M1/M2 已达到“原画面与玩法保持一致，规则与操作协调可脱离 Pygame 运行，表现只读独立值”，见 [M1](M1_IMPLEMENTATION.md) 和 [M2 实施与验收](M2_IMPLEMENTATION.md)。
 
-下一个任务是 **ARCH-02 / M2**：将 Game 中的操作协调收拢到 Controller，扩展现有棋盘视图以覆盖侧栏，并用 UIAction 隔离按钮布局。M1 提前引入棋盘视图是为了让 Renderer 不读取规则对象，不代表 M2 已完成。
+下一个任务是 **ARCH-03 / M3**：迁移规则内部 AttackResult/TurnSnapshot 的实体引用，引入结算编号、表现代次及匹配确认。M2 仅将现有结算转换为独立 AttackPresentation，并通过 busy 轮询保持单次交接；没有提前加入异步完成通知或磁盘存档。
 ````
 
 ## docs/references/architecture_proposal.md
@@ -1366,6 +1500,30 @@ if __name__ == "__main__":
 """Offline tactics prototype with manually controlled battle turns."""
 ```
 
+## tactics/actions.py
+
+```python
+"""Semantic UI actions; no keyboard codes or button geometry in the controller."""
+
+from dataclasses import dataclass
+from enum import Enum
+
+
+class UIAction(Enum):
+    SKIP_PHASE = "skip_phase"
+    END_TURN = "end_turn"
+    UNDO = "undo"
+
+
+@dataclass(frozen=True)
+class ActionResult:
+    accepted: bool
+    reason: str = ""
+
+    def __bool__(self):
+        return self.accepted
+```
+
 ## tactics/battle.py
 
 ```python
@@ -1669,6 +1827,126 @@ class BoardRenderer:
             pygame.draw.rect(surface, (105, 218, 153), fill)
 ```
 
+## tactics/controller.py
+
+```python
+"""Application operations and animation handoff, independent of Pygame.
+
+The injected presentation provides play_attack(values), update(seconds), busy and
+clear(). It never receives live entities. A no-op implementation supports callers
+without a window; a successful attack still resolves on the next update().
+"""
+
+from .actions import ActionResult, UIAction
+from .battle import Battle
+from .board import Board
+from .scenario import Scenario
+from .view_models import AttackPresentation, BattleView, build_battle_view
+
+
+class NullPresentation:
+    busy = False
+
+    def play_attack(self, result):
+        pass
+
+    def update(self, elapsed):
+        pass
+
+    def clear(self):
+        pass
+
+
+class Controller:
+    def __init__(self, scenario: Scenario, presentation=None):
+        self._board = Board(scenario)
+        self._battle = Battle(self._board)
+        self._presentation = NullPresentation() if presentation is None else presentation
+        self._selected_uid = self._battle.active_unit.uid
+
+    def _unit(self, uid):
+        return next((unit for unit in self._board.units if unit.uid == uid), None)
+
+    def _select_active(self):
+        actor = self._battle.active_unit
+        self._selected_uid = actor.uid if actor is not None else None
+
+    def get_view_state(self) -> BattleView:
+        return build_battle_view(self._board, self._battle, self._unit(self._selected_uid))
+
+    def select(self, uid: str) -> ActionResult:
+        if self._battle.phase == "resolving":
+            return ActionResult(False, "resolving")
+        unit = self._unit(uid)
+        if unit is None or not unit.alive:
+            return ActionResult(False, "unknown_or_dead_unit")
+        self._selected_uid = uid
+        return ActionResult(True)
+
+    def move_to(self, cell) -> ActionResult:
+        """Move the active actor; legality remains exclusively in Battle."""
+        if not self._battle.move(cell):
+            return ActionResult(False, "illegal_move")
+        self._select_active()
+        return ActionResult(True)
+
+    def attack(self, target_uid: str) -> ActionResult:
+        target = self._unit(target_uid)
+        if target is None or not self._battle.attack(target):
+            return ActionResult(False, "illegal_target")
+        result = self._battle.pending_attack
+        self._select_active()
+        self._presentation.play_attack(AttackPresentation(
+            result.actor.uid, result.target.uid, tuple(result.target.cell),
+            result.target.team, result.damage, result.killed,
+        ))
+        return ActionResult(True)
+
+    def click_cell(self, cell) -> ActionResult:
+        """Inspect any living unit, or move/attack when inspecting the active actor."""
+        if self._battle.phase == "resolving":
+            return ActionResult(False, "resolving")
+        if cell is None:
+            return ActionResult(False, "outside_board")
+        unit = self._board.unit_at(cell)
+        actor = self._battle.active_unit
+        if actor is not None and self._selected_uid == actor.uid:
+            if self.move_to(cell):
+                return ActionResult(True)
+            if unit is not None and self.attack(unit.uid):
+                return ActionResult(True)
+        if unit is not None:
+            return self.select(unit.uid)
+        return ActionResult(False, "no_action")
+
+    def handle_action(self, action: UIAction) -> ActionResult:
+        if self._battle.phase == "resolving":
+            return ActionResult(False, "resolving")
+        if action is UIAction.UNDO:
+            return self.undo()
+        if action is UIAction.SKIP_PHASE and self._battle.phase in ("move", "attack"):
+            self._battle.skip_phase()
+        elif action is UIAction.END_TURN and self._battle.end_turn():
+            pass
+        else:
+            return ActionResult(False, "unavailable_action")
+        self._select_active()
+        return ActionResult(True)
+
+    def undo(self) -> ActionResult:
+        if not self._battle.undo():
+            return ActionResult(False, "undo_unavailable")
+        self._presentation.clear()
+        self._select_active()
+        return ActionResult(True)
+
+    def update(self, elapsed):
+        self._presentation.update(max(0, elapsed))
+        if self._battle.phase == "resolving" and not self._presentation.busy:
+            self._battle.finish_attack()
+            self._select_active()
+```
+
 ## tactics/effects.py
 
 ```python
@@ -1680,6 +1958,7 @@ from dataclasses import dataclass
 import pygame
 
 from .geometry import BoardGeometry
+from .view_models import AttackPresentation
 
 DAMAGE_DURATION = 0.9
 DEATH_DURATION = 0.65
@@ -1712,10 +1991,10 @@ class CombatEffects:
     def busy(self):
         return bool(self.damage_texts or self.deaths)
 
-    def play_attack(self, result):
-        self.damage_texts.append(DamageText(result.target.cell, result.damage))
+    def play_attack(self, result: AttackPresentation):
+        self.damage_texts.append(DamageText(result.target_cell, result.damage))
         if result.killed:
-            self.deaths.append(DeathEffect(result.target.cell, result.target.team, result.target.uid))
+            self.deaths.append(DeathEffect(result.target_cell, result.target_team, result.target_uid))
 
     def clear(self):
         self.damage_texts.clear()
@@ -1781,21 +2060,20 @@ class CombatEffects:
 
 import pygame
 
-from .board import Board
+from .actions import UIAction
 from .board_renderer import BoardRenderer
-from .battle import Battle
+from .controller import Controller
 from .effects import CombatEffects
 from .geometry import BoardGeometry
 from .panel import InfoPanel
 from .scenario import default_scenario
 from .settings import CELL_SIZE, FPS, MIN_WINDOW_HEIGHT, PANEL_WIDTH
-from .view_models import build_board_view
 
 
 class Game:
     def __init__(self, scenario=None):
-        self.board = Board(default_scenario() if scenario is None else scenario)
-        self.geometry = BoardGeometry(self.board.cols, self.board.rows, CELL_SIZE)
+        scenario = default_scenario() if scenario is None else scenario
+        self.geometry = BoardGeometry(scenario.cols, scenario.rows, CELL_SIZE)
         window_size = (self.geometry.width + PANEL_WIDTH, max(MIN_WINDOW_HEIGHT, self.geometry.height))
         # The prototype needs only display and fonts, so do not initialize audio.
         pygame.display.init()
@@ -1804,72 +2082,36 @@ class Game:
         pygame.display.set_caption("Grid Tactics - Battle Prototype")
         self.clock = pygame.time.Clock()
         self.renderer = BoardRenderer(self.geometry)
-        self.battle = Battle(self.board)
         self.panel = InfoPanel(self.geometry.width, window_size[1])
         self.effects = CombatEffects(self.geometry)
-        self.selected = self.battle.active_unit
+        self.controller = Controller(scenario, self.effects)
         self.running = True
 
     def handle_event(self, event):
         if event.type == pygame.QUIT:
             self.running = False
-        elif self.battle.phase == "resolving":
-            return
         elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_BACKSPACE:
-                self.undo()
-            elif event.key == pygame.K_SPACE:
-                self.battle.skip_phase()
-                self.selected = self.battle.active_unit
-            elif event.key == pygame.K_RETURN:
-                self.battle.end_turn()
-                self.selected = self.battle.active_unit
+            action = {pygame.K_BACKSPACE: UIAction.UNDO,
+                      pygame.K_SPACE: UIAction.SKIP_PHASE,
+                      pygame.K_RETURN: UIAction.END_TURN}.get(event.key)
+            if action is not None:
+                self.controller.handle_action(action)
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self.panel.undo_button.collidepoint(event.pos):
-                self.undo()
-            elif self.panel.skip_button.collidepoint(event.pos):
-                self.battle.skip_phase()
-                self.selected = self.battle.active_unit
-            elif self.panel.end_button.collidepoint(event.pos):
-                self.battle.end_turn()
-                self.selected = self.battle.active_unit
+            action = self.panel.hit_test(event.pos)
+            if action is not None:
+                self.controller.handle_action(action)
             else:
-                self.board_click(event.pos)
-
-    def board_click(self, position):
-        if self.battle.phase == "resolving":
-            return
-        cell = self.geometry.cell_at(position)
-        if cell is None:
-            return
-        unit = self.board.unit_at(cell)
-        if self.battle.active_unit is not None and self.selected is self.battle.active_unit:
-            if self.battle.move(cell):
-                return
-            if unit is not None and self.battle.attack(unit):
-                self.effects.play_attack(self.battle.pending_attack)
-                return
-        if unit is not None:
-            self.selected = unit
-
-    def undo(self):
-        if not self.battle.undo():
-            return False
-        self.effects.clear()
-        self.selected = self.battle.active_unit
-        return True
+                self.controller.click_cell(self.geometry.cell_at(event.pos))
 
     def update(self, elapsed):
-        self.effects.update(elapsed)
-        if self.battle.phase == "resolving" and not self.effects.busy:
-            self.battle.finish_attack()
-            self.selected = self.battle.active_unit
+        self.controller.update(elapsed)
 
     def draw(self):
         self.screen.fill((21, 30, 42))
-        self.renderer.draw(self.screen, build_board_view(self.board, self.battle, self.selected))
+        view = self.controller.get_view_state()
+        self.renderer.draw(self.screen, view.board)
         self.effects.draw(self.screen)
-        self.panel.draw(self.screen, self.selected, self.battle)
+        self.panel.draw(self.screen, view)
         pygame.display.flip()
 
     def run(self):
@@ -1983,6 +2225,8 @@ from pathlib import Path
 import pygame
 
 from .settings import MIN_WINDOW_HEIGHT, PANEL_WIDTH
+from .actions import UIAction
+from .view_models import BattleView
 
 
 def load_fonts():
@@ -2013,9 +2257,16 @@ class InfoPanel:
         self.height = height
         fonts, self.chinese = load_fonts()
         self.title_font, self.font, self.small_font = fonts
-        self.skip_button = pygame.Rect(self.board_width + 24, 284, 162, 38)
-        self.end_button = pygame.Rect(self.board_width + 198, 284, 162, 38)
-        self.undo_button = pygame.Rect(self.board_width + 208, 14, 152, 32)
+        self._buttons = {
+            UIAction.SKIP_PHASE: pygame.Rect(self.board_width + 24, 284, 162, 38),
+            UIAction.END_TURN: pygame.Rect(self.board_width + 198, 284, 162, 38),
+            UIAction.UNDO: pygame.Rect(self.board_width + 208, 14, 152, 32),
+        }
+
+    def hit_test(self, position):
+        """Return intent only; the controller decides whether it is available."""
+        return next((action for action, rect in self._buttons.items()
+                     if rect.collidepoint(position)), None)
 
     def text(self, surface, value, y, color=(220, 230, 241), small=False, title=False, x=None, width=None):
         font = self.title_font if title else self.small_font if small else self.font
@@ -2033,30 +2284,31 @@ class InfoPanel:
         text = self.small_font.render(label, True, (236, 241, 247) if enabled else (104, 117, 132))
         surface.blit(text, text.get_rect(center=rect.center))
 
-    def draw(self, surface, selected, battle):
+    def draw(self, surface, view: BattleView):
         pygame.draw.rect(surface, (21, 30, 42), (self.board_width, 0, PANEL_WIDTH, self.height))
         cn = self.chinese
-        actor = battle.active_unit
+        selected = view.selected
+        actor = view.active
         name = (actor.name if cn else actor.uid) if actor is not None else ""
-        moving = battle.phase == "move"
-        self.text(surface, ("第 {} 回合" if cn else "ROUND {:02d}").format(battle.round_number),
+        moving = view.phase == "move"
+        self.text(surface, ("第 {} 回合" if cn else "ROUND {:02d}").format(view.round_number),
                   14, title=True, width=182)
-        self.button(surface, self.undo_button, "回溯 [退格]" if cn else "Undo [Backspace]", battle.can_undo)
-        if battle.finished:
+        self.button(surface, self._buttons[UIAction.UNDO], "回溯 [退格]" if cn else "Undo [Backspace]", view.can_undo)
+        if view.finished:
             winners = {"ally": ("蓝方获胜", "BLUE WINS"), "enemy": ("红方获胜", "RED WINS"),
                        "draw": ("平局", "DRAW")}
-            self.text(surface, winners[battle.winner][0 if cn else 1], 54, (255, 219, 116))
+            self.text(surface, winners[view.winner][0 if cn else 1], 54, (255, 219, 116))
             status = "战斗结束 · 可以回溯最后一次行动" if cn else "Battle ended. Undo is available."
         else:
             self.text(surface, ("当前行动：{} [{}]" if cn else "Active: {} [{}]").format(name, actor.uid),
                       54, (255, 219, 116))
-        if not battle.finished and cn:
-            phase = {"move": "移动阶段", "attack": "攻击阶段", "resolving": "攻击结算中"}[battle.phase]
+        if not view.finished and cn:
+            phase = {"move": "移动阶段", "attack": "攻击阶段", "resolving": "攻击结算中"}[view.phase]
             team = "蓝方" if actor.team == "ally" else "红方"
-            status = "{} · {} · 移动 {} / 攻击 {}".format(team, phase, int(moving), int(battle.phase != "resolving"))
-        elif not battle.finished:
-            status = "{} / {} / Move {} / Attack {}".format(actor.team.upper(), battle.phase.upper(),
-                                                           int(moving), int(battle.phase != "resolving"))
+            status = "{} · {} · 移动 {} / 攻击 {}".format(team, phase, int(moving), int(view.phase != "resolving"))
+        elif not view.finished:
+            status = "{} / {} / Move {} / Attack {}".format(actor.team.upper(), view.phase.upper(),
+                                                           int(moving), int(view.phase != "resolving"))
         self.text(surface, status, 86, (132, 159, 185), small=True)
         pygame.draw.line(surface, (60, 77, 96), (self.board_width + 24, 116), (self.board_width + PANEL_WIDTH - 24, 116))
         if selected is None:
@@ -2078,14 +2330,13 @@ class InfoPanel:
 
         skip = ("跳过移动 [空格]" if moving else "跳过攻击 [空格]") if cn else (
             "Skip move [Space]" if moving else "Skip attack [Space]")
-        enabled = battle.phase in ("move", "attack")
-        self.button(surface, self.skip_button, skip, enabled)
-        self.button(surface, self.end_button, "结束行动 [回车]" if cn else "End turn [Enter]", enabled)
-        if battle.phase == "resolving":
+        self.button(surface, self._buttons[UIAction.SKIP_PHASE], skip, view.can_skip)
+        self.button(surface, self._buttons[UIAction.END_TURN], "结束行动 [回车]" if cn else "End turn [Enter]", view.can_end_turn)
+        if view.phase == "resolving":
             hint = "攻击动画播放中，结束后继续" if cn else "Resolving attack. Please wait."
-        elif battle.finished:
+        elif view.finished:
             hint = "战斗结束，可回溯上一单位行动" if cn else "Battle ended. Undo the previous turn."
-        elif selected is not actor:
+        elif (selected.uid if selected else None) != (actor.uid if actor else None):
             hint = "点击金框单位，继续当前行动" if cn else "Click the gold-frame unit to act."
         elif moving:
             hint = "绿色：可移动；点击高亮格确认" if cn else "Green cells: click once to move."
@@ -2094,14 +2345,14 @@ class InfoPanel:
         self.text(surface, hint, 334, (166, 207, 191), small=True)
         self.text(surface, "伤害 = 攻击 × 100% · 退格回溯" if cn else "Damage = ATK x 100% / Backspace undo",
                   357, (132, 159, 185), small=True)
-        for index, message in enumerate(battle.log):
+        for index, message in enumerate(view.log):
             self.text(surface, message[0 if cn else 1], 385 + index * 21, small=True)
 
         self.text(surface, "行动顺序（速度↓，金色为当前）" if cn else "ORDER / SPD descending / gold = active",
                   433, (132, 159, 185), small=True)
-        for index, unit in enumerate(battle.order):
+        for index, unit in enumerate(view.order):
             name = unit.name if cn else unit.uid
-            color = (255, 219, 116) if unit is actor else (161, 178, 196)
+            color = (255, 219, 116) if actor is not None and unit.uid == actor.uid else (161, 178, 196)
             label = "{}.{}({})".format(index + 1, name, unit.speed)
             self.text(surface, label, 459 + (index // 3) * 25, color, small=True,
                       x=self.board_width + 24 + (index % 3) * 114, width=108)
@@ -2227,7 +2478,7 @@ FPS = 60
 ## tactics/view_models.py
 
 ```python
-"""Detached board-render data; the complete application/UI view belongs to M2."""
+"""Detached, immutable values shared by the application and presentation layers."""
 
 from dataclasses import dataclass
 from typing import FrozenSet, Optional, Tuple
@@ -2257,6 +2508,58 @@ class BoardView:
     target_cells: FrozenSet[Cell]
 
 
+@dataclass(frozen=True)
+class UnitView:
+    uid: str
+    name: str
+    team: str
+    role: str
+    cell: Cell
+    health: int
+    max_health: int
+    attack: int
+    defense: int
+    speed: int
+    movement: int
+
+    @property
+    def alive(self):
+        return self.health > 0
+
+
+@dataclass(frozen=True)
+class BattleView:
+    board: BoardView
+    units: Tuple[UnitView, ...]
+    active: Optional[UnitView]
+    selected: Optional[UnitView]
+    phase: str
+    round_number: int
+    winner: Optional[str]
+    order: Tuple[UnitView, ...]
+    log: Tuple[Tuple[str, str], ...]
+    can_undo: bool
+    can_skip: bool
+    can_end_turn: bool
+    input_locked: bool
+
+    @property
+    def finished(self):
+        return self.winner is not None
+
+
+@dataclass(frozen=True)
+class AttackPresentation:
+    """Only values cross into effects; rule AttackResult stays internal until M3."""
+
+    actor_uid: str
+    target_uid: str
+    target_cell: Cell
+    target_team: str
+    damage: int
+    killed: bool
+
+
 def build_board_view(board, battle, selected):
     """Project existing legal queries into values; never expose live Unit objects."""
     active = battle.active_unit
@@ -2274,6 +2577,26 @@ def build_board_view(board, battle, selected):
         active.uid if active is not None else None,
         selected.uid if selected is not None else None,
         move_cells, attack_cells, target_cells,
+    )
+
+
+def build_battle_view(board, battle, selected):
+    """Build one consistent snapshot, including units that a later undo may revive."""
+    units = tuple(UnitView(
+        unit.uid, unit.name, unit.team, unit.role, tuple(unit.cell),
+        unit.health, unit.max_health, unit.attack, unit.defense, unit.speed, unit.movement,
+    ) for unit in board.units)
+    by_uid = {unit.uid: unit for unit in units}
+    actor = battle.active_unit
+    can_act = battle.phase in ("move", "attack")
+    return BattleView(
+        build_board_view(board, battle, selected), units,
+        by_uid[actor.uid] if actor is not None else None,
+        by_uid[selected.uid] if selected is not None else None,
+        battle.phase, battle.round_number, battle.winner,
+        tuple(by_uid[unit.uid] for unit in battle.order),
+        tuple(tuple(message) for message in battle.log),
+        battle.can_undo, can_act, can_act, battle.phase == "resolving",
     )
 ```
 
@@ -2412,6 +2735,282 @@ class BattleChecks(unittest.TestCase):
         self.assertEqual(target.health, health - enemy.attack)
         self.battle.finish_attack()
         self.assertEqual(self.battle.index, 3)
+
+
+if __name__ == "__main__":
+    unittest.main()
+```
+
+## tests/test_controller.py
+
+```python
+"""Application contracts; run with python -S, without Pygame or a display."""
+
+from dataclasses import FrozenInstanceError, fields, is_dataclass, replace
+import ast
+from pathlib import Path
+import unittest
+
+from tactics.actions import UIAction
+from tactics.controller import Controller
+from tactics.scenario import default_scenario
+
+
+class HeldPresentation:
+    """Test-controlled completion: advancing time alone does not finish an attack."""
+
+    def __init__(self):
+        self.busy = False
+        self.results = []
+        self.elapsed = []
+        self.clears = 0
+
+    def play_attack(self, result):
+        self.results.append(result)
+        self.busy = True
+
+    def update(self, elapsed):
+        self.elapsed.append(elapsed)
+
+    def clear(self):
+        self.clears += 1
+        self.busy = False
+
+
+def changed_scenario(**changes):
+    scenario = default_scenario()
+    return replace(scenario, units=tuple(
+        replace(unit, **changes.get(unit.uid, {})) for unit in scenario.units))
+
+
+class ControllerChecks(unittest.TestCase):
+    def setUp(self):
+        self.presentation = HeldPresentation()
+        self.controller = Controller(default_scenario(), self.presentation)
+
+    @property
+    def view(self):
+        return self.controller.get_view_state()
+
+    def unit(self, uid):
+        return next(unit for unit in self.view.units if unit.uid == uid)
+
+    def start_attack(self):
+        self.assertTrue(self.controller.move_to((4, 4)))
+        self.assertTrue(self.controller.attack("D2"))
+
+    def finish(self):
+        self.presentation.busy = False
+        self.controller.update(0)
+
+    def test_initial_view_contains_complete_stats_order_log_ranges_and_buttons(self):
+        view = self.view
+        self.assertEqual(view.active, view.selected)
+        self.assertEqual((view.active.uid, view.active.health, view.active.max_health,
+                          view.active.attack, view.active.defense, view.active.speed,
+                          view.active.movement, view.active.role),
+                         ("A2", 80, 100, 10, 5, 14, 4, "侦察"))
+        self.assertEqual(tuple(unit.uid for unit in view.order), ("A2", "A1", "D1", "A3", "D2", "D3"))
+        self.assertEqual(view.board.active_uid, view.active.uid)
+        self.assertEqual(view.board.selected_uid, view.selected.uid)
+        self.assertTrue(view.can_skip and view.can_end_turn and view.board.move_cells and view.log)
+        self.assertFalse(view.can_undo or view.input_locked or view.finished)
+
+    def test_full_view_has_only_deeply_immutable_values(self):
+        def check(value):
+            if is_dataclass(value):
+                self.assertTrue(value.__dataclass_params__.frozen)
+                for field in fields(value):
+                    check(getattr(value, field.name))
+            elif isinstance(value, (tuple, frozenset)):
+                for child in value:
+                    check(child)
+            else:
+                self.assertIs(type(value) in (str, int, bool, type(None)), True)
+        check(self.view)
+        with self.assertRaises(FrozenInstanceError):
+            self.view.selected.health = 0
+        with self.assertRaises(FrozenInstanceError):
+            self.view.can_undo = True
+        with self.assertRaises(AttributeError):
+            self.view.board.move_cells.add((7, 7))
+
+    def test_old_views_remain_detached_after_move_damage_handoff_and_undo(self):
+        before = self.view
+        self.start_attack()
+        resolving = self.view
+        self.finish()
+        self.controller.undo()
+        self.assertEqual(self.view, before)
+        self.assertEqual(before.active.cell, (1, 3))
+        self.assertEqual(next(unit.health for unit in before.units if unit.uid == "D2"), 100)
+        self.assertEqual(resolving.active.cell, (4, 4))
+        self.assertEqual(next(unit.health for unit in resolving.units if unit.uid == "D2"), 90)
+        self.assertTrue(resolving.input_locked)
+
+    def test_click_inspection_hides_ranges_and_requires_reselecting_actor(self):
+        self.assertTrue(self.controller.click_cell((1, 1)))
+        self.assertEqual(self.view.selected.uid, "A1")
+        self.assertEqual(self.view.active.uid, "A2")
+        self.assertFalse(self.view.board.move_cells)
+        before = self.view
+        self.assertFalse(self.controller.click_cell((4, 4)))
+        self.assertEqual(self.view, before)
+        self.controller.click_cell((1, 3))
+        self.controller.click_cell((4, 4))
+        self.assertEqual((self.view.phase, self.view.active.cell), ("attack", (4, 4)))
+
+    def test_invalid_clicks_and_selection_do_not_change_any_view_state(self):
+        before = self.view
+        for cell in (None, (-1, 0), (8, 0), (7, 7), (3, 1)):
+            result = self.controller.click_cell(cell)
+            self.assertFalse(result)
+            self.assertTrue(result.reason)
+            self.assertEqual(self.view, before)
+        self.assertFalse(self.controller.select("missing"))
+        self.assertEqual(self.view, before)
+        self.assertFalse(self.presentation.results)
+
+    def test_explicit_commands_act_on_active_actor_and_validate_once_in_rules(self):
+        self.controller.select("D1")
+        self.assertTrue(self.controller.move_to((4, 4)))
+        self.assertEqual(self.view.selected.uid, "A2")
+        before = self.view
+        self.assertFalse(self.controller.move_to((4, 3)))
+        self.assertEqual(self.view, before)
+        self.assertTrue(self.controller.attack("D2"))
+        self.assertEqual(self.unit("D2").health, 90)
+
+    def test_illegal_attacks_return_failure_without_changing_state_or_playing_effects(self):
+        self.assertFalse(self.controller.attack("D2"))  # Before moving/skipping.
+        self.controller.move_to((4, 4))
+        before = self.view
+        for uid in ("missing", "A2", "A1", "D1"):
+            result = self.controller.attack(uid)
+            self.assertFalse(result)
+            self.assertEqual(result.reason, "illegal_target")
+            self.assertEqual(self.view, before)
+        self.assertFalse(self.presentation.results)
+
+    def test_all_application_inputs_are_locked_while_resolving(self):
+        self.start_attack()
+        before = self.view
+        self.assertTrue(before.input_locked)
+        self.assertFalse(before.can_skip or before.can_end_turn or before.can_undo)
+        attempts = [lambda: self.controller.select("D1"),
+                    lambda: self.controller.click_cell((6, 1)),
+                    lambda: self.controller.move_to((4, 3)),
+                    lambda: self.controller.attack("D2"), self.controller.undo]
+        attempts += [lambda action=action: self.controller.handle_action(action) for action in UIAction]
+        for attempt in attempts:
+            self.assertFalse(attempt())
+            self.assertEqual(self.view, before)
+        self.assertEqual(len(self.presentation.results), 1)
+        self.assertEqual(self.presentation.clears, 0)
+
+    def test_completion_waits_for_presentation_and_hands_off_only_once(self):
+        self.start_attack()
+        self.controller.update(100)
+        self.assertEqual(self.view.phase, "resolving")
+        self.controller.update(-1)
+        self.assertEqual(self.presentation.elapsed[-1], 0)
+        self.finish()
+        handoff = self.view
+        self.assertEqual(handoff.active.uid, "A1")
+        self.assertEqual(handoff.selected, handoff.active)
+        self.assertFalse(handoff.input_locked)
+        for _ in range(3):
+            self.controller.update(1)
+            self.assertEqual(self.view, handoff)
+
+    def test_without_presentation_attack_completes_on_next_update(self):
+        self.controller = Controller(default_scenario())
+        self.start_attack()
+        self.assertEqual(self.view.phase, "resolving")
+        self.controller.update(0)
+        self.assertEqual(self.view.active.uid, "A1")
+        self.assertTrue(self.controller.undo())
+        self.assertEqual(self.unit("D2").health, 100)
+
+    def test_undo_clears_effects_restores_previous_turn_and_discards_partial_move(self):
+        before = self.view
+        self.assertFalse(self.controller.undo())
+        self.assertEqual(self.presentation.clears, 0)
+        self.start_attack()
+        self.finish()
+        self.controller.move_to((0, 1))
+        self.assertTrue(self.controller.handle_action(UIAction.UNDO))
+        self.assertEqual(self.view, before)
+        self.assertEqual(self.presentation.clears, 1)
+        self.assertFalse(self.presentation.busy)
+        self.assertFalse(self.controller.undo())
+
+    def test_final_kill_waits_then_finishes_and_undo_revives_target(self):
+        scenario = changed_scenario(D2={"health": 5})
+        scenario = replace(scenario, units=tuple(unit for unit in scenario.units if unit.uid in ("A2", "D2")))
+        self.controller = Controller(scenario, self.presentation)
+        self.start_attack()
+        self.assertFalse(self.view.finished)
+        self.assertFalse(self.controller.select("D2"))
+        self.assertNotIn("D2", tuple(unit.uid for unit in self.view.board.units))
+        self.finish()
+        self.assertEqual((self.view.phase, self.view.winner, self.view.active, self.view.selected),
+                         ("finished", "ally", None, None))
+        before = self.view
+        self.assertFalse(self.controller.handle_action(UIAction.END_TURN))
+        self.assertFalse(self.controller.handle_action(UIAction.SKIP_PHASE))
+        self.assertEqual(self.view, before)
+        self.assertTrue(self.controller.select("A2"))  # Inspection remains available.
+        self.assertTrue(self.controller.undo())
+        self.assertEqual((self.view.active.uid, self.unit("D2").health), ("A2", 5))
+        self.assertEqual(len(self.view.board.units), 2)
+        self.assertFalse(self.view.finished)
+
+    def test_semantic_actions_work_for_both_teams_and_round_wrap(self):
+        for uid in ("A2", "A1", "D1", "A3", "D2", "D3"):
+            self.assertEqual(self.view.active.uid, uid)
+            self.assertTrue(self.controller.handle_action(UIAction.SKIP_PHASE))
+            self.assertEqual(self.view.phase, "attack")
+            self.assertTrue(self.controller.handle_action(UIAction.SKIP_PHASE))
+            self.assertEqual(self.view.selected, self.view.active)
+        self.assertEqual((self.view.round_number, self.view.active.uid), (2, "A2"))
+        self.assertTrue(self.controller.undo())
+        self.assertEqual((self.view.round_number, self.view.active.uid), (1, "D3"))
+
+    def test_zero_movement_and_invalid_action_do_not_need_presentation(self):
+        self.controller = Controller(changed_scenario(A2={"movement": 0}), self.presentation)
+        before = self.view
+        self.assertFalse(before.board.move_cells)
+        self.assertFalse(self.controller.handle_action("end_turn"))
+        self.assertEqual(self.view, before)
+        self.assertTrue(self.controller.handle_action(UIAction.SKIP_PHASE))
+        self.assertEqual(self.view.phase, "attack")
+        self.assertFalse(self.presentation.results)
+
+    def test_effect_result_is_detached_and_read_only_even_after_undo(self):
+        self.start_attack()
+        result = self.presentation.results[0]
+        self.assertEqual((result.actor_uid, result.target_uid, result.target_cell,
+                          result.target_team, result.damage, result.killed),
+                         ("A2", "D2", (5, 4), "enemy", 10, False))
+        self.assertFalse(hasattr(result, "target") or hasattr(result, "actor"))
+        with self.assertRaises(FrozenInstanceError):
+            result.damage = 0
+        self.finish()
+        self.controller.undo()
+        self.assertEqual((result.target_cell, result.damage), ((5, 4), 10))
+
+    def test_presentation_and_game_do_not_import_mutable_rule_objects(self):
+        root = Path(__file__).resolve().parents[1] / "tactics"
+        for name in ("game", "panel", "effects", "board_renderer"):
+            tree = ast.parse((root / (name + ".py")).read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom):
+                    self.assertNotIn(node.module, ("board", "battle", "models",
+                                                  "tactics.board", "tactics.battle", "tactics.models"), name)
+                elif isinstance(node, ast.Import):
+                    for alias in node.names:
+                        self.assertNotIn(alias.name, ("tactics.board", "tactics.battle", "tactics.models"), name)
 
 
 if __name__ == "__main__":
@@ -2575,6 +3174,8 @@ from tactics.battle import Battle
 from tactics.scenario import default_scenario
 from tactics.geometry import BoardGeometry
 from tactics.view_models import build_board_view
+from tactics.controller import Controller
+from tactics.actions import UIAction
 board = Board(default_scenario())
 battle = Battle(board)
 assert battle.move((4, 4))
@@ -2585,6 +3186,14 @@ assert battle.undo()
 assert board.enemies[1].health == 100
 assert build_board_view(board, battle, battle.active_unit).active_uid == 'A2'
 assert BoardGeometry(8, 8, 64).cell_at((511, 511)) == (7, 7)
+controller = Controller(default_scenario())
+assert controller.move_to((4, 4))
+assert controller.attack('D2')
+assert controller.get_view_state().input_locked
+controller.update(0)
+assert controller.get_view_state().active.uid == 'A1'
+assert controller.handle_action(UIAction.UNDO)
+assert controller.get_view_state().active.cell == (1, 3)
 assert 'pygame' not in sys.modules
 print('core-without-pygame: OK')
 """
@@ -2604,20 +3213,31 @@ if __name__ == "__main__":
 ```python
 """Actual window rendering, animation lifecycle, input lock and rewind controls."""
 
+from dataclasses import replace
 import unittest
 from unittest.mock import patch
 
 import pygame
 
-from tactics.battle import Battle
+from tactics.scenario import default_scenario
 from tactics.game import Game
 
 
 class CombatInteractionChecks(unittest.TestCase):
     def setUp(self):
         self.game = Game()
-        self.actor = self.game.battle.active_unit
-        self.target = self.game.board.enemies[1]
+
+    @property
+    def view(self):
+        return self.game.controller.get_view_state()
+
+    @property
+    def actor(self):
+        return next(unit for unit in self.view.units if unit.uid == "A2")
+
+    @property
+    def target(self):
+        return next(unit for unit in self.view.units if unit.uid == "D2")
 
     def tearDown(self):
         pygame.quit()
@@ -2625,11 +3245,14 @@ class CombatInteractionChecks(unittest.TestCase):
     def click(self, position):
         self.game.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=position))
 
-    def start_attack(self, lethal=False):
+    def start_attack(self, lethal=False, final=False):
         if lethal:
-            self.target.health = 5
-            self.game.battle = Battle(self.game.board)
-            self.game.selected = self.game.battle.active_unit
+            scenario = default_scenario()
+            units = tuple(replace(unit, health=5) if unit.uid == "D2" else unit
+                          for unit in scenario.units)
+            if final:
+                units = tuple(unit for unit in units if unit.uid in ("A2", "D2"))
+            self.game = Game(replace(scenario, units=units))
         self.click(self.game.geometry.cell_center((4, 4)))
         self.click(self.game.geometry.cell_center(self.target.cell))
 
@@ -2641,16 +3264,16 @@ class CombatInteractionChecks(unittest.TestCase):
         self.game.draw()
         for key in (pygame.K_RETURN, pygame.K_SPACE, pygame.K_BACKSPACE):
             self.game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=key))
-        for rect in (self.game.panel.skip_button, self.game.panel.end_button, self.game.panel.undo_button):
-            self.click(rect.center)
+        for position in ((617, 303), (791, 303), (796, 30)):
+            self.click(position)
         self.click(self.game.geometry.cell_center(self.target.cell))
         self.assertEqual(self.target.health, self.target.max_health - self.actor.attack)
-        self.assertIs(self.game.battle.active_unit, self.actor)
-        self.assertEqual(self.game.battle.phase, "resolving")
+        self.assertEqual(self.view.active, self.actor)
+        self.assertEqual(self.view.phase, "resolving")
         self.game.update(1.0)
         self.assertFalse(self.game.effects.busy)
-        self.assertEqual(self.game.battle.phase, "move")
-        self.assertEqual(self.game.battle.active_unit.uid, "A1")
+        self.assertEqual(self.view.phase, "move")
+        self.assertEqual(self.view.active.uid, "A1")
 
     def test_defeated_body_animates_then_disappears_from_actual_surface(self):
         self.start_attack(lethal=True)
@@ -2674,11 +3297,11 @@ class CombatInteractionChecks(unittest.TestCase):
     def test_sidebar_undo_revives_target_and_clears_visual_state(self):
         self.start_attack(lethal=True)
         self.game.update(1.0)
-        self.click(self.game.panel.undo_button.center)
+        self.click((self.game.geometry.width + 284, 30))
         self.assertEqual(self.target.health, 5)
-        self.assertIs(self.game.board.unit_at(self.target.cell), self.target)
-        self.assertIs(self.game.battle.active_unit, self.actor)
-        self.assertIs(self.game.selected, self.actor)
+        self.assertIn(self.target.uid, tuple(unit.uid for unit in self.view.board.units))
+        self.assertEqual(self.view.active, self.actor)
+        self.assertEqual(self.view.selected, self.actor)
         self.assertEqual(self.actor.cell, (1, 3))
         self.assertFalse(self.game.effects.busy)
         self.game.draw()
@@ -2688,27 +3311,28 @@ class CombatInteractionChecks(unittest.TestCase):
         self.game.update(1.0)
         self.click(self.game.geometry.cell_center((0, 1)))
         self.game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_BACKSPACE))
-        self.assertEqual(self.game.battle.active_unit.uid, "A2")
+        self.assertEqual(self.view.active.uid, "A2")
         self.assertEqual(self.target.health, self.target.max_health)
-        self.assertEqual(self.game.board.allies[0].cell, (1, 1))
-        self.assertEqual(self.game.battle.phase, "move")
+        self.assertEqual(next(unit.cell for unit in self.view.units if unit.uid == "A1"), (1, 1))
+        self.assertEqual(self.view.phase, "move")
 
     def test_finished_battle_is_renderable_and_can_be_undone(self):
-        self.game.board.units = (self.actor, self.target)
-        self.start_attack(lethal=True)
+        self.start_attack(lethal=True, final=True)
         self.game.update(1.0)
-        self.assertTrue(self.game.battle.finished)
+        self.assertTrue(self.view.finished)
         self.game.draw()
         self.game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
-        self.assertTrue(self.game.battle.finished)
+        self.assertTrue(self.view.finished)
         self.game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_BACKSPACE))
-        self.assertFalse(self.game.battle.finished)
+        self.assertFalse(self.view.finished)
         self.assertTrue(self.target.alive)
         self.game.draw()
 
     def test_health_panel_shows_current_and_maximum(self):
-        self.actor.health = 800
-        self.actor.max_health = 1000
+        scenario = default_scenario()
+        self.game = Game(replace(scenario, units=tuple(
+            replace(unit, health=800, max_health=1000) if unit.uid == "A2" else unit
+            for unit in scenario.units)))
         with patch.object(self.game.panel, "text", wraps=self.game.panel.text) as draw_text:
             self.game.draw()
         expected = "生命: 800/1000" if self.game.panel.chinese else "HP: 800/1000"
@@ -2729,7 +3353,7 @@ if __name__ == "__main__":
 ## tests/test_game.py
 
 ```python
-"""Run with: python -m unittest discover -s tests -v"""
+"""Window input adapters and retained font regression checks."""
 
 import os
 import unittest
@@ -2738,6 +3362,7 @@ from unittest.mock import patch
 
 import pygame
 
+from tactics.actions import UIAction
 from tactics.game import Game
 from tactics.panel import InfoPanel
 from tactics.settings import CELL_SIZE
@@ -2750,87 +3375,95 @@ class GameChecks(unittest.TestCase):
     def tearDown(self):
         pygame.quit()
 
+    @property
+    def view(self):
+        return self.game.controller.get_view_state()
+
+    def unit(self, uid):
+        return next(unit for unit in self.view.units if unit.uid == uid)
+
     def click(self, position, button=1):
         self.game.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=position, button=button))
 
     def test_layout_and_initial_scenario(self):
+        for name in ("board", "battle", "selected"):
+            self.assertFalse(hasattr(self.game, name), name)
         self.assertEqual(self.game.screen.get_size(), (896, 512))
         self.assertEqual(CELL_SIZE, 64)
         self.assertEqual((self.game.geometry.width, self.game.geometry.height), (512, 512))
-        cells = [unit.cell for unit in self.game.board.units] + list(self.game.board.obstacles)
-        self.assertEqual(len(self.game.board.allies), 3)
-        self.assertEqual(len(self.game.board.enemies), 3)
-        self.assertTrue(self.game.board.obstacles)
+        cells = [unit.cell for unit in self.view.units] + list(self.view.board.obstacles)
+        self.assertEqual(sum(unit.team == "ally" for unit in self.view.units), 3)
+        self.assertEqual(sum(unit.team == "enemy" for unit in self.view.units), 3)
+        self.assertTrue(self.view.board.obstacles)
         self.assertEqual(len(cells), len(set(cells)))
         self.assertTrue(all(0 <= col < 8 and 0 <= row < 8 for col, row in cells))
 
     def test_inspect_each_unit_without_changing_turn(self):
-        actor = self.game.battle.active_unit
-        for unit in self.game.board.units:
+        actor = self.view.active
+        for unit in self.view.units:
             self.click(self.game.geometry.cell_center(unit.cell))
-            self.assertIs(self.game.selected, unit)
-            self.assertIs(self.game.battle.active_unit, actor)
+            self.assertEqual(self.view.selected, unit)
+            self.assertEqual(self.view.active, actor)
             self.game.draw()
 
     def test_invalid_terrain_and_outside_clicks_do_not_consume_action(self):
-        actor = self.game.battle.active_unit
-        start = actor.cell
+        before = self.view
         positions = [(511, 511), (530, 20), (-1, 0), (0, 512)]
-        positions += [self.game.geometry.cell_center(cell) for cell in self.game.board.obstacles]
+        positions += [self.game.geometry.cell_center(cell) for cell in self.view.board.obstacles]
         for position in positions:
             self.click(position)
-            self.assertEqual(actor.cell, start)
-            self.assertEqual(self.game.battle.phase, "move")
+            self.assertEqual(self.view, before)
         self.assertEqual(self.game.geometry.cell_at((511, 511)), (7, 7))
 
     def test_right_click_does_not_change_selection_or_scenario(self):
-        before = tuple(unit.cell for unit in self.game.board.units)
-        selected = self.game.selected
+        before = self.view
         self.click(self.game.geometry.cell_center((4, 4)), button=3)
-        self.assertIs(self.game.selected, selected)
-        self.assertEqual(tuple(unit.cell for unit in self.game.board.units), before)
+        self.assertEqual(self.view, before)
 
     def test_mouse_move_attack_and_turn_handoff(self):
-        actor = self.game.battle.active_unit
-        target = self.game.board.enemies[1]
-        health = target.health
+        actor = self.view.active
+        target = self.unit("D2")
         self.click(self.game.geometry.cell_center((4, 4)))
-        self.assertEqual(actor.cell, (4, 4))
-        self.assertEqual(self.game.battle.phase, "attack")
+        self.assertEqual(self.view.active.cell, (4, 4))
+        self.assertEqual(self.view.phase, "attack")
         self.game.draw()
         self.click(self.game.geometry.cell_center(target.cell))
-        self.assertEqual(target.health, health - actor.attack)
-        self.assertEqual(self.game.battle.phase, "resolving")
+        self.assertEqual(self.unit("D2").health, target.health - actor.attack)
+        self.assertEqual(self.view.phase, "resolving")
         self.assertTrue(self.game.effects.busy)
         self.game.draw()
         self.game.update(1.0)
-        self.assertIs(self.game.selected, self.game.battle.active_unit)
-        self.assertIsNot(self.game.selected, actor)
+        self.assertEqual(self.view.selected, self.view.active)
+        self.assertNotEqual(self.view.selected.uid, actor.uid)
         self.game.draw()
 
     def test_inspection_cannot_move_a_unit_out_of_turn(self):
-        actor = self.game.battle.active_unit
-        start = actor.cell
-        other = self.game.board.allies[0]
+        actor = self.view.active
+        other = self.unit("A1")
         self.click(self.game.geometry.cell_center(other.cell))
         self.click(self.game.geometry.cell_center((4, 4)))
-        self.assertEqual(actor.cell, start)
-        self.assertEqual(other.cell, (1, 1))
+        self.assertEqual(self.view.active, actor)
+        self.assertEqual(self.unit("A1"), other)
         self.click(self.game.geometry.cell_center(actor.cell))
         self.click(self.game.geometry.cell_center((4, 4)))
-        self.assertEqual(actor.cell, (4, 4))
+        self.assertEqual(self.view.active.cell, (4, 4))
 
     def test_keyboard_and_sidebar_skip_controls(self):
         self.game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_SPACE))
-        self.assertEqual(self.game.battle.phase, "attack")
+        self.assertEqual(self.view.phase, "attack")
         self.game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
-        self.assertEqual(self.game.battle.index, 1)
-        self.click(self.game.panel.skip_button.center)
-        self.assertEqual(self.game.battle.phase, "attack")
-        self.click(self.game.panel.end_button.center)
-        self.assertEqual(self.game.battle.index, 2)
-        self.assertEqual(self.game.battle.active_unit.team, "enemy")
-        self.assertIs(self.game.selected, self.game.battle.active_unit)
+        self.assertEqual(self.view.active.uid, "A1")
+        # Exercise public input and semantic hit testing, without reading panel rectangles.
+        skip = (self.game.geometry.width + 105, 303)
+        end = (self.game.geometry.width + 279, 303)
+        self.assertIs(self.game.panel.hit_test(skip), UIAction.SKIP_PHASE)
+        self.assertIs(self.game.panel.hit_test(end), UIAction.END_TURN)
+        self.click(skip)
+        self.assertEqual(self.view.phase, "attack")
+        self.click(end)
+        self.assertEqual(self.view.active.uid, "D1")
+        self.assertEqual(self.view.active.team, "enemy")
+        self.assertEqual(self.view.selected, self.view.active)
         self.game.draw()
 
     def test_window_quit_event_exits_main_loop(self):
@@ -2867,7 +3500,7 @@ class FontChecks(unittest.TestCase):
                     game = Game()
                 self.assertFalse(game.panel.chinese)
                 game.draw()
-                game.selected = game.board.allies[0]
+                game.controller.select("A1")
                 game.draw()
                 pygame.event.post(pygame.event.Event(pygame.QUIT))
                 game.run()
@@ -2896,11 +3529,14 @@ from unittest.mock import patch
 
 import pygame
 
+from tactics.actions import UIAction
 from tactics.battle import Battle
+from tactics.controller import Controller
 from tactics.board import Board
 from tactics.board_renderer import BoardRenderer
 from tactics.game import Game
 from tactics.geometry import BoardGeometry
+from tactics.panel import InfoPanel
 from tactics.scenario import Scenario, UnitSpawn, default_scenario
 from tactics.view_models import build_board_view
 
@@ -2969,20 +3605,47 @@ class RenderBoundaryChecks(unittest.TestCase):
         game = Game(scenario)
         self.assertEqual(game.geometry.bounds, (0, 0, 320, 256))
         self.assertEqual(game.screen.get_size(), (704, 512))
-        self.assertEqual(game.panel.skip_button.left, 344)
+        self.assertIs(game.panel.hit_test((344, 284)), UIAction.SKIP_PHASE)
         self.assertIs(game.effects.geometry, game.geometry)
         game.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1,
                                             pos=game.geometry.cell_center((2, 0))))
-        self.assertEqual(game.battle.phase, "attack")
+        self.assertEqual(game.controller.get_view_state().phase, "attack")
         game.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1,
                                             pos=game.geometry.cell_center((3, 0))))
-        self.assertEqual(game.board.enemies[0].health, 33)
+        self.assertEqual(next(unit.health for unit in game.controller.get_view_state().units if unit.uid == "red"), 33)
         self.assertEqual(game.effects.damage_texts[0].cell, (3, 0))
         game.draw()
         game.update(1)
-        game.undo()
-        self.assertEqual(game.board.enemies[0].health, 50)
+        game.controller.undo()
+        self.assertEqual(next(unit.health for unit in game.controller.get_view_state().units if unit.uid == "red"), 50)
         game.draw()
+
+    def test_panel_hit_test_returns_intent_with_half_open_bounds_at_custom_width(self):
+        panel = InfoPanel(320)
+        for position, expected in (
+            ((344, 284), UIAction.SKIP_PHASE), ((505, 321), UIAction.SKIP_PHASE),
+            ((518, 284), UIAction.END_TURN), ((679, 321), UIAction.END_TURN),
+            ((528, 14), UIAction.UNDO), ((679, 45), UIAction.UNDO),
+            ((343, 284), None), ((506, 303), None), ((344, 322), None),
+            ((680, 30), None), ((528, 46), None), ((0, 0), None),
+        ):
+            with self.subTest(position=position):
+                self.assertIs(panel.hit_test(position), expected)
+        for name in ("undo_button", "skip_button", "end_button"):
+            self.assertFalse(hasattr(panel, name), name)
+
+    def test_panel_draws_saved_view_without_access_to_controller_or_rules(self):
+        controller = Controller(default_scenario())
+        saved = controller.get_view_state()
+        controller.handle_action(UIAction.END_TURN)
+        panel = InfoPanel()
+        surface = pygame.Surface((896, 512))
+        with patch.object(panel, "text", wraps=panel.text) as text:
+            panel.draw(surface, saved)
+        expected = "当前行动：斥候 [A2]" if panel.chinese else "Active: A2 [A2]"
+        self.assertTrue(any(call.args[1] == expected for call in text.call_args_list))
+        self.assertEqual(saved.active.uid, "A2")
+        self.assertEqual(controller.get_view_state().active.uid, "A1")
 
 
 if __name__ == "__main__":

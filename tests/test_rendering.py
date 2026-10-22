@@ -6,11 +6,14 @@ from unittest.mock import patch
 
 import pygame
 
+from tactics.actions import UIAction
 from tactics.battle import Battle
+from tactics.controller import Controller
 from tactics.board import Board
 from tactics.board_renderer import BoardRenderer
 from tactics.game import Game
 from tactics.geometry import BoardGeometry
+from tactics.panel import InfoPanel
 from tactics.scenario import Scenario, UnitSpawn, default_scenario
 from tactics.view_models import build_board_view
 
@@ -79,20 +82,47 @@ class RenderBoundaryChecks(unittest.TestCase):
         game = Game(scenario)
         self.assertEqual(game.geometry.bounds, (0, 0, 320, 256))
         self.assertEqual(game.screen.get_size(), (704, 512))
-        self.assertEqual(game.panel.skip_button.left, 344)
+        self.assertIs(game.panel.hit_test((344, 284)), UIAction.SKIP_PHASE)
         self.assertIs(game.effects.geometry, game.geometry)
         game.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1,
                                             pos=game.geometry.cell_center((2, 0))))
-        self.assertEqual(game.battle.phase, "attack")
+        self.assertEqual(game.controller.get_view_state().phase, "attack")
         game.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1,
                                             pos=game.geometry.cell_center((3, 0))))
-        self.assertEqual(game.board.enemies[0].health, 33)
+        self.assertEqual(next(unit.health for unit in game.controller.get_view_state().units if unit.uid == "red"), 33)
         self.assertEqual(game.effects.damage_texts[0].cell, (3, 0))
         game.draw()
         game.update(1)
-        game.undo()
-        self.assertEqual(game.board.enemies[0].health, 50)
+        game.controller.undo()
+        self.assertEqual(next(unit.health for unit in game.controller.get_view_state().units if unit.uid == "red"), 50)
         game.draw()
+
+    def test_panel_hit_test_returns_intent_with_half_open_bounds_at_custom_width(self):
+        panel = InfoPanel(320)
+        for position, expected in (
+            ((344, 284), UIAction.SKIP_PHASE), ((505, 321), UIAction.SKIP_PHASE),
+            ((518, 284), UIAction.END_TURN), ((679, 321), UIAction.END_TURN),
+            ((528, 14), UIAction.UNDO), ((679, 45), UIAction.UNDO),
+            ((343, 284), None), ((506, 303), None), ((344, 322), None),
+            ((680, 30), None), ((528, 46), None), ((0, 0), None),
+        ):
+            with self.subTest(position=position):
+                self.assertIs(panel.hit_test(position), expected)
+        for name in ("undo_button", "skip_button", "end_button"):
+            self.assertFalse(hasattr(panel, name), name)
+
+    def test_panel_draws_saved_view_without_access_to_controller_or_rules(self):
+        controller = Controller(default_scenario())
+        saved = controller.get_view_state()
+        controller.handle_action(UIAction.END_TURN)
+        panel = InfoPanel()
+        surface = pygame.Surface((896, 512))
+        with patch.object(panel, "text", wraps=panel.text) as text:
+            panel.draw(surface, saved)
+        expected = "当前行动：斥候 [A2]" if panel.chinese else "Active: A2 [A2]"
+        self.assertTrue(any(call.args[1] == expected for call in text.call_args_list))
+        self.assertEqual(saved.active.uid, "A2")
+        self.assertEqual(controller.get_view_state().active.uid, "A1")
 
 
 if __name__ == "__main__":

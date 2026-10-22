@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import pygame
 
 from .geometry import BoardGeometry
+from .view_models import AttackPresentation
 
 DAMAGE_DURATION = 0.9
 DEATH_DURATION = 0.65
@@ -38,10 +39,10 @@ class CombatEffects:
     def busy(self):
         return bool(self.damage_texts or self.deaths)
 
-    def play_attack(self, result):
-        self.damage_texts.append(DamageText(result.target.cell, result.damage))
+    def play_attack(self, result: AttackPresentation):
+        self.damage_texts.append(DamageText(result.target_cell, result.damage))
         if result.killed:
-            self.deaths.append(DeathEffect(result.target.cell, result.target.team, result.target.uid))
+            self.deaths.append(DeathEffect(result.target_cell, result.target_team, result.target_uid))
 
     def clear(self):
         self.damage_texts.clear()

@@ -1,12 +1,12 @@
 # 整体架构与扩展边界
 
-状态：M1 已实施；M2–M5 仍为目标架构。M1 增加 Scenario、Geometry、BoardRenderer 和最小 BoardView，核心已不依赖 Pygame。完整进度以 [TASKS.md](../TASKS.md) 为准，实现细节见 [M1 验收记录](M1_IMPLEMENTATION.md)。
+状态：M1、M2 已实施；M3–M5 仍为目标架构。规则与 Controller 已不依赖 Pygame，界面和动画读取独立数据。完整进度以 [TASKS.md](../TASKS.md) 为准，实现细节见 [M1](M1_IMPLEMENTATION.md) 和 [M2 验收记录](M2_IMPLEMENTATION.md)。
 
 最简单的划分：规则决定“能做什么、结果是什么”；协调层决定“接收哪次操作、何时继续”；表现层负责“输入来自哪里、画面怎样显示”。替换图片不应影响伤害，增加技能不应要求改写主循环。
 
 ## 现状与目标
 
-现状：`models` 只存放运行单位状态；`scenario` 定义并验证初始阵容和障碍；`Board` 只管理逻辑地图；`Geometry` 转换坐标；`BoardRenderer` 读取独立的 BoardView 绘制。`Battle` 仍管理战斗与内存回溯；`Game` 仍协调输入与动画，Panel 仍读取运行对象，这些留给 M2/M3。
+现状：`models` 存放运行单位状态；`scenario` 验证初始阵容和障碍；`Board` 管理逻辑地图；`Geometry` 转换坐标；`BoardRenderer`/`Panel` 读取只读视图。`Controller` 统一操作、选中 UID 和动画交接，向 Effects 提交独立 AttackPresentation。`Game` 只组装模块、转换键鼠输入并调度循环。`Battle` 仍管理战斗与内存回溯，其内部结果与快照引用留给 M3。
 
 目标仍使用 Python/Pygame，先维持当前平铺模块结构。模块职责稳定后才考虑按包分组，避免为目录美观改动所有导入。
 
@@ -26,7 +26,7 @@ tactics/
   game.py            初始化、组装、事件循环与退出
 ```
 
-这是分阶段职责图。scenario、geometry、board_renderer 及 view_models 中的棋盘子集已在 M1 落地；controller、完整 UI 视图与 assets 尚未实现，不提前创建空模块。
+这是分阶段职责图。scenario、geometry、board_renderer 在 M1 落地；controller、完整 UI 视图及 actions.py 的 UIAction/ActionResult 在 M2 落地；assets 尚未实现，不提前创建空模块。
 
 ## 依赖方向
 
@@ -56,7 +56,7 @@ flowchart TD
 | renderer / panel / effects / assets | Pygame、只读视图、资源与布局 | 改写 Unit/Battle、自己计算第二套移动或攻击规则 |
 | game | 组装上述模块、适配操作系统输入 | 重复实现指令校验、伤害或回溯 |
 
-M1 的规则、场景、几何与棋盘渲染边界已有测试。其余是后续迁移目标，不把尚未迁移的 Panel、Game 和动画结果声称为完全解耦。
+M1/M2 的规则、场景、几何、棋盘渲染、侧栏与协调边界已有测试；核心与控制器可在无第三方包的环境运行。M3 的内部快照和结算协议、M4 的资源加载仍为后续目标。
 
 ## 数据模型
 
@@ -106,6 +106,10 @@ AttackResolved
 
 DTO 不保留可变 Unit/Battle 引用；嵌套集合也使用只读形式或独立副本。`frozen` 数据类中的可变对象不会自动变为只读。Renderer 只显示计算好的可达格与目标格，不调用 Battle 查询合法性。
 
+M2 实际接口：`get_view_state()` 返回 BattleView，其中 `board` 是既有 BoardView，`units` 是完整阵容（含死亡单位）的 UnitView 元组，`active/selected` 是独立 UnitView，`order` 仅包含存活单位。日志使用双语元组，按钮提供 `can_undo/can_skip/can_end_turn`，另有 `input_locked`。结算编号、表现代次和 visual_id 尚未加入。
+
+Controller 的 `select/move_to/attack/click_cell/handle_action/undo` 返回 ActionResult，包含 `accepted` 与失败 `reason`，支持布尔判断。显式移动/攻击提交给当前行动者，不依赖查看对象；鼠标 `click_cell` 额外保留“查看行动者时才尝试移动/攻击”的交互策略。二者最终调用同一 Battle 校验。UIAction 仅包括跳过阶段、结束行动、回溯。
+
 初期不用全局消息总线。普通函数调用、返回值和一个有明确消费位置的事件列表即可。日志最终可从结构化结果格式化，避免规则到处拼接界面文字；第一轮迁移保留现有双语显示行为。
 
 ## 动画与结算协议
@@ -113,6 +117,8 @@ DTO 不保留可变 Unit/Battle 引用；嵌套集合也使用只读形式或独
 保持现有语义：合法攻击立即计算生命和击杀，进入 resolving；表现层根据结果绘制跳字与死亡形体；协调层收到有效完成通知后调用规则交接一次。
 
 Game 在启动时将表现适配器交给 Controller。该接口只需要“播放结果、逐帧更新、报告完成、清除旧代次”几种操作；规则不导入适配器，协调层不导入 Pygame。纯逻辑测试使用立即完成的测试适配器，不依赖真实时间或窗口。
+
+M2 实际使用 `play_attack(AttackPresentation)/update(elapsed)/busy/clear()`；Controller 在每次 update 后检查 resolving 与 busy，结束时交接一次。未传适配器时使用 NullPresentation，攻击仍先进入 resolving，再在下一次 update 交接。以下编号与代次约束由 M3 实施，不将 busy 轮询视为完整异步通知协议。
 
 每次结算有编号，每次回溯/重开场景提升表现代次。只有当前代次、当前结算的完成通知有效，重复通知无效。动画播放不改变已结算的伤害；待机循环和环境特效不是阻塞任务，不参与行动交接的等待。
 

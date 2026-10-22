@@ -1,19 +1,30 @@
 """Actual window rendering, animation lifecycle, input lock and rewind controls."""
 
+from dataclasses import replace
 import unittest
 from unittest.mock import patch
 
 import pygame
 
-from tactics.battle import Battle
+from tactics.scenario import default_scenario
 from tactics.game import Game
 
 
 class CombatInteractionChecks(unittest.TestCase):
     def setUp(self):
         self.game = Game()
-        self.actor = self.game.battle.active_unit
-        self.target = self.game.board.enemies[1]
+
+    @property
+    def view(self):
+        return self.game.controller.get_view_state()
+
+    @property
+    def actor(self):
+        return next(unit for unit in self.view.units if unit.uid == "A2")
+
+    @property
+    def target(self):
+        return next(unit for unit in self.view.units if unit.uid == "D2")
 
     def tearDown(self):
         pygame.quit()
@@ -21,11 +32,14 @@ class CombatInteractionChecks(unittest.TestCase):
     def click(self, position):
         self.game.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=position))
 
-    def start_attack(self, lethal=False):
+    def start_attack(self, lethal=False, final=False):
         if lethal:
-            self.target.health = 5
-            self.game.battle = Battle(self.game.board)
-            self.game.selected = self.game.battle.active_unit
+            scenario = default_scenario()
+            units = tuple(replace(unit, health=5) if unit.uid == "D2" else unit
+                          for unit in scenario.units)
+            if final:
+                units = tuple(unit for unit in units if unit.uid in ("A2", "D2"))
+            self.game = Game(replace(scenario, units=units))
         self.click(self.game.geometry.cell_center((4, 4)))
         self.click(self.game.geometry.cell_center(self.target.cell))
 
@@ -37,16 +51,16 @@ class CombatInteractionChecks(unittest.TestCase):
         self.game.draw()
         for key in (pygame.K_RETURN, pygame.K_SPACE, pygame.K_BACKSPACE):
             self.game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=key))
-        for rect in (self.game.panel.skip_button, self.game.panel.end_button, self.game.panel.undo_button):
-            self.click(rect.center)
+        for position in ((617, 303), (791, 303), (796, 30)):
+            self.click(position)
         self.click(self.game.geometry.cell_center(self.target.cell))
         self.assertEqual(self.target.health, self.target.max_health - self.actor.attack)
-        self.assertIs(self.game.battle.active_unit, self.actor)
-        self.assertEqual(self.game.battle.phase, "resolving")
+        self.assertEqual(self.view.active, self.actor)
+        self.assertEqual(self.view.phase, "resolving")
         self.game.update(1.0)
         self.assertFalse(self.game.effects.busy)
-        self.assertEqual(self.game.battle.phase, "move")
-        self.assertEqual(self.game.battle.active_unit.uid, "A1")
+        self.assertEqual(self.view.phase, "move")
+        self.assertEqual(self.view.active.uid, "A1")
 
     def test_defeated_body_animates_then_disappears_from_actual_surface(self):
         self.start_attack(lethal=True)
@@ -70,11 +84,11 @@ class CombatInteractionChecks(unittest.TestCase):
     def test_sidebar_undo_revives_target_and_clears_visual_state(self):
         self.start_attack(lethal=True)
         self.game.update(1.0)
-        self.click(self.game.panel.undo_button.center)
+        self.click((self.game.geometry.width + 284, 30))
         self.assertEqual(self.target.health, 5)
-        self.assertIs(self.game.board.unit_at(self.target.cell), self.target)
-        self.assertIs(self.game.battle.active_unit, self.actor)
-        self.assertIs(self.game.selected, self.actor)
+        self.assertIn(self.target.uid, tuple(unit.uid for unit in self.view.board.units))
+        self.assertEqual(self.view.active, self.actor)
+        self.assertEqual(self.view.selected, self.actor)
         self.assertEqual(self.actor.cell, (1, 3))
         self.assertFalse(self.game.effects.busy)
         self.game.draw()
@@ -84,27 +98,28 @@ class CombatInteractionChecks(unittest.TestCase):
         self.game.update(1.0)
         self.click(self.game.geometry.cell_center((0, 1)))
         self.game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_BACKSPACE))
-        self.assertEqual(self.game.battle.active_unit.uid, "A2")
+        self.assertEqual(self.view.active.uid, "A2")
         self.assertEqual(self.target.health, self.target.max_health)
-        self.assertEqual(self.game.board.allies[0].cell, (1, 1))
-        self.assertEqual(self.game.battle.phase, "move")
+        self.assertEqual(next(unit.cell for unit in self.view.units if unit.uid == "A1"), (1, 1))
+        self.assertEqual(self.view.phase, "move")
 
     def test_finished_battle_is_renderable_and_can_be_undone(self):
-        self.game.board.units = (self.actor, self.target)
-        self.start_attack(lethal=True)
+        self.start_attack(lethal=True, final=True)
         self.game.update(1.0)
-        self.assertTrue(self.game.battle.finished)
+        self.assertTrue(self.view.finished)
         self.game.draw()
         self.game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
-        self.assertTrue(self.game.battle.finished)
+        self.assertTrue(self.view.finished)
         self.game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_BACKSPACE))
-        self.assertFalse(self.game.battle.finished)
+        self.assertFalse(self.view.finished)
         self.assertTrue(self.target.alive)
         self.game.draw()
 
     def test_health_panel_shows_current_and_maximum(self):
-        self.actor.health = 800
-        self.actor.max_health = 1000
+        scenario = default_scenario()
+        self.game = Game(replace(scenario, units=tuple(
+            replace(unit, health=800, max_health=1000) if unit.uid == "A2" else unit
+            for unit in scenario.units)))
         with patch.object(self.game.panel, "text", wraps=self.game.panel.text) as draw_text:
             self.game.draw()
         expected = "生命: 800/1000" if self.game.panel.chinese else "HP: 800/1000"

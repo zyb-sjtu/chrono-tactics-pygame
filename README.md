@@ -1,6 +1,6 @@
 # Chrono Tactics · 离线回溯战棋
 
-仓库名称：`chrono-tactics-pygame`，最近发布版本：`0.1.0`；当前开发代码已完成 M1（未发布）。
+仓库名称：`chrono-tactics-pygame`，最近发布版本：`0.1.0`；当前开发代码已完成 M1、M2（未发布）。
 
 项目仓库：[zyb-sjtu/chrono-tactics-pygame](https://github.com/zyb-sjtu/chrono-tactics-pygame)。这是私有仓库，需要登录有权限的 GitHub 账号访问。
 
@@ -8,7 +8,7 @@
 
 ## 整体规划与后续开发
 
-已完成评审与 M1：默认场景提取、纯逻辑 Board、纯数值 Geometry、独立 BoardRenderer 和最小只读棋盘视图。完整控制器、侧栏视图、ID 快照与资源管理仍属于 M2–M4，未提前标记完成。
+已完成评审、M1 与 M2：场景注入、纯逻辑地图、独立渲染、Controller 操作入口、完整只读视图和 UIAction。主循环只组装与适配输入，侧栏和动画接收独立值。规则内部 ID 结果/快照和资源管理仍属于 M3–M4。
 
 | 文档 | 内容 |
 | --- | --- |
@@ -17,9 +17,10 @@
 | [实施路线](docs/ROADMAP.md) | M0–M5、前置能力、小批次提交与验收标准 |
 | [美术资源规范](docs/ASSET_GUIDE.md) | 路径、清单、缓存、透明图片、锚点、图层和动画 |
 | [功能开发规范](docs/FEATURE_DEVELOPMENT.md) | 新功能的数据归属、回溯方案、扩展边界与完成条件 |
-| [M1 实施与验收](docs/M1_IMPLEMENTATION.md) | 当前模块接口、场景示例、57 项检查与 8 帧像素对照 |
+| [M1 实施与验收](docs/M1_IMPLEMENTATION.md) | M1 模块接口、场景示例、57 项检查与 8 帧像素对照 |
+| [M2 实施与验收](docs/M2_IMPLEMENTATION.md) | Controller 接口、完整视图、75 项检查与 13 帧像素对照 |
 
-下一任务是 **ARCH-02 / M2**。后续功能需要先具备对应的最小架构边界；新增状态必须能回溯，新增美术通过资源与渲染入口接入。约束同时写入 [AGENTS.md](AGENTS.md)，实现进度见 [TASKS.md](TASKS.md)。
+下一任务是 **ARCH-03 / M3**。后续功能需要先具备对应的最小架构边界；新增状态必须能回溯，新增美术通过资源与渲染入口接入。约束同时写入 [AGENTS.md](AGENTS.md)，实现进度见 [TASKS.md](TASKS.md)。
 
 ## 运行
 
@@ -97,8 +98,9 @@ E:\gamedesign\
 ├── scripts/export_source.py # 源码汇总生成与一致性检查
 ├── docs/
 │   ├── ARCHITECTURE_REVIEW.md # 对原整改报告的源码核对与评审
-│   ├── ARCHITECTURE.md      # M1 已实施，其余为目标架构
+│   ├── ARCHITECTURE.md      # M1/M2 已实施，其余为目标架构
 │   ├── M1_IMPLEMENTATION.md # M1 接口与验证记录
+│   ├── M2_IMPLEMENTATION.md # M2 指令、视图与验证记录
 │   ├── ROADMAP.md           # 阶段、前置与验收
 │   ├── ASSET_GUIDE.md       # 美术资源与动画规范
 │   ├── FEATURE_DEVELOPMENT.md # 后续开发约束
@@ -110,18 +112,21 @@ E:\gamedesign\
 │   ├── scenario.py          # 不可变场景、验证、默认阵容
 │   ├── board.py             # 纯逻辑地图、空间查询与 BFS
 │   ├── geometry.py          # 不依赖 Pygame 的坐标转换
-│   ├── view_models.py       # 最小只读棋盘视图
+│   ├── actions.py           # UIAction 与操作结果
+│   ├── controller.py        # 统一操作、选中 UID、动画交接和回溯清理
+│   ├── view_models.py       # 完整只读视图与独立表现数据
 │   ├── board_renderer.py    # 只读视图驱动的棋盘绘制
 │   ├── battle.py            # 伤害、击杀、速度队列、回合快照与回溯
 │   ├── effects.py           # 伤害跳字、几何击杀动画、逐帧更新
-│   ├── panel.py             # 字体回退、属性栏、按钮、日志和队列
+│   ├── panel.py             # 字体回退、只读侧栏与动作命中
 │   └── game.py              # 鼠标/键盘事件、主循环、退出清理
 ├── tests\
 │   ├── test_battle.py       # 11 项战斗规则检查，无需创建窗口
 │   ├── test_game.py         # 11 项窗口交互、绘制与字体检查
 │   ├── test_effects.py      # 7 项动画、按键、血量显示和退出检查
 │   ├── test_core.py         # 12 项无第三方包的 M1 核心检查
-│   ├── test_rendering.py    # 4 项只读视图、渲染和场景注入检查
+│   ├── test_controller.py   # 16 项无第三方包的协调与数据边界检查
+│   ├── test_rendering.py    # 6 项只读视图、渲染、按钮和场景注入检查
 │   └── test_rewind.py       # 12 项回溯、击杀及行动顺序检查
 ├── artifacts\               # 实际运行截图，不是游戏资源
 │   ├── initial.png          # 开局移动范围
@@ -158,10 +163,11 @@ git archive --format=zip --prefix=chrono-tactics-pygame/ --output=dist/chrono-ta
 
 ## 验证记录
 
-M1 开发版本目前共 **57 项检查通过**，其中 **12 项可在无第三方包环境执行**。原 41 项行为覆盖保留，8 个默认场景关键画面与重构前逐像素一致；另在 Windows 实际窗口验证了 5×4 场景。详情见 [M1 实施记录](docs/M1_IMPLEMENTATION.md)。
+M2 开发版本目前共 **75 项检查通过**，其中 **28 项可在无第三方包环境执行**。原有行为覆盖保留；Windows 实际窗口的 13 个状态画面与 M1 逐像素一致，包含查看、英文界面、伤害、击杀、回溯和战斗结束。完整检查分别在 dummy 与 Windows 显示驱动下通过，5×4 场景继续通过交互检查。详情见 [M2 实施记录](docs/M2_IMPLEMENTATION.md)。
 
 ```powershell
 .\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_core.py -v
+.\.venv\Scripts\python.exe -S -m unittest discover -s tests -p test_controller.py -v
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 

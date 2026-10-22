@@ -6,6 +6,8 @@ from pathlib import Path
 import pygame
 
 from .settings import MIN_WINDOW_HEIGHT, PANEL_WIDTH
+from .actions import UIAction
+from .view_models import BattleView
 
 
 def load_fonts():
@@ -36,9 +38,16 @@ class InfoPanel:
         self.height = height
         fonts, self.chinese = load_fonts()
         self.title_font, self.font, self.small_font = fonts
-        self.skip_button = pygame.Rect(self.board_width + 24, 284, 162, 38)
-        self.end_button = pygame.Rect(self.board_width + 198, 284, 162, 38)
-        self.undo_button = pygame.Rect(self.board_width + 208, 14, 152, 32)
+        self._buttons = {
+            UIAction.SKIP_PHASE: pygame.Rect(self.board_width + 24, 284, 162, 38),
+            UIAction.END_TURN: pygame.Rect(self.board_width + 198, 284, 162, 38),
+            UIAction.UNDO: pygame.Rect(self.board_width + 208, 14, 152, 32),
+        }
+
+    def hit_test(self, position):
+        """Return intent only; the controller decides whether it is available."""
+        return next((action for action, rect in self._buttons.items()
+                     if rect.collidepoint(position)), None)
 
     def text(self, surface, value, y, color=(220, 230, 241), small=False, title=False, x=None, width=None):
         font = self.title_font if title else self.small_font if small else self.font
@@ -56,30 +65,31 @@ class InfoPanel:
         text = self.small_font.render(label, True, (236, 241, 247) if enabled else (104, 117, 132))
         surface.blit(text, text.get_rect(center=rect.center))
 
-    def draw(self, surface, selected, battle):
+    def draw(self, surface, view: BattleView):
         pygame.draw.rect(surface, (21, 30, 42), (self.board_width, 0, PANEL_WIDTH, self.height))
         cn = self.chinese
-        actor = battle.active_unit
+        selected = view.selected
+        actor = view.active
         name = (actor.name if cn else actor.uid) if actor is not None else ""
-        moving = battle.phase == "move"
-        self.text(surface, ("第 {} 回合" if cn else "ROUND {:02d}").format(battle.round_number),
+        moving = view.phase == "move"
+        self.text(surface, ("第 {} 回合" if cn else "ROUND {:02d}").format(view.round_number),
                   14, title=True, width=182)
-        self.button(surface, self.undo_button, "回溯 [退格]" if cn else "Undo [Backspace]", battle.can_undo)
-        if battle.finished:
+        self.button(surface, self._buttons[UIAction.UNDO], "回溯 [退格]" if cn else "Undo [Backspace]", view.can_undo)
+        if view.finished:
             winners = {"ally": ("蓝方获胜", "BLUE WINS"), "enemy": ("红方获胜", "RED WINS"),
                        "draw": ("平局", "DRAW")}
-            self.text(surface, winners[battle.winner][0 if cn else 1], 54, (255, 219, 116))
+            self.text(surface, winners[view.winner][0 if cn else 1], 54, (255, 219, 116))
             status = "战斗结束 · 可以回溯最后一次行动" if cn else "Battle ended. Undo is available."
         else:
             self.text(surface, ("当前行动：{} [{}]" if cn else "Active: {} [{}]").format(name, actor.uid),
                       54, (255, 219, 116))
-        if not battle.finished and cn:
-            phase = {"move": "移动阶段", "attack": "攻击阶段", "resolving": "攻击结算中"}[battle.phase]
+        if not view.finished and cn:
+            phase = {"move": "移动阶段", "attack": "攻击阶段", "resolving": "攻击结算中"}[view.phase]
             team = "蓝方" if actor.team == "ally" else "红方"
-            status = "{} · {} · 移动 {} / 攻击 {}".format(team, phase, int(moving), int(battle.phase != "resolving"))
-        elif not battle.finished:
-            status = "{} / {} / Move {} / Attack {}".format(actor.team.upper(), battle.phase.upper(),
-                                                           int(moving), int(battle.phase != "resolving"))
+            status = "{} · {} · 移动 {} / 攻击 {}".format(team, phase, int(moving), int(view.phase != "resolving"))
+        elif not view.finished:
+            status = "{} / {} / Move {} / Attack {}".format(actor.team.upper(), view.phase.upper(),
+                                                           int(moving), int(view.phase != "resolving"))
         self.text(surface, status, 86, (132, 159, 185), small=True)
         pygame.draw.line(surface, (60, 77, 96), (self.board_width + 24, 116), (self.board_width + PANEL_WIDTH - 24, 116))
         if selected is None:
@@ -101,14 +111,13 @@ class InfoPanel:
 
         skip = ("跳过移动 [空格]" if moving else "跳过攻击 [空格]") if cn else (
             "Skip move [Space]" if moving else "Skip attack [Space]")
-        enabled = battle.phase in ("move", "attack")
-        self.button(surface, self.skip_button, skip, enabled)
-        self.button(surface, self.end_button, "结束行动 [回车]" if cn else "End turn [Enter]", enabled)
-        if battle.phase == "resolving":
+        self.button(surface, self._buttons[UIAction.SKIP_PHASE], skip, view.can_skip)
+        self.button(surface, self._buttons[UIAction.END_TURN], "结束行动 [回车]" if cn else "End turn [Enter]", view.can_end_turn)
+        if view.phase == "resolving":
             hint = "攻击动画播放中，结束后继续" if cn else "Resolving attack. Please wait."
-        elif battle.finished:
+        elif view.finished:
             hint = "战斗结束，可回溯上一单位行动" if cn else "Battle ended. Undo the previous turn."
-        elif selected is not actor:
+        elif (selected.uid if selected else None) != (actor.uid if actor else None):
             hint = "点击金框单位，继续当前行动" if cn else "Click the gold-frame unit to act."
         elif moving:
             hint = "绿色：可移动；点击高亮格确认" if cn else "Green cells: click once to move."
@@ -117,14 +126,14 @@ class InfoPanel:
         self.text(surface, hint, 334, (166, 207, 191), small=True)
         self.text(surface, "伤害 = 攻击 × 100% · 退格回溯" if cn else "Damage = ATK x 100% / Backspace undo",
                   357, (132, 159, 185), small=True)
-        for index, message in enumerate(battle.log):
+        for index, message in enumerate(view.log):
             self.text(surface, message[0 if cn else 1], 385 + index * 21, small=True)
 
         self.text(surface, "行动顺序（速度↓，金色为当前）" if cn else "ORDER / SPD descending / gold = active",
                   433, (132, 159, 185), small=True)
-        for index, unit in enumerate(battle.order):
+        for index, unit in enumerate(view.order):
             name = unit.name if cn else unit.uid
-            color = (255, 219, 116) if unit is actor else (161, 178, 196)
+            color = (255, 219, 116) if actor is not None and unit.uid == actor.uid else (161, 178, 196)
             label = "{}.{}({})".format(index + 1, name, unit.speed)
             self.text(surface, label, 459 + (index // 3) * 25, color, small=True,
                       x=self.board_width + 24 + (index % 3) * 114, width=108)
