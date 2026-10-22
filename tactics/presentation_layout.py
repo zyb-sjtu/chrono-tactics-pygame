@@ -40,14 +40,16 @@ def load_presentation(filename, root=None):
     if viewport["background_fit"] != "contain":
         raise DataError(label + ": background_fit must be contain")
     viewport_size = size_pair(viewport["reference_size"], label + ".viewport.reference_size")
-    fields(board, ("cols","rows","reference_image_size","corners"), (), label + ".board")
+    fields(board, ("cols","rows","reference_image_size","corners"), ("reference_region","cells"), label + ".board")
     cols = number(board["cols"], label + ".board.cols", minimum=1, integer=True)
     rows = number(board["rows"], label + ".board.rows", minimum=1, integer=True)
     image_size = size_pair(board["reference_image_size"], label + ".board.reference_image_size")
+    if any(key in board and board[key] is None for key in ("reference_region","cells")):
+        raise DataError(label + ".board: optional region/cells cannot be null")
     fields(board["corners"], ("p00","p10","p11","p01"), (), label + ".board.corners")
     try:
         geometry = PerspectiveBoardGeometry(cols, rows, tuple(board["corners"][k] for k in ("p00","p10","p11","p01")),
-                                            image_size, viewport_size)
+                                            image_size, viewport_size, board.get("reference_region"), board.get("cells"))
     except ValueError as error:
         raise DataError(label + ".board.corners: " + str(error)) from error
     fields(hud, ("layout","safe_margin"), (), label + ".hud")

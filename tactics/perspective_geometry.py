@@ -67,6 +67,9 @@ class PerspectiveBoardGeometry:
     corners: tuple
     reference_size: tuple
     viewport_size: tuple = (1280, 720)
+    reference_region: tuple = None
+    cells: tuple = None
+    _cell_set: frozenset = field(init=False, repr=False)
     _matrix: tuple = field(init=False, repr=False)
     _inverse: tuple = field(init=False, repr=False)
     _polygons: tuple = field(init=False, repr=False)
@@ -78,6 +81,24 @@ class PerspectiveBoardGeometry:
     def __post_init__(self):
         if any(type(v) is not int or v <= 0 for v in (self.cols, self.rows)):
             raise ValueError("board dimensions must be positive integers")
+        region = (0, 0, self.cols, self.rows) if self.reference_region is None else self.reference_region
+        if (not isinstance(region, (tuple, list)) or len(region) != 4
+                or any(type(v) is not int for v in region)
+                or min(region[:2]) < 0 or min(region[2:]) <= 0
+                or region[0]+region[2] > self.cols or region[1]+region[3] > self.rows):
+            raise ValueError("reference_region must be an integer rectangle inside the logical board")
+        object.__setattr__(self, "reference_region", tuple(region))
+        cells = tuple((c,r) for r in range(self.rows) for c in range(self.cols)) if self.cells is None else self.cells
+        if (not isinstance(cells, (tuple, list)) or not cells
+                or any(not isinstance(p, (tuple, list)) or len(p) != 2
+                       or any(type(v) is not int for v in p)
+                       or not (0 <= p[0] < self.cols and 0 <= p[1] < self.rows) for p in cells)):
+            raise ValueError("cells must be nonempty integer cells inside the logical board")
+        cell_set = frozenset(tuple(p) for p in cells)
+        if len(cell_set) != len(cells):
+            raise ValueError("duplicate playable cell")
+        object.__setattr__(self, "_cell_set", cell_set)
+        object.__setattr__(self, "cells", tuple(sorted(cell_set, key=lambda p: (p[1],p[0]))))
         fit = BackgroundFit(self.reference_size, self.viewport_size)
         object.__setattr__(self, "reference_size", fit.image_size)
         object.__setattr__(self, "viewport_size", fit.viewport_size)
@@ -112,7 +133,15 @@ class PerspectiveBoardGeometry:
         polygons, centers, anchors, scales = [], [], [], []
         for row in range(self.rows):
             for col in range(self.cols):
+                if (col,row) not in self._cell_set:
+                    for cache in (polygons, centers, anchors, scales):
+                        cache.append(None)
+                    continue
                 polygon = tuple(self.project(p) for p in ((col,row),(col+1,row),(col+1,row+1),(col,row+1)))
+                if any(not (-EPSILON <= x <= self.reference_size[0]+EPSILON
+                            and -EPSILON <= y <= self.reference_size[1]+EPSILON)
+                       for x,y in (self.fit.to_image(point) for point in polygon)):
+                    raise ValueError("playable cell projects outside reference image")
                 polygons.append(polygon)
                 centers.append(self.project((col+.5, row+.5)))
                 anchors.append(self.project((col+.5, row+.82)))
@@ -129,13 +158,14 @@ class PerspectiveBoardGeometry:
     def _index(self, cell):
         if (not isinstance(cell, (tuple, list)) or len(cell) != 2
                 or any(type(v) is not int for v in cell)
-                or not (0 <= cell[0] < self.cols and 0 <= cell[1] < self.rows)):
+                or tuple(cell) not in self._cell_set):
             raise ValueError("cell outside perspective board: {}".format(cell))
         return cell[1]*self.cols + cell[0]
 
     def project(self, logical_point):
         point = pair(logical_point, "logical point")
-        x, y = transform(self._matrix, (point[0]/self.cols, point[1]/self.rows))
+        ox, oy, width, height = self.reference_region
+        x, y = transform(self._matrix, ((point[0]-ox)/width, (point[1]-oy)/height))
         return self.fit.to_screen((x*self.reference_size[0], y*self.reference_size[1]))
 
     def cell_at(self, position):
@@ -144,12 +174,14 @@ class PerspectiveBoardGeometry:
             if not (0 <= x < self.reference_size[0] and 0 <= y < self.reference_size[1]):
                 return None
             u, v = transform(self._inverse, (x/self.reference_size[0], y/self.reference_size[1]))
-            u, v = u*self.cols, v*self.rows
+            ox, oy, width, height = self.reference_region
+            u, v = u*width+ox, v*height+oy
             # Snap roundoff on exact shared edges; ownership remains [left, right).
             u = round(u) if abs(u-round(u)) < EPSILON else u
             v = round(v) if abs(v-round(v)) < EPSILON else v
             if 0 <= u < self.cols and 0 <= v < self.rows:
-                return math.floor(u), math.floor(v)
+                cell = math.floor(u), math.floor(v)
+                return cell if cell in self._cell_set else None
         except (ValueError, TypeError, OverflowError):
             pass
         return None
@@ -170,12 +202,10 @@ class PerspectiveBoardGeometry:
         return self.cell_anchor(cell)[1]
 
     def body_rect(self, cell):
-        # Geometric placeholders remain centered on their actual pickable cell.
-        # PNG bodies use cell_anchor separately, so their bottom pivot stays intact.
-        x, y = self.cell_center(cell)
-        size = round(64*self.cell_scale(cell))
-        return round(x-size/2), round(y-size/2), size, size
+        x, y = self.cell_anchor(cell)
+        size = round(42*self.cell_scale(cell))
+        return round(x-size/2), round(y-size), size, size
 
     @property
     def scales(self):
-        return tuple(sorted(set(self._scales)))
+        return tuple(sorted(s for s in set(self._scales) if s is not None))

@@ -57,6 +57,10 @@ jobs:
         run: python -S -m unittest discover -s tests -p test_perspective_geometry.py -v
       - name: Verify presentation configuration without site packages
         run: python -S -m unittest discover -s tests -p test_presentation_layout.py -v
+      - name: Verify calibration observations without site packages
+        run: python -S -m unittest discover -s tests -p test_calibration.py -v
+      - name: Verify measured map matches runtime presentation
+        run: python -S scripts/fit_board.py --check
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
       - name: Check source bundle
@@ -98,7 +102,8 @@ htmlcov/
 ## 先确认实际状态
 
 - 阶段版本是 v0.2.0，M1–M5 已实施：规则/表现分离、纯数据回溯与结算确认、JSON/PNG 链路、第二场景/外观与开发模板。发布状态以 tag/Release 为准；以 `TASKS.md` 区分现有能力和规划。
-- 当前开发代码另有透视战场模式，阅读 `docs/PERSPECTIVE_BATTLEFIELD.md`；原图已接入，角色是明确几何回退，原画局部砖缝的最终校准仍待美术确认。
+- 当前透视模式采用 8×8 逻辑包围盒内 28 块不规则石砖，按用户允许不规则地图的补充完成校准；角色仍为几何回退。先读 `docs/WAR_TORN_CALIBRATION.md`，原 `docs/PERSPECTIVE_BATTLEFIELD.md` 的旧四角/152项是历史基线。
+- 实测40顶点分20标定/20独立验证；保留单应性与有效格遮罩，没有控制网格。模型四角是拟合估计，不得冒充原图观测；扩图须补真实交点及验证、Scenario void 阻挡，运行 `python -S scripts/fit_board.py --check`。不以旧2×6统计或外推点冒充整图结果。
 - 修改玩法、结构或资源入口前，阅读 [整体架构](docs/ARCHITECTURE.md)、[实施路线](docs/ROADMAP.md) 与 [功能开发规范](docs/FEATURE_DEVELOPMENT.md)。接入美术时同时遵守 [资源规范](docs/ASSET_GUIDE.md)。用户提供的原始报告是评审材料，当前开发决策以这些评审后文档为准。
 
 ## 开发边界
@@ -129,7 +134,8 @@ htmlcov/
 - 修改协调、动作或完整视图后，另运行 `python -S -m unittest discover -s tests -p test_controller.py -v`。CI 在安装依赖前执行这两组检查。
 - 修改快照、结算或动画交接后，另运行 `python -S -m unittest discover -s tests -p test_resolution.py -v`；CI 安装依赖前执行三组共 44 项检查。真实动画还需完整回归验证，纯测试不能代替实际完成通知与清理检查。
 - 修改内容或清单后，另运行 `python -S -m unittest discover -s tests -p test_content.py -v`，CI 安装依赖前合计 57 项；原图/缩放缓存和实际资源链路由 `test_assets.py` 及真实窗口检查。Windows 无创建符号链接权限时该项可明确跳过，路径越界等其他检查仍须通过。
-- 涉及透视几何/布局时，另以 `-S` 运行 test_perspective_geometry.py 与 test_presentation_layout.py；六组共 69 项。test_perspective_rendering.py 覆盖缓存、背景、HUD、CLI、资源动画和矩形/透视完整状态一致；真实窗口仍需单独观察校准和遮挡。
+- 涉及透视几何/布局时，另以 `-S` 运行 test_perspective_geometry.py 与 test_presentation_layout.py；六组共 71 项。test_perspective_rendering.py 覆盖缓存、背景、HUD、CLI、资源动画和矩形/透视完整状态一致；真实窗口仍需单独观察校准和遮挡。
+- 校准工具/观测变化另以 `-S` 运行 test_calibration.py；七组纯检查共80项。用 `scripts/fit_board.py --check` 重算正式地图原图观测和独立误差；`calibrate_board.py` 的2×6仅历史诊断。先确认实测对应，再决定是否升级映射，不以测试绿灯替代对齐验收。
 - 保留原有行为覆盖；接口迁移时可调整测试夹具，不为保留旧字段访问而保留架构漏洞。新增架构边界在相应阶段就加入检查，不推迟到最终验收。
 - 使用 `python scripts/export_source.py` 更新 `SOURCE.md`，再用 `python scripts/export_source.py --check` 检查一致性。
 - 后续需求参考 `docs/templates/FEATURE_TEMPLATE.md`；换场景/外观参考 `docs/EXTENSION_EXERCISE.md`。新增内容要补真实集成，不能只验证文件存在。阶段发布按 `docs/RELEASE.md` 从确切提交打包并验证解压产物。
@@ -140,6 +146,21 @@ htmlcov/
 
 ````markdown
 # 更新记录
+
+## 未发布 · 不规则逐砖地图校准
+
+- 用户允许不规则地图后，以 28 块可辨石砖建立有效区，保留六单位初始坐标/数值，36 个 void 由现有 Scenario 障碍数据阻挡；不改 Battle、路径算法、伤害、快照或 token。
+- 保留 PerspectiveBoardGeometry 的单应性公式，增加参照逻辑矩形和有效格遮罩；四角实测基线不达标后，对同一单应性作离线多点标定，没有升级控制网格。原图40观测/模型估计分开保存。
+- 20 标定与20独立验证隔离，1280×720 验证平均5.567316px/最大11.419992px，独立内部9点3.855241/6.002102px；近处边界仍有残差，明确报告不确定性。
+- 四边形选中、统一脚底/标签/血条/跳字，几何死亡形体接入脚底Y/UID排序；可见形体点击与地面逆投影分开，void不命中。原三个障碍在有效区外不画图外岩石；独立障碍脚底另用明确夹具验收。
+- 新增可复算标定/配置检查工具和实际窗口截图；完整165项，本机164通过/1项权限跳过，七组纯80项；CI/解压验收纳入实测配置检查，旧训练场/渡口/矩形完整回归保留。
+
+## 诊断历史 · 不规则地图需求补充前
+
+- 实际 Windows F3 网格确认旧选区未核对真实整砖跨度，不能把明显错位只解释为原画不规则；正式四角、单位初始位置、运行几何/渲染及规则均未改。
+- 保留原图坐标观测与可重算报告：已确认2×6砖带的5个独立内部点，均值5.555742px/最大11.713753px，仅局部满足阈值，完整8×8明确未通过。
+- 新增纯测量/完整性检查、四角与内部点的交互草稿工具（标点、撤销、预览、保存）和两张实际游戏截图；不自动导出正式配置，不将外推点伪装成81个实测控制点。
+- 全量159项，本机158通过/1项符号链接权限跳过；新增6项纯测量和1项UI流程，CI增加纯校准组，SOURCE与开发状态同步。继续实现依赖完整8×8整砖对应或允许砖块细分的明确条件。
 
 ## 未发布 · 透视战场
 
@@ -235,7 +256,9 @@ htmlcov/
 
 仓库名称：`chrono-tactics-pygame`，阶段版本：`0.2.0`；M0–M5 已实施。发布状态以仓库 tag / Release 为准。
 
-当前开发代码另已接入用户原图的 **8×8 透视战场**：完整背景、透视点击/高亮、深度排序、独立叠加 HUD 与调试网格。该扩展尚未单独发布；角色暂用几何回退，原画砖缝与均匀单应网格存在局部偏差，见 [实施与校准记录](docs/PERSPECTIVE_BATTLEFIELD.md)。
+当前开发代码另有原图逐砖透视战场：**8×8 逻辑包围盒内的 28 块不规则有效地块**，完整背景、透视点击/高亮、脚底深度排序、独立 HUD 和 F3 网格。该扩展尚未单独发布，角色仍为几何回退。
+
+按用户允许不规则地图的补充要求完成校准：保留单应性，20 个独立验证交点平均 **5.57 px**、最大 **11.42 px**；其中 9 个内部交点为 **3.86/6.00 px**（1280×720）。六个单位初始坐标/属性不变，void 通过原有场景障碍数据阻挡。实测点与拟合四角分开记录；近处边界仍有残差，详见 [校准报告、截图与限制](docs/WAR_TORN_CALIBRATION.md)。
 
 项目仓库：[zyb-sjtu/chrono-tactics-pygame](https://github.com/zyb-sjtu/chrono-tactics-pygame)。这是私有仓库，需要登录有权限的 GitHub 账号访问。
 
@@ -260,7 +283,7 @@ htmlcov/
 | [扩展演练](docs/EXTENSION_EXERCISE.md) | 渡口试玩与仅通过 JSON/PNG 扩展的具体步骤 |
 | [功能模板](docs/templates/FEATURE_TEMPLATE.md) | 可复制的规则、数据、回溯、表现与验收模板 |
 | [源码发布](docs/RELEASE.md) | 提交树打包、SHA256 与解压验收 |
-| [透视战场](docs/PERSPECTIVE_BATTLEFIELD.md) | 原图、配置、四角/边界、独立 HUD、152 项检查与校准限制 |
+| [透视战场基线](docs/PERSPECTIVE_BATTLEFIELD.md) / [逐砖校准](docs/WAR_TORN_CALIBRATION.md) | 原图、28 格不规则地图、独立误差、实际截图、输入与脚底 |
 
 架构整改 M0–M5 已落实，后续按实际功能需求继续开发；新增状态必须能回溯，新增美术通过资源与渲染入口接入。约束同时写入 [AGENTS.md](AGENTS.md)，实现进度见 [TASKS.md](TASKS.md)。
 
@@ -288,6 +311,8 @@ cd E:\gamedesign
 默认内容/资源路径相对项目位置解析，与工作目录无关。--scenario 相对 content 根；显式传入 --content-root 或 --assets 时，目录相对当前工作目录或使用绝对路径。更换单位、地砖和动画只改 JSON/PNG，步骤见 [M4 记录](docs/M4_IMPLEMENTATION.md) 和 [资源来源](assets/README.md)。
 
 透视入口固定 1280×720，F3 切换调试网格。`--presentation` 的路径相对项目根；它与 `--scenario`、`--assets`、`--content-root`、`--geometry` 互斥，冲突会报错退出，不隐含覆盖。`--debug-grid` 需要透视入口。快速体验：移动 A2 到内部坐标 `(4,3)`，再攻击 D1 `(5,3)`，击杀后退格恢复；坐标可用调试网格查看。
+
+逐砖校准复核：`python -S scripts/fit_board.py --check`；原图标点、误差分区、配置再生成和真实窗口截图见 [校准报告](docs/WAR_TORN_CALIBRATION.md)。
 
 在新机器安装（Python 3.9 或以上、可用的桌面环境）：
 
@@ -363,6 +388,8 @@ E:\gamedesign\
 │   ├── EXTENSION_EXERCISE.md # 第二场景与外观演练
 │   ├── RELEASE.md          # 提交树打包与解压验收
 │   ├── PERSPECTIVE_BATTLEFIELD.md # 透视模式与校准记录
+│   ├── WAR_TORN_CALIBRATION.md # 不规则地图、实测误差与运行截图
+│   ├── calibration/         # 历史样带、正式40交点及独立误差报告
 │   ├── templates/FEATURE_TEMPLATE.md # 可复制开发模板
 │   ├── ROADMAP.md           # 阶段、前置与验收
 │   ├── ASSET_GUIDE.md       # 美术资源与动画规范
@@ -398,9 +425,10 @@ E:\gamedesign\
 │   ├── test_assets.py       # 16 项 PNG、缓存、渲染和动画检查
 │   ├── test_milestone.py    # 6 项跨场景/外观集成验收
 │   ├── test_release.py      # 4 项发布包损坏/来源/路径检查
-│   ├── test_perspective_geometry.py # 7 项纯透视几何检查
-│   ├── test_presentation_layout.py # 5 项纯配置/背景检查
-│   ├── test_perspective_rendering.py # 7 项显示/输入/战斗集成
+│   ├── test_perspective_geometry.py # 8 项纯透视/遮罩几何检查
+│   ├── test_presentation_layout.py # 6 项纯配置/背景检查
+│   ├── test_perspective_rendering.py # 9 项显示/输入/战斗集成
+│   ├── test_calibration.py  # 9 项观测、误差及标定/验证分离检查
 │   ├── test_content.py      # 13 项无第三方包的内容/清单检查
 │   ├── test_core.py         # 12 项无第三方包的 M1 核心检查
 │   ├── test_controller.py   # 16 项无第三方包的协调与数据边界检查
@@ -408,12 +436,14 @@ E:\gamedesign\
 │   ├── test_rendering.py    # 6 项只读视图、渲染、按钮和场景注入检查
 │   └── test_rewind.py       # 12 项回溯、击杀及行动顺序检查
 ├── content/                 # units.json、训练场/渡口/war_torn 三个场景
-├── presentations/war_torn_8x8.json # 透视角点、视口、HUD、调试
+├── presentations/war_torn_8x8.json # 参照角点、28格遮罩、视口、HUD、调试
 ├── assets/                  # 默认/dusk 共 26 张 PNG；war_torn 原始背景与独立清单
 ├── scripts/generate_demo_assets.py # 重建演示 PNG，不下载外部资源
 ├── scripts/generate_dusk_assets.py # 重建第二套演示 PNG
 ├── scripts/build_release.py # 从确切提交构建源码 ZIP 与 SHA256
 ├── scripts/verify_release.py # 校验并在解压目录验收
+├── scripts/calibrate_board.py # 四角/内部点的可撤销草稿标点
+├── scripts/fit_board.py     # 单应性多点标定、独立误差、配置一致性与真实截图
 ├── VERSION.txt             # 阶段版本 0.2.0
 ├── artifacts\               # 实际运行截图，不是游戏资源
 │   ├── m4_assets.png        # 当前默认地砖/斥候素材
@@ -455,7 +485,9 @@ $releaseCommit = git rev-parse HEAD
 
 ## 验证记录
 
-当前透视扩展共 **152 项：本机 151 通过、1 项符号链接权限跳过**，dummy 与 windows 实际窗口分别执行；六组纯检查 69 项，另 4 项包完整性检查可用 `-S`。矩形/透视完整战斗状态一致；旧几何 13 帧逐像素不变。实际截图、自动事件验证与待人工认可的接缝校准分开记录，见 [透视实施记录](docs/PERSPECTIVE_BATTLEFIELD.md)。
+当前总计 **165 项，本机 164 通过、1 项符号链接权限跳过**，dummy 与实际 Windows 显示分别验证。七组纯检查 80 项，另 4 项包完整性检查；逐砖误差另由真实原图交点独立测量，不以测试数量代替对齐证据。
+
+透视功能实现时的基线为 **152 项：本机 151 通过、1 项符号链接权限跳过**，dummy 与 windows 实际窗口分别执行；当时六组纯检查 69 项，另 4 项包完整性检查可用 `-S`。矩形/透视完整战斗状态一致；旧几何 13 帧逐像素不变。这是功能/兼容性基线，不是接缝对齐验收，见 [透视实施记录](docs/PERSPECTIVE_BATTLEFIELD.md)。
 
 M5 共 **133 项测试**，本机 **132 通过、1 项跳过**（Windows 无创建符号链接权限，其他路径检查通过）。四组核心/内容检查共 **57 项无需第三方包**，另 4 项发布完整性检查也可用 `-S`。dummy 与 Windows 实际窗口分别回归；两场景 × 三模式的完整状态一致，覆盖击杀、跨轮、战斗结束、连续回溯、旧通知、字体异常及异地 CLI/QUIT。真实窗口使用自动投递事件，非人工逐次点击。详见 [M5 记录](docs/M5_IMPLEMENTATION.md)。M4 的 123 项基线及 13 帧几何像素对照记录保留。
 
@@ -496,7 +528,7 @@ v0.1.0 基线记录：2026-10-22，本机 Python 3.9.1 / Pygame 2.6.1 / SDL 2.28
 
 阶段版本：`0.2.0`，M0–M5 已实施；发布状态以仓库 tag / Release 为准。已实现能力与后续规划分开记录。
 
-当前另已实施未单独发布的透视战场扩展，最终美术接缝校准与正式角色图仍待确认；不将这些人工事项标为完成。
+当前另已实施未单独发布的透视战场扩展。按用户允许不规则地图的补充完成 28 格逐砖校准；正式角色美术仍待接入。
 
 ## 已实现能力
 
@@ -509,13 +541,14 @@ v0.1.0 基线记录：2026-10-22，本机 Python 3.9.1 / Pygame 2.6.1 / SDL 2.28
 | COMBAT-02 | 已完成 | 击杀动画、消失、死亡单位退出队列、一方全灭结束战斗 |
 | REWIND-01 | 已完成 | 回溯上一单位行动开始前、连续回溯、恢复死亡单位和战斗状态 |
 | FIX-01 | 已完成 | Windows 系统字体扫描异常回退，保留英文降级界面 |
-| QA-01 | 已完成 | 152 项测试，本机 151 通过、1 项符号链接权限跳过；六组核心/内容/透视 69 项与包完整性 4 项无需第三方包；旧几何 13 帧不变，矩形/透视状态一致，真实窗口实测 |
+| QA-01 | 已完成 | 165 项，本机 164 通过、1 项符号链接权限跳过；七组纯检查 80 项与包完整性 4 项无需第三方包；dummy/实际 Windows、战斗/回溯/矩形兼容验收 |
 | ASSET-01 | 已完成 | JSON 单位/场景、清单验证、PNG 与缩放缓存、可选缺失回退、必需缺失拒绝、静态和循环/非循环素材接入 |
 | DELIVERY-01 | 已完成 | 运行文档、源码汇总生成脚本、忽略规则和自动测试配置 |
 | EXTENSION-01 | 已完成 | 6×5 渡口场景、17 PNG 的 dusk 外观；复用现有运行代码；可复制功能开发模板 |
 | RELEASE-01 | 已完成 | VERSION、提交树源码 ZIP、SHA256、解压验收脚本；四组 CI 包含产物检查，发布见 tag/Release |
 | PERSPECTIVE-01 | 已完成 | 原始 1672×941 背景、纯单应投影/拾取、严格布局、完整背景/透明高亮/深度排序、HUD、CLI/F3、特效与回溯适配 |
-| PERSPECTIVE-02 | 待美术确认 | 当前四角/均匀逻辑细分与原画局部不规则砖缝的最终贴合；正式角色暂缺，使用明确几何回退 |
+| PERSPECTIVE-02 | 美术待接入 | 角色暂为明确几何回退；近处边界存在阈值内残差，未声称每个破损接缝像素重合 |
+| CALIBRATION-01 | 已完成，按不规则地图补充需求 | 28 块真实石砖/40 交点，20 标定+20 独立验证；全体验证均值5.57/最大11.42px，独立内部3.86/6.00px；原单应性+有效区遮罩，无控制网格；脚底/形体点击/真实截图，见校准报告 |
 
 CI 配置覆盖 Windows / Linux 与 Python 3.9 / 3.12。远程执行结果以 GitHub Actions 为准，配置存在不代表运行已通过。
 
@@ -755,17 +788,223 @@ CI 配置覆盖 Windows / Linux 与 Python 3.9 / 3.12。远程执行结果以 Gi
 
 ```text
 {
-  "schema_version":1,
-  "id":"war_torn",
-  "cols":8,"rows":8,
-  "obstacles":[[0,1],[7,6],[6,0]],
-  "spawns":[
-    {"uid":"A2","definition_id":"scout","team":"ally","cell":[1,4],"overrides":{"health":80}},
-    {"uid":"A1","definition_id":"vanguard","team":"ally","cell":[1,6]},
-    {"uid":"A3","definition_id":"guard","team":"ally","cell":[2,6]},
-    {"uid":"D1","definition_id":"dummy","team":"enemy","cell":[5,3],"overrides":{"health":5}},
-    {"uid":"D2","definition_id":"dummy","team":"enemy","cell":[6,2],"overrides":{"speed":9}},
-    {"uid":"D3","definition_id":"dummy","team":"enemy","cell":[6,5],"overrides":{"speed":8}}
+  "schema_version": 1,
+  "id": "war_torn",
+  "cols": 8,
+  "rows": 8,
+  "obstacles": [
+    [
+      0,
+      0
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      2,
+      0
+    ],
+    [
+      3,
+      0
+    ],
+    [
+      4,
+      0
+    ],
+    [
+      5,
+      0
+    ],
+    [
+      6,
+      0
+    ],
+    [
+      7,
+      0
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      2,
+      1
+    ],
+    [
+      3,
+      1
+    ],
+    [
+      4,
+      1
+    ],
+    [
+      5,
+      1
+    ],
+    [
+      6,
+      1
+    ],
+    [
+      7,
+      1
+    ],
+    [
+      0,
+      2
+    ],
+    [
+      1,
+      2
+    ],
+    [
+      2,
+      2
+    ],
+    [
+      7,
+      2
+    ],
+    [
+      0,
+      3
+    ],
+    [
+      7,
+      3
+    ],
+    [
+      0,
+      4
+    ],
+    [
+      7,
+      4
+    ],
+    [
+      0,
+      5
+    ],
+    [
+      7,
+      5
+    ],
+    [
+      0,
+      6
+    ],
+    [
+      7,
+      6
+    ],
+    [
+      0,
+      7
+    ],
+    [
+      1,
+      7
+    ],
+    [
+      2,
+      7
+    ],
+    [
+      3,
+      7
+    ],
+    [
+      4,
+      7
+    ],
+    [
+      5,
+      7
+    ],
+    [
+      6,
+      7
+    ],
+    [
+      7,
+      7
+    ]
+  ],
+  "spawns": [
+    {
+      "uid": "A2",
+      "definition_id": "scout",
+      "team": "ally",
+      "cell": [
+        1,
+        4
+      ],
+      "overrides": {
+        "health": 80
+      }
+    },
+    {
+      "uid": "A1",
+      "definition_id": "vanguard",
+      "team": "ally",
+      "cell": [
+        1,
+        6
+      ]
+    },
+    {
+      "uid": "A3",
+      "definition_id": "guard",
+      "team": "ally",
+      "cell": [
+        2,
+        6
+      ]
+    },
+    {
+      "uid": "D1",
+      "definition_id": "dummy",
+      "team": "enemy",
+      "cell": [
+        5,
+        3
+      ],
+      "overrides": {
+        "health": 5
+      }
+    },
+    {
+      "uid": "D2",
+      "definition_id": "dummy",
+      "team": "enemy",
+      "cell": [
+        6,
+        2
+      ],
+      "overrides": {
+        "speed": 9
+      }
+    },
+    {
+      "uid": "D3",
+      "definition_id": "dummy",
+      "team": "enemy",
+      "cell": [
+        6,
+        5
+      ],
+      "overrides": {
+        "speed": 8
+      }
+    }
   ]
 }
 ```
@@ -1772,6 +2011,8 @@ M0–M5 架构规划已落实；后续按真实功能需求继续开发。技能
 ````markdown
 # 透视战场：实现与验收
 
+本文保留首版透视功能的实现历史，包含旧四角、64格细分和152项基线，不能作为当前地图配置。用户补充允许不规则地图后，已完成28格校准、20点独立验证5.57/11.42px与165项回归；现状、真实截图和限制见 [逐砖校准报告](WAR_TORN_CALIBRATION.md)。
+
 本功能基于已发布 v0.2.0，以独立透视模式接入用户背景。设计依据见 [用户设计稿](references/perspective_battlefield_design.md)；其中的示意零角点没有用于运行。本次只改变表现与输入映射，规则、Controller、Unit、ViewModel 和规则快照未修改。无 AI、技能、存档、网络或新依赖。
 
 ## 使用与参数约定
@@ -1808,9 +2049,9 @@ Python API 可用 `Game(scenario, presentation_file=...)` 注入独立 Scenario 
 
 PNG 以该站立点作脚底锚定；临时几何形体、标签和选中环围绕逻辑格中心绘制，点击形体中心仍命中同一格，避免斜向投影时点到邻格。几何死亡与跳字使用相同表现形体矩形，规则占格不变。
 
-## 当前校准与实际试玩
+## 首版校准与实际试玩（历史）
 
-原图真实为 1672×941，SHA256 与来源见 [资源记录](../assets/skins/war_torn/README.md)。四角以原图坐标保存，按画面中部的铺石区域选取并用实际窗口调试网格检查，不是报告中的零占位：
+原图真实为 1672×941，SHA256 与来源见 [资源记录](../assets/skins/war_torn/README.md)。下列旧四角以原图坐标保存，但只有目测选区，没有真实整砖计数与独立误差验收，当前已确认不是有效8×8整砖边界：
 
 | 逻辑外角 | 原图坐标 |
 | --- | --- |
@@ -1842,7 +2083,7 @@ PNG 以该站立点作脚底锚定；临时几何形体、标签和选中环围�
 - 真实窗口：windows 驱动保存并查看下列 4 张实际绘制画面；点击由事件自动投递，不是人工鼠标逐次试玩。字体扫描异常时 HUD 英文回退，结算中 QUIT 正常释放。
 - CI：Windows/Linux × Python 3.9/3.12 增加两组依赖安装前检查；SOURCE 导出包含 presentations；交付包解压验证同时运行 M5 与透视集成。远程结果以当前 PR/Actions 为准。
 
-## 待人工确认与后续
+## 首版待确认事项（历史，现状见逐砖校准报告）
 
 角色仍为临时几何回退；当前角点是首版可交互校准，原画局部砖缝与严格单应网格存在偏差，需要最终美术确认。窗口暂不支持 resize、相机、音频、图集或编辑器；这些没有标记为已实现。新增规则状态仍须按功能模板补快照/恢复，本次没有改变玩法和防御计算。
 
@@ -1875,7 +2116,7 @@ Get-FileHash dist/chrono-tactics-pygame-0.2.0-source.zip -Algorithm SHA256
 
 产物：`dist/chrono-tactics-pygame-0.2.0-source.zip` 和 `.zip.sha256`。构建使用 git archive；ZIP comment 保存格式、版本、完整提交 SHA，不把生成元数据混入 SOURCE 扫描。相同提交重复构建字节一致；未提交文件、`.git`、`.venv`、缓存、`.delivery` 和旧包不进入交付。
 
-校验器检查 SHA256、ZIP CRC、路径、版本与指定提交，然后在临时目录解压，使用调用者已有 Python/Pygame 离线执行 SOURCE 一致性、`main.py --help`、六项 M5 与七项透视集成验收。通过不代表安装了独立运行时，也不代表人工点击验收；完整回归在打包前执行。已发布 v0.2.0 保留其原始六项验收脚本；未发布透视扩展在当前提交中另纳入新验收，不覆盖已发布附件。
+校验器检查 SHA256、ZIP CRC、路径、版本与指定提交，然后临时解压，用调用者已有 Python/Pygame 离线执行 SOURCE 一致性、`main.py --help`、实测地图/正式配置一致性、M5 与透视集成检查（含标点 UI）。不代表安装独立运行时或人工点击；独立对齐误差见校准报告，完整回归在打包前执行。已发布 v0.2.0 保留原附件；未发布扩展只进入当前提交验收，不覆盖已发布附件。
 
 显式校验其他位置的文件：
 
@@ -1993,6 +2234,2020 @@ M1–M5 已完成，见 [M5 实施与验收](M5_IMPLEMENTATION.md) 及各阶段�
 
 后续按用户实际需求推进，使用 [开发模板](templates/FEATURE_TEMPLATE.md) 记录最小必要设计与验收。扩展演练见 [EXTENSION_EXERCISE](EXTENSION_EXERCISE.md)，阶段发布见 [RELEASE](RELEASE.md)。不自动进入技能、AI 或存档开发。
 ````
+
+## docs/WAR_TORN_CALIBRATION.md
+
+````markdown
+# War Torn：不规则逐砖地图与单应性校准
+
+用户明确补充：**不要求完整 n×n 矩形区域，但每个小地块必须与图片对齐**。据此采用 28 块可辨认石砖组成的不规则地图，保留 8×8 逻辑包围盒及六个单位的初始坐标、定义和数值。没有把大石砖再等分，也没有挪动单位掩盖几何误差。
+
+## 诊断与坐标链
+
+旧配置将原图四点 `(1060,270)/(1530,452)/(892,898)/(340,568)` 之间的目测区域直接均分为 8×8；该区实际约跨 4–5 列、6 行大石砖，四角未对应同一整砖区域的外边界。主因是选区和砖块计数错误；没有发现矩阵行列颠倒或重复缩放，未重写运行时单应性公式。
+
+| 项目 | 实际值 |
+| --- | --- |
+| 原始 PNG | 1672×941；文件内容未修改 |
+| SHA256 | `f3ae6033599a5cc9047a8509c3d3f2269e3604513aa29cb0ec7e4db1051f5d2a` |
+| 参考视口 | 1280×720 |
+| contain 比例 | `720/941 = 0.7651434643995749` |
+| 理论偏移 | `(0.34006376195532084, 0)` |
+| 缓存背景 | 1279×720，整数 blit 位置 `(0,0)` |
+
+背景、网格、脚底、特效和地面拾取共用 `BackgroundFit`。缓存尺寸/blit 取整差异不到 1 px，无法解释旧网格跨越砖块中央的错位。所有观测和配置角点均在原始 PNG 坐标系中，测量时才转到视口。
+
+## 地图与四角标定
+
+有效格为 row=2 的 col=3…6，以及 row=3…6 的 col=1…6，共 28 格。其余 36 格在场景 JSON 中显式不可通行，不画假石砖，也不作为可选地面。四方向逻辑邻接不变。
+
+参考矩形的逻辑原点 `(1,3)`、跨度 `6×4`，仅用于建立同一个单应性，并非不规则地图外轮廓。row=2 的四块石砖在参照矩形外，但都属于已观测、验证的地图。F3 的 `REF p00/p10/p11/p01` 同时显示逻辑顶点编号。
+
+先用参考矩形的四个真实交点精确标定，再测其余 36 点：平均 **13.605058 px**、最大 **27.442275 px**，未达标。四角正确后，局部非规则绘画和人工读点误差仍会使单次四点解不稳定。
+
+接着先对**同一个单应性**做多点标定，未直接升级控制网格：40 个实测交点按奇偶分组，20 点仅用于离线最小二乘，另外 20 点只验证、不参与求解；四个参考外角全部属于验证组。运行时仍由原 `PerspectiveBoardGeometry` 计算投影/逆变换，不执行拟合，没有逐格形变。
+
+| 参考顶点 | 原图人工观测 | 多点模型估计，原图坐标 |
+| --- | --- | --- |
+| p00 `(1,3)` | `(771,288)` | `(785.806252,286.443252)` |
+| p10 `(7,3)` | `(1491,527)` | `(1493.022837,531.157249)` |
+| p11 `(7,7)` | `(1029,845)` | `(1042.659639,844.366933)` |
+| p01 `(1,7)` | `(308,458)` | `(298.787556,467.715916)` |
+
+**配置四角是模型估计，不能当成人工精确点选值。** 它们估计真实边界交点的位置；观测、预测、误差分别保存，不将拟合值回填成实测。四个外角接受同样的非零误差验收，没有把拟合四角的零残差混入平均数。
+
+## 实际误差
+
+正式数据：[40 个原图交点](calibration/war_torn_map_observations.json)；可重算结果：[完整误差报告](calibration/war_torn_map_report.json)。以下均为 1280×720 下的欧氏距离。
+
+| 样本 | 数量 | 平均 px | 最大 px |
+| --- | --- | --- | --- |
+| 独立验证，含地图边界 | 20 | **5.567316** | **11.419992** |
+| 其中独立内部交点，四周都有有效格 | 9 | **3.855241** | **6.002102** |
+| 远处独立验证 | 6 | 4.807837 | 11.391354 |
+| 中部独立验证 | 7 | 3.475779 | 7.207970 |
+| 近处独立验证，含外边界 | 7 | 8.309834 | 11.419992 |
+| 标定点，另列，不能当独立验证 | 20 | 4.807673 | 10.442478 |
+| 全部观测顶点 | 40 | 5.187494 | 11.419992 |
+
+独立整体及内部交点达到均值≤6/最大≤12 px 的目标，因此**不实现 `CalibratedGridGeometry` 或 9×9 控制点模式**。近处边界仍有约 8–11 px 残差，未声称每个分区均值都≤6，或每个破损砖缝像素完全重合。人工读点估计有约 3–6 个原图像素不确定性；这是观测点估值，不是零误差或亚像素测量。
+
+最初的 2×6 样带保留为历史证据：[旧观测](calibration/war_torn_observations.json)、[旧报告](calibration/war_torn_report.json)。其 5.56/11.71 px 仅属于当时局部粗标点；正式地图采用重新放大核对的数据，不混用统计。
+
+## 运行与复核
+
+```powershell
+.\.venv\Scripts\python.exe main.py --presentation presentations/war_torn_8x8.json --debug-grid
+.\.venv\Scripts\python.exe -S scripts/fit_board.py --check --report docs/calibration/war_torn_map_report.json
+.\.venv\Scripts\python.exe scripts/fit_board.py --check --screenshot artifacts/calibration_validation.png
+```
+
+`fit_board.py` 默认只测量；`--check` 验证正式配置与标定、遮罩和原图尺寸一致。显式 `--write-presentation` 才重新生成四角。校验原图散列、所有地块顶点的真实观测、标定/验证分离、远中近覆盖、重复、越界和退化数据；阈值失败时非零退出。CI 和解压验收也运行检查。
+
+已有交互读点工具：
+
+```powershell
+.\.venv\Scripts\python.exe scripts/calibrate_board.py --pick --cols 6 --rows 4
+```
+
+先标四角，再逐行标内部点；Backspace/Z 撤销，P 预览，S 保存草稿，Esc 退出。草稿不自动替换正式地图。此工具处理矩形参照区；尚无不规则地图鼠标绘制编辑器。不规则边界及样本角色在 JSON 编辑后运行 `fit_board.py`，不能用预测点补全不可辨认砖面。
+
+## 定位与输入
+
+- 单位、PNG 动画统一用脚底 `cell_anchor`；几何角色表现矩形以脚底为底边。标签、血条和伤害跳字由同一脚底/尺度派生。
+- 选中框、移动/攻击范围和目标框使用投影四边形。地面共享边界按半开区间归属右/下一逻辑格；若该格为 void 则不命中，不向邻格吸附。
+- 角色身体可能高于地面格，Game 先由 Renderer 按相同脚底/精灵透明像素检测可见形体，再逆投影地面；HUD 优先。Renderer 只读 BoardView，操作仍经 Controller。
+- 独立障碍底部落在对应脚底；PNG 攻击/死亡及几何死亡形体一并按屏幕脚底 Y、稳定 UID 排序。伤害文字保留覆盖层。
+- 原三个障碍坐标在有效区外，继续作为 void 阻挡，不在图外画岩石。障碍定位用同一 Scenario 增加 `(3,6)` 障碍的注入夹具验收，截图注明夹具；未将额外障碍写入正式场景。
+- Battle、Board 寻路、伤害、行动顺序、快照和结算 token 的代码/语义未改；地图形状通过已有 Scenario 障碍数据约束移动。训练场、渡口、矩形/几何模式保留。
+
+## 文件与验证
+
+| 文件组 | 变更 |
+| --- | --- |
+| `tactics/perspective_geometry.py` | 原单应性增加参照矩形/有效格遮罩；脚底表现矩形 |
+| `tactics/presentation_layout.py`、`game.py` | 可选配置、void/出生格校验、形体输入 |
+| `tactics/perspective_board_renderer.py`、`effects.py` | 有效区绘制、四边形选中、脚底与死亡深度排序 |
+| `presentations/war_torn_8x8.json`、`content/scenarios/war_torn.json` | 标定四角、参照区、28 格遮罩、36 格阻挡；单位数据不变 |
+| `scripts/fit_board.py`、`docs/calibration/war_torn_map_*.json` | 可复算单应性、独立验证、配置一致性、实际游戏截图 |
+| 四个校准/透视测试模块、CI、`scripts/verify_release.py` | 输入/边界/兼容/脚底检查、标定纳入交付检查 |
+| README/TASKS/CHANGELOG/AGENTS/SOURCE | 维护与验收记录 |
+
+完整套件 **165 项，本机 164 通过、1 项因 Windows 无符号链接权限跳过**。dummy 与 Windows 实际驱动分别运行；七组纯核心/内容/几何/配置/校准共 80 项可用 `-S`，另 4 项纯包完整性通过。覆盖 28 个地面中心、远中近形体、void、共享边、范围、三次击杀/胜利/连续回溯、拒绝旧 token 和矩形/透视完整 BattleView 一致性。
+
+截图来自实际 Windows SDL 窗口的 Game Surface；F3、点击和退出以事件调用验证，不声称人工逐次点击。交点核对使用原始图片，截图没有用手绘棋盘替代。
+
+## 限制与后续
+
+仅 28 块已观测石砖开放，其他可见铺石仍是背景；文件名 8×8 表示逻辑包围盒。角色仍为几何回退。未新增控制网格、地图编辑器、resize、相机或玩法。扩图先补真实交点、独立验证和 void 数据；误差超目标后再评估控制网格，不靠移动单位或将预测值冒充观测消除报告误差。
+
+![诊断前实际 F3](../artifacts/calibration_before.png)
+
+![校准后实际完整有效网格、中心、编号和参考角点](../artifacts/calibration_after.png)
+
+![实际游戏验证点：绿圈观测、红点预测、短线为残差](../artifacts/calibration_validation.png)
+
+![实际战斗攻击范围](../artifacts/calibration_attack_range.png)
+
+![实际伤害文字与死亡形体](../artifacts/calibration_death.png)
+
+![独立障碍验收夹具：同一场景增加 (3,6) 障碍，仅用于脚底验收](../artifacts/calibration_obstacle_fixture.png)
+````
+
+## docs/calibration/war_torn_map_observations.json
+
+```text
+{
+  "schema_version": 1,
+  "image": "assets/skins/war_torn/backgrounds/battlefield.png",
+  "sha256": "f3ae6033599a5cc9047a8509c3d3f2269e3604513aa29cb0ec7e4db1051f5d2a",
+  "image_size": [
+    1672,
+    941
+  ],
+  "viewport_size": [
+    1280,
+    720
+  ],
+  "logical_size": [
+    8,
+    8
+  ],
+  "reference_region": [
+    1,
+    3,
+    6,
+    4
+  ],
+  "cells": [
+    [
+      3,
+      2
+    ],
+    [
+      4,
+      2
+    ],
+    [
+      5,
+      2
+    ],
+    [
+      6,
+      2
+    ],
+    [
+      1,
+      3
+    ],
+    [
+      2,
+      3
+    ],
+    [
+      3,
+      3
+    ],
+    [
+      4,
+      3
+    ],
+    [
+      5,
+      3
+    ],
+    [
+      6,
+      3
+    ],
+    [
+      1,
+      4
+    ],
+    [
+      2,
+      4
+    ],
+    [
+      3,
+      4
+    ],
+    [
+      4,
+      4
+    ],
+    [
+      5,
+      4
+    ],
+    [
+      6,
+      4
+    ],
+    [
+      1,
+      5
+    ],
+    [
+      2,
+      5
+    ],
+    [
+      3,
+      5
+    ],
+    [
+      4,
+      5
+    ],
+    [
+      5,
+      5
+    ],
+    [
+      6,
+      5
+    ],
+    [
+      1,
+      6
+    ],
+    [
+      2,
+      6
+    ],
+    [
+      3,
+      6
+    ],
+    [
+      4,
+      6
+    ],
+    [
+      5,
+      6
+    ],
+    [
+      6,
+      6
+    ]
+  ],
+  "observations": [
+    {
+      "node": [
+        3,
+        2
+      ],
+      "image": [
+        1084,
+        316
+      ],
+      "role": "calibration",
+      "band": "far"
+    },
+    {
+      "node": [
+        4,
+        2
+      ],
+      "image": [
+        1195,
+        350
+      ],
+      "role": "validation",
+      "band": "far"
+    },
+    {
+      "node": [
+        5,
+        2
+      ],
+      "image": [
+        1311,
+        385
+      ],
+      "role": "calibration",
+      "band": "far"
+    },
+    {
+      "node": [
+        6,
+        2
+      ],
+      "image": [
+        1437,
+        424
+      ],
+      "role": "validation",
+      "band": "far"
+    },
+    {
+      "node": [
+        7,
+        2
+      ],
+      "image": [
+        1576,
+        469
+      ],
+      "role": "calibration",
+      "band": "far"
+    },
+    {
+      "node": [
+        1,
+        3
+      ],
+      "image": [
+        771,
+        288
+      ],
+      "role": "validation",
+      "band": "far"
+    },
+    {
+      "node": [
+        2,
+        3
+      ],
+      "image": [
+        874,
+        321
+      ],
+      "role": "calibration",
+      "band": "far"
+    },
+    {
+      "node": [
+        3,
+        3
+      ],
+      "image": [
+        990,
+        356
+      ],
+      "role": "validation",
+      "band": "far"
+    },
+    {
+      "node": [
+        4,
+        3
+      ],
+      "image": [
+        1103,
+        395
+      ],
+      "role": "calibration",
+      "band": "far"
+    },
+    {
+      "node": [
+        5,
+        3
+      ],
+      "image": [
+        1223,
+        434
+      ],
+      "role": "validation",
+      "band": "far"
+    },
+    {
+      "node": [
+        6,
+        3
+      ],
+      "image": [
+        1352,
+        479
+      ],
+      "role": "calibration",
+      "band": "far"
+    },
+    {
+      "node": [
+        7,
+        3
+      ],
+      "image": [
+        1491,
+        527
+      ],
+      "role": "validation",
+      "band": "far"
+    },
+    {
+      "node": [
+        1,
+        4
+      ],
+      "image": [
+        685,
+        333
+      ],
+      "role": "calibration",
+      "band": "middle"
+    },
+    {
+      "node": [
+        2,
+        4
+      ],
+      "image": [
+        771,
+        359
+      ],
+      "role": "validation",
+      "band": "middle"
+    },
+    {
+      "node": [
+        3,
+        4
+      ],
+      "image": [
+        883,
+        401
+      ],
+      "role": "calibration",
+      "band": "middle"
+    },
+    {
+      "node": [
+        4,
+        4
+      ],
+      "image": [
+        1002,
+        445
+      ],
+      "role": "validation",
+      "band": "middle"
+    },
+    {
+      "node": [
+        5,
+        4
+      ],
+      "image": [
+        1123,
+        490
+      ],
+      "role": "calibration",
+      "band": "middle"
+    },
+    {
+      "node": [
+        6,
+        4
+      ],
+      "image": [
+        1255,
+        541
+      ],
+      "role": "validation",
+      "band": "middle"
+    },
+    {
+      "node": [
+        7,
+        4
+      ],
+      "image": [
+        1393,
+        596
+      ],
+      "role": "calibration",
+      "band": "middle"
+    },
+    {
+      "node": [
+        1,
+        5
+      ],
+      "image": [
+        567,
+        369
+      ],
+      "role": "validation",
+      "band": "middle"
+    },
+    {
+      "node": [
+        2,
+        5
+      ],
+      "image": [
+        655,
+        406
+      ],
+      "role": "calibration",
+      "band": "middle"
+    },
+    {
+      "node": [
+        3,
+        5
+      ],
+      "image": [
+        769,
+        454
+      ],
+      "role": "validation",
+      "band": "middle"
+    },
+    {
+      "node": [
+        4,
+        5
+      ],
+      "image": [
+        889,
+        501
+      ],
+      "role": "calibration",
+      "band": "middle"
+    },
+    {
+      "node": [
+        5,
+        5
+      ],
+      "image": [
+        1012,
+        552
+      ],
+      "role": "validation",
+      "band": "middle"
+    },
+    {
+      "node": [
+        6,
+        5
+      ],
+      "image": [
+        1140,
+        609
+      ],
+      "role": "calibration",
+      "band": "middle"
+    },
+    {
+      "node": [
+        7,
+        5
+      ],
+      "image": [
+        1288,
+        673
+      ],
+      "role": "validation",
+      "band": "middle"
+    },
+    {
+      "node": [
+        1,
+        6
+      ],
+      "image": [
+        429,
+        411
+      ],
+      "role": "calibration",
+      "band": "near"
+    },
+    {
+      "node": [
+        2,
+        6
+      ],
+      "image": [
+        529,
+        457
+      ],
+      "role": "validation",
+      "band": "near"
+    },
+    {
+      "node": [
+        3,
+        6
+      ],
+      "image": [
+        646,
+        508
+      ],
+      "role": "calibration",
+      "band": "near"
+    },
+    {
+      "node": [
+        4,
+        6
+      ],
+      "image": [
+        765,
+        561
+      ],
+      "role": "validation",
+      "band": "near"
+    },
+    {
+      "node": [
+        5,
+        6
+      ],
+      "image": [
+        889,
+        620
+      ],
+      "role": "calibration",
+      "band": "near"
+    },
+    {
+      "node": [
+        6,
+        6
+      ],
+      "image": [
+        1023,
+        685
+      ],
+      "role": "validation",
+      "band": "near"
+    },
+    {
+      "node": [
+        7,
+        6
+      ],
+      "image": [
+        1165,
+        755
+      ],
+      "role": "calibration",
+      "band": "near"
+    },
+    {
+      "node": [
+        1,
+        7
+      ],
+      "image": [
+        308,
+        458
+      ],
+      "role": "validation",
+      "band": "near"
+    },
+    {
+      "node": [
+        2,
+        7
+      ],
+      "image": [
+        398,
+        510
+      ],
+      "role": "calibration",
+      "band": "near"
+    },
+    {
+      "node": [
+        3,
+        7
+      ],
+      "image": [
+        515,
+        568
+      ],
+      "role": "validation",
+      "band": "near"
+    },
+    {
+      "node": [
+        4,
+        7
+      ],
+      "image": [
+        628,
+        628
+      ],
+      "role": "calibration",
+      "band": "near"
+    },
+    {
+      "node": [
+        5,
+        7
+      ],
+      "image": [
+        759,
+        694
+      ],
+      "role": "validation",
+      "band": "near"
+    },
+    {
+      "node": [
+        6,
+        7
+      ],
+      "image": [
+        889,
+        766
+      ],
+      "role": "calibration",
+      "band": "near"
+    },
+    {
+      "node": [
+        7,
+        7
+      ],
+      "image": [
+        1029,
+        845
+      ],
+      "role": "validation",
+      "band": "near"
+    }
+  ],
+  "annotation": "Native PNG seam-center observations inspected in magnified source crops. Estimated manual uncertainty 3-6 native pixels, larger at worn joints. Alternating parity split keeps all four reference rectangle corners in independent validation. Model-generated corner estimates are stored separately from these observations; no projected vertices are labelled as measured. Irregular 28-tile mask retains all six original logical unit cells."
+}
+```
+
+## docs/calibration/war_torn_map_report.json
+
+```text
+{
+  "image_sha256": "f3ae6033599a5cc9047a8509c3d3f2269e3604513aa29cb0ec7e4db1051f5d2a",
+  "viewport_size": [
+    1280,
+    720
+  ],
+  "scale": 0.7651434643995749,
+  "offset": [
+    0.34006376195532084,
+    0.0
+  ],
+  "playable_cells": 28,
+  "method": "One homography refined offline; runtime PerspectiveBoardGeometry formula unchanged.",
+  "reference_region": [
+    1,
+    3,
+    6,
+    4
+  ],
+  "fitted_corners_image": {
+    "p00": [
+      785.8062519854639,
+      286.44325233527604
+    ],
+    "p10": [
+      1493.02283721993,
+      531.1572489530942
+    ],
+    "p11": [
+      1042.6596392405297,
+      844.3669334366049
+    ],
+    "p01": [
+      298.78755614375797,
+      467.71591609752414
+    ]
+  },
+  "observed_reference_corners_image": {
+    "p00": [
+      771,
+      288
+    ],
+    "p10": [
+      1491,
+      527
+    ],
+    "p11": [
+      1029,
+      845
+    ],
+    "p01": [
+      308,
+      458
+    ]
+  },
+  "four_observed_corners_baseline": {
+    "count": 36,
+    "mean_px": 13.605057700552218,
+    "max_px": 27.442274938900766
+  },
+  "calibration": {
+    "count": 20,
+    "mean_px": 4.807673228910535,
+    "max_px": 10.442477862768744
+  },
+  "independent_validation": {
+    "count": 20,
+    "mean_px": 5.567315763585733,
+    "max_px": 11.41999211967498
+  },
+  "all_vertices": {
+    "count": 40,
+    "mean_px": 5.187494496248133,
+    "max_px": 11.41999211967498
+  },
+  "independent_interior": {
+    "count": 9,
+    "mean_px": 3.855241185859837,
+    "max_px": 6.002101554331281
+  },
+  "bands": {
+    "far": {
+      "count": 6,
+      "mean_px": 4.807837170217445,
+      "max_px": 11.391353551582771
+    },
+    "middle": {
+      "count": 7,
+      "mean_px": 3.4757789343163403,
+      "max_px": 7.207970336328134
+    },
+    "near": {
+      "count": 7,
+      "mean_px": 8.309834244313658,
+      "max_px": 11.41999211967498
+    }
+  },
+  "threshold_met": true,
+  "full_rectangular_8x8": false,
+  "points": [
+    {
+      "node": [
+        3,
+        2
+      ],
+      "image": [
+        1084,
+        316
+      ],
+      "role": "calibration",
+      "band": "far",
+      "predicted_image": [
+        1080.0697921993747,
+        314.3087438919754
+      ],
+      "error_px": 3.27378419167604
+    },
+    {
+      "node": [
+        4,
+        2
+      ],
+      "image": [
+        1195,
+        350
+      ],
+      "role": "validation",
+      "band": "far",
+      "predicted_image": [
+        1190.2088694929646,
+        349.6706252904999
+      ],
+      "error_px": 3.6745547252828534
+    },
+    {
+      "node": [
+        5,
+        2
+      ],
+      "image": [
+        1311,
+        385
+      ],
+      "role": "calibration",
+      "band": "far",
+      "predicted_image": [
+        1308.851522367961,
+        387.7627132475154
+      ],
+      "error_px": 2.6778426017199477
+    },
+    {
+      "node": [
+        6,
+        2
+      ],
+      "image": [
+        1437,
+        424
+      ],
+      "role": "validation",
+      "band": "far",
+      "predicted_image": [
+        1437.0221060327408,
+        428.91389309853264
+      ],
+      "error_px": 3.759871234889329
+    },
+    {
+      "node": [
+        7,
+        2
+      ],
+      "image": [
+        1576,
+        469
+      ],
+      "role": "calibration",
+      "band": "far",
+      "predicted_image": [
+        1575.9163859173018,
+        473.5080841241113
+      ],
+      "error_px": 3.449924360854747
+    },
+    {
+      "node": [
+        1,
+        3
+      ],
+      "image": [
+        771,
+        288
+      ],
+      "role": "validation",
+      "band": "far",
+      "predicted_image": [
+        785.8062519854639,
+        286.44325233527604
+      ],
+      "error_px": 11.391353551582771
+    },
+    {
+      "node": [
+        2,
+        3
+      ],
+      "image": [
+        874,
+        321
+      ],
+      "role": "calibration",
+      "band": "far",
+      "predicted_image": [
+        882.3558752377736,
+        319.8517507660421
+      ],
+      "error_px": 6.453527121674999
+    },
+    {
+      "node": [
+        3,
+        3
+      ],
+      "image": [
+        990,
+        356
+      ],
+      "role": "validation",
+      "band": "far",
+      "predicted_image": [
+        986.1531051602166,
+        355.76809591758916
+      ],
+      "error_px": 2.948769938827149
+    },
+    {
+      "node": [
+        4,
+        3
+      ],
+      "image": [
+        1103,
+        395
+      ],
+      "role": "calibration",
+      "band": "far",
+      "predicted_image": [
+        1098.0458406869918,
+        394.4856812725476
+      ],
+      "error_px": 3.811015016273398
+    },
+    {
+      "node": [
+        5,
+        3
+      ],
+      "image": [
+        1223,
+        434
+      ],
+      "role": "validation",
+      "band": "far",
+      "predicted_image": [
+        1219.0196089539077,
+        436.34552299090893
+      ],
+      "error_px": 3.5350117429595445
+    },
+    {
+      "node": [
+        6,
+        3
+      ],
+      "image": [
+        1352,
+        479
+      ],
+      "role": "calibration",
+      "band": "far",
+      "predicted_image": [
+        1350.2266705701336,
+        481.7463310360737
+      ],
+      "error_px": 2.5013324440445417
+    },
+    {
+      "node": [
+        7,
+        3
+      ],
+      "image": [
+        1491,
+        527
+      ],
+      "role": "validation",
+      "band": "far",
+      "predicted_image": [
+        1493.0228372199304,
+        531.1572489530942
+      ],
+      "error_px": 3.5374618277630256
+    },
+    {
+      "node": [
+        1,
+        4
+      ],
+      "image": [
+        685,
+        333
+      ],
+      "role": "calibration",
+      "band": "middle",
+      "predicted_image": [
+        680.8727503568576,
+        325.5004292373722
+      ],
+      "error_px": 6.549813583854788
+    },
+    {
+      "node": [
+        2,
+        4
+      ],
+      "image": [
+        771,
+        359
+      ],
+      "role": "validation",
+      "band": "middle",
+      "predicted_image": [
+        778.0597800622454,
+        361.9862144874186
+      ],
+      "error_px": 5.865111463716077
+    },
+    {
+      "node": [
+        3,
+        4
+      ],
+      "image": [
+        883,
+        401
+      ],
+      "role": "calibration",
+      "band": "middle",
+      "predicted_image": [
+        882.9047079962697,
+        401.34691453920067
+      ],
+      "error_px": 0.27527120921527526
+    },
+    {
+      "node": [
+        4,
+        4
+      ],
+      "image": [
+        1002,
+        445
+      ],
+      "role": "validation",
+      "band": "middle",
+      "predicted_image": [
+        996.3497676256354,
+        443.93626103803996
+      ],
+      "error_px": 4.399186773408743
+    },
+    {
+      "node": [
+        5,
+        4
+      ],
+      "image": [
+        1123,
+        490
+      ],
+      "role": "calibration",
+      "band": "middle",
+      "predicted_image": [
+        1119.498380800686,
+        490.1684986912177
+      ],
+      "error_px": 2.682341217503711
+    },
+    {
+      "node": [
+        6,
+        4
+      ],
+      "image": [
+        1255,
+        541
+      ],
+      "role": "validation",
+      "band": "middle",
+      "predicted_image": [
+        1253.651165970423,
+        540.5319034092786
+      ],
+      "error_px": 1.092432936890221
+    },
+    {
+      "node": [
+        7,
+        4
+      ],
+      "image": [
+        1393,
+        596
+      ],
+      "role": "calibration",
+      "band": "middle",
+      "predicted_image": [
+        1400.3520505782699,
+        595.6060937412525
+      ],
+      "error_px": 5.633441690118532
+    },
+    {
+      "node": [
+        1,
+        5
+      ],
+      "image": [
+        567,
+        369
+      ],
+      "role": "validation",
+      "band": "middle",
+      "predicted_image": [
+        565.8078626684804,
+        368.3285975908011
+      ],
+      "error_px": 1.0468696717041603
+    },
+    {
+      "node": [
+        2,
+        5
+      ],
+      "image": [
+        655,
+        406
+      ],
+      "role": "calibration",
+      "band": "middle",
+      "predicted_image": [
+        663.2929897128848,
+        408.35072272960804
+      ],
+      "error_px": 6.595322549495995
+    },
+    {
+      "node": [
+        3,
+        5
+      ],
+      "image": [
+        769,
+        454
+      ],
+      "role": "validation",
+      "band": "middle",
+      "predicted_image": [
+        768.8610712603954,
+        451.69127219038603
+      ],
+      "error_px": 1.7697034422975442
+    },
+    {
+      "node": [
+        4,
+        5
+      ],
+      "image": [
+        889,
+        501
+      ],
+      "role": "calibration",
+      "band": "middle",
+      "predicted_image": [
+        883.560880881674,
+        498.7808157262852
+      ],
+      "error_px": 4.494773111995415
+    },
+    {
+      "node": [
+        5,
+        5
+      ],
+      "image": [
+        1012,
+        552
+      ],
+      "role": "validation",
+      "band": "middle",
+      "predicted_image": [
+        1008.6308338264325,
+        550.1277797157743
+      ],
+      "error_px": 2.949177915869502
+    },
+    {
+      "node": [
+        6,
+        5
+      ],
+      "image": [
+        1140,
+        609
+      ],
+      "role": "calibration",
+      "band": "middle",
+      "predicted_image": [
+        1145.5438807845032,
+        606.3368781149106
+      ],
+      "error_px": 4.705901798516729
+    },
+    {
+      "node": [
+        7,
+        5
+      ],
+      "image": [
+        1288,
+        673
+      ],
+      "role": "validation",
+      "band": "middle",
+      "predicted_image": [
+        1296.0657886753477,
+        668.1330394000606
+      ],
+      "error_px": 7.207970336328134
+    },
+    {
+      "node": [
+        1,
+        6
+      ],
+      "image": [
+        429,
+        411
+      ],
+      "role": "calibration",
+      "band": "near",
+      "predicted_image": [
+        439.0698761562441,
+        415.5015965148594
+      ],
+      "error_px": 8.439736251045368
+    },
+    {
+      "node": [
+        2,
+        6
+      ],
+      "image": [
+        529,
+        457
+      ],
+      "role": "validation",
+      "band": "near",
+      "predicted_image": [
+        536.3953795677992,
+        459.61594739587196
+      ],
+      "error_px": 6.002101554331281
+    },
+    {
+      "node": [
+        3,
+        6
+      ],
+      "image": [
+        646,
+        508
+      ],
+      "role": "calibration",
+      "band": "near",
+      "predicted_image": [
+        642.2357421434587,
+        507.5897952401758
+      ],
+      "error_px": 2.897248352754742
+    },
+    {
+      "node": [
+        4,
+        6
+      ],
+      "image": [
+        765,
+        561
+      ],
+      "role": "validation",
+      "band": "near",
+      "predicted_image": [
+        757.7595089642778,
+        559.9528019135618
+      ],
+      "error_px": 5.597657716528402
+    },
+    {
+      "node": [
+        5,
+        6
+      ],
+      "image": [
+        889,
+        620
+      ],
+      "role": "calibration",
+      "band": "near",
+      "predicted_image": [
+        884.3592972791572,
+        617.3361935983505
+      ],
+      "error_px": 4.0941958308460125
+    },
+    {
+      "node": [
+        6,
+        6
+      ],
+      "image": [
+        1023,
+        685
+      ],
+      "role": "validation",
+      "band": "near",
+      "predicted_image": [
+        1023.7082089948733,
+        680.4983306624625
+      ],
+      "error_px": 3.4867871267372244
+    },
+    {
+      "node": [
+        7,
+        6
+      ],
+      "image": [
+        1165,
+        755
+      ],
+      "role": "calibration",
+      "band": "near",
+      "predicted_image": [
+        1177.8341897273367,
+        750.3584120962137
+      ],
+      "error_px": 10.442477862768744
+    },
+    {
+      "node": [
+        1,
+        7
+      ],
+      "image": [
+        308,
+        458
+      ],
+      "role": "validation",
+      "band": "near",
+      "predicted_image": [
+        298.787556143758,
+        467.71591609752414
+      ],
+      "error_px": 10.2445866054385
+    },
+    {
+      "node": [
+        2,
+        7
+      ],
+      "image": [
+        398,
+        510
+      ],
+      "role": "calibration",
+      "band": "near",
+      "predicted_image": [
+        395.3362929558614,
+        516.6022512207514
+      ],
+      "error_px": 5.447319393156913
+    },
+    {
+      "node": [
+        3,
+        7
+      ],
+      "image": [
+        515,
+        568
+      ],
+      "role": "validation",
+      "band": "near",
+      "predicted_image": [
+        500.82507957448723,
+        570.0152770629938
+      ],
+      "error_px": 10.954912278057362
+    },
+    {
+      "node": [
+        4,
+        7
+      ],
+      "image": [
+        628,
+        628
+      ],
+      "role": "calibration",
+      "band": "near",
+      "predicted_image": [
+        616.5559187463,
+        628.6142476415122
+      ],
+      "error_px": 8.768967922047146
+    },
+    {
+      "node": [
+        5,
+        7
+      ],
+      "image": [
+        759,
+        694
+      ],
+      "role": "validation",
+      "band": "near",
+      "predicted_image": [
+        744.0965395928538,
+        693.1929644471313
+      ],
+      "error_px": 11.41999211967498
+    },
+    {
+      "node": [
+        6,
+        7
+      ],
+      "image": [
+        889,
+        766
+      ],
+      "role": "calibration",
+      "band": "near",
+      "predicted_image": [
+        885.351832697661,
+        764.7159467735619
+      ],
+      "error_px": 2.959228068647654
+    },
+    {
+      "node": [
+        7,
+        7
+      ],
+      "image": [
+        1029,
+        845
+      ],
+      "role": "validation",
+      "band": "near",
+      "predicted_image": [
+        1042.65963924053,
+        844.366933436605
+      ],
+      "error_px": 10.46280230942786
+    }
+  ]
+}
+```
+
+## docs/calibration/war_torn_observations.json
+
+```text
+{
+  "schema_version": 1,
+  "status": "diagnostic_only",
+  "image": "assets/skins/war_torn/backgrounds/battlefield.png",
+  "sha256": "f3ae6033599a5cc9047a8509c3d3f2269e3604513aa29cb0ec7e4db1051f5d2a",
+  "image_size": [1672, 941],
+  "viewport_size": [1280, 720],
+  "physical_span": [2, 6],
+  "corners": {"p00":[1169,278],"p10":[1392,342],"p11":[757,694],"p01":[515,568]},
+  "samples": [
+    {"node":[1,1],"image":[1196,349],"band":"far"},
+    {"node":[1,2],"image":[1103,395],"band":"middle"},
+    {"node":[1,3],"image":[1000,445],"band":"middle"},
+    {"node":[1,4],"image":[883,503],"band":"near"},
+    {"node":[1,5],"image":[765,561],"band":"near"}
+  ],
+  "annotation": "Manually read seam-center intersections from native PNG. Four corners define a visible 2x6 stone strip; five interior landmarks are independent of the homography. This is not an 8x8 game calibration; no projected/interpolated point is an observation. Seam width and hand annotation introduce several source pixels of uncertainty."
+}
+```
+
+## docs/calibration/war_torn_report.json
+
+```text
+{
+  "image_sha256": "f3ae6033599a5cc9047a8509c3d3f2269e3604513aa29cb0ec7e4db1051f5d2a",
+  "viewport_size": [
+    1280,
+    720
+  ],
+  "scale": 0.7651434643995749,
+  "offset": [
+    0.34006376195532084,
+    0.0
+  ],
+  "measured_physical_span": [
+    2,
+    6
+  ],
+  "interior": {
+    "count": 5,
+    "mean_px": 5.555742450788599,
+    "max_px": 11.713753031428595
+  },
+  "bands": {
+    "far": {
+      "count": 1,
+      "mean_px": 0.5573474339180795,
+      "max_px": 0.5573474339180795
+    },
+    "middle": {
+      "count": 2,
+      "mean_px": 4.957335080837491,
+      "max_px": 6.4567896284244375
+    },
+    "near": {
+      "count": 2,
+      "mean_px": 8.653347329174967,
+      "max_px": 11.713753031428595
+    }
+  },
+  "points": [
+    {
+      "node": [
+        1,
+        1
+      ],
+      "observed_image": [
+        1196,
+        349
+      ],
+      "predicted_image": [
+        1195.6332979159592,
+        348.3706126911767
+      ],
+      "band": "far",
+      "error_viewport_px": 0.5573474339180795
+    },
+    {
+      "node": [
+        1,
+        2
+      ],
+      "observed_image": [
+        1103,
+        395
+      ],
+      "predicted_image": [
+        1106.5870081675023,
+        392.25098871598135
+      ],
+      "band": "middle",
+      "error_viewport_px": 3.457880533250545
+    },
+    {
+      "node": [
+        1,
+        3
+      ],
+      "observed_image": [
+        1000,
+        445
+      ],
+      "predicted_image": [
+        1007.4781687030768,
+        441.09000441631093
+      ],
+      "band": "middle",
+      "error_viewport_px": 6.4567896284244375
+    },
+    {
+      "node": [
+        1,
+        4
+      ],
+      "observed_image": [
+        883,
+        503
+      ],
+      "predicted_image": [
+        896.4989793291396,
+        495.77851052266146
+      ],
+      "band": "near",
+      "error_viewport_px": 11.713753031428595
+    },
+    {
+      "node": [
+        1,
+        5
+      ],
+      "observed_image": [
+        765,
+        561
+      ],
+      "predicted_image": [
+        771.3810113907315,
+        557.4343470106937
+      ],
+      "band": "near",
+      "error_viewport_px": 5.592941626921337
+    }
+  ],
+  "local_threshold_met": true,
+  "requested_8x8_verified": false,
+  "reason": "This is a diagnostic strip, not a measured complete 8x8 region. No acceptance claim or automatic config export.",
+  "extent_diagnostic": {
+    "search_origins": "integer col,row in [-16,8] relative to diagnostic strip",
+    "warning": "EXTRAPOLATION ONLY; not measured corners, not a proof of global image topology. y>=160 is a loose necessary paving bound, not a segmentation mask.",
+    "candidates_inside_png": [
+      {
+        "origin_node": [
+          -7,
+          -6
+        ],
+        "predicted_corners_image": [
+          [
+            1007.766781394511,
+            8.885847752626422
+          ],
+          [
+            1632.1834571864924,
+            133.2467125647118
+          ],
+          [
+            1106.5870081675023,
+            392.25098871598135
+          ],
+          [
+            421.15897472028377,
+            161.16958254357505
+          ]
+        ],
+        "all_y_at_least_160": false
+      },
+      {
+        "origin_node": [
+          -8,
+          -5
+        ],
+        "predicted_corners_image": [
+          [
+            888.7975662918429,
+            10.879845993751086
+          ],
+          [
+            1487.9434231661612,
+            136.57248819849127
+          ],
+          [
+            894.9700207505363,
+            399.51176449899776
+          ],
+          [
+            260.08070922354034,
+            164.88360115261818
+          ]
+        ],
+        "all_y_at_least_160": false
+      },
+      {
+        "origin_node": [
+          -7,
+          -5
+        ],
+        "predicted_corners_image": [
+          [
+            950.3469531657903,
+            23.79206924207277
+          ],
+          [
+            1584.3797286976273,
+            156.80351192608458
+          ],
+          [
+            1007.4781687030768,
+            441.09000441631093
+          ],
+          [
+            320.6409876543209,
+            187.2641116478799
+          ]
+        ],
+        "all_y_at_least_160": false
+      },
+      {
+        "origin_node": [
+          -10,
+          -4
+        ],
+        "predicted_corners_image": [
+          [
+            712.5869153296396,
+            0.49459353695966957
+          ],
+          [
+            1254.9293141154353,
+            120.70087350206545
+          ],
+          [
+            584.5655523730104,
+            368.1951343316052
+          ],
+          [
+            44.79247269732835,
+            147.42343777420805
+          ]
+        ],
+        "all_y_at_least_160": false
+      },
+      {
+        "origin_node": [
+          -9,
+          -4
+        ],
+        "predicted_corners_image": [
+          [
+            768.5368403275751,
+            12.895490762376134
+          ],
+          [
+            1341.7469408008071,
+            139.94337411166592
+          ],
+          [
+            679.2307253403918,
+            406.9139805057519
+          ],
+          [
+            96.69226478601212,
+            168.65088608874672
+          ]
+        ],
+        "all_y_at_least_160": false
+      },
+      {
+        "origin_node": [
+          -8,
+          -4
+        ],
+        "predicted_corners_image": [
+          [
+            827.3508168948523,
+            25.931184355455535
+          ],
+          [
+            1434.1530003505206,
+            160.4245105479345
+          ],
+          [
+            782.7719460871547,
+            449.26320433444204
+          ],
+          [
+            152.13102349374344,
+            191.32580129996083
+          ]
+        ],
+        "all_y_at_least_160": false
+      },
+      {
+        "origin_node": [
+          -7,
+          -4
+        ],
+        "predicted_corners_image": [
+          [
+            889.2545358094605,
+            39.65169704889443
+          ],
+          [
+            1532.7050263457245,
+            182.26785610681048
+          ],
+          [
+            896.4989793291396,
+            495.77851052266146
+          ],
+          [
+            211.48350069326378,
+            215.60146005288604
+          ]
+        ],
+        "all_y_at_least_160": false
+      },
+      {
+        "origin_node": [
+          -6,
+          -4
+        ],
+        "predicted_corners_image": [
+          [
+            954.4980404684621,
+            54.112449157715226
+          ],
+          [
+            1638.0372671259283,
+            205.6139873569656
+          ],
+          [
+            1021.9926156067783,
+            547.106455600652
+          ],
+          [
+            275.1792957234271,
+            241.65357206416033
+          ]
+        ],
+        "all_y_at_least_160": false
+      },
+      {
+        "origin_node": [
+          -8,
+          -3
+        ],
+        "predicted_corners_image": [
+          [
+            761.9513330512061,
+            41.950742260006855
+          ],
+          [
+            1375.9750880604395,
+            186.2220557530164
+          ],
+          [
+            656.990495141114,
+            505.03785383650916
+          ],
+          [
+            34.83130264387665,
+            220.05828602162282
+          ]
+        ],
+        "all_y_at_least_160": false
+      },
+      {
+        "origin_node": [
+          -7,
+          -3
+        ],
+        "predicted_corners_image": [
+          [
+            824.1255390388966,
+            56.559223267544084
+          ],
+          [
+            1476.6693235413761,
+            209.8812212095559
+          ],
+          [
+            771.3810113907315,
+            557.4343470106937
+          ],
+          [
+            92.52265220087281,
+            246.48376693016579
+          ]
+        ],
+        "all_y_at_least_160": false
+      },
+      {
+        "origin_node": [
+          -6,
+          -3
+        ],
+        "predicted_corners_image": [
+          [
+            889.7680322756171,
+            71.98261469655351
+          ],
+          [
+            1584.5939708335945,
+            235.2392476638973
+          ],
+          [
+            898.402306432735,
+            615.6163592687833
+          ],
+          [
+            154.63259752959434,
+            274.9331824338416
+          ]
+        ],
+        "all_y_at_least_160": false
+      },
+      {
+        "origin_node": [
+          -6,
+          -2
+        ],
+        "predicted_corners_image": [
+          [
+            820.4872712286111,
+            91.10911727443413
+          ],
+          [
+            1526.2649212996964,
+            267.57283102756986
+          ],
+          [
+            757.0,
+            693.9999999999999
+          ],
+          [
+            22.295363327089905,
+            311.46783379840235
+          ]
+        ],
+        "all_y_at_least_160": false
+      },
+      {
+        "origin_node": [
+          -5,
+          -2
+        ],
+        "predicted_corners_image": [
+          [
+            890.3492357143417,
+            108.5765189440677
+          ],
+          [
+            1645.4598273853105,
+            297.37481722847207
+          ],
+          [
+            900.8366809351335,
+            768.8901727182925
+          ],
+          [
+            87.23017237373969,
+            345.276866607815
+          ]
+        ],
+        "all_y_at_least_160": false
+      }
+    ],
+    "candidates_above_loose_paving_bound": 0
+  }
+}
+```
 
 ## docs/references/architecture_proposal.md
 
@@ -2830,13 +5085,168 @@ if __name__ == "__main__":
   "mode": "perspective",
   "scenario_file": "scenarios/war_torn.json",
   "asset_root": "assets/skins/war_torn",
-  "viewport": {"reference_size":[1280,720],"background_fit":"contain"},
-  "board": {
-    "cols":8,"rows":8,"reference_image_size":[1672,941],
-    "corners":{"p00":[1060,270],"p10":[1530,452],"p11":[892,898],"p01":[340,568]}
+  "viewport": {
+    "reference_size": [
+      1280,
+      720
+    ],
+    "background_fit": "contain"
   },
-  "hud": {"layout":"overlay","safe_margin":24},
-  "debug": {"show_grid":false,"show_cell_centers":false,"show_coordinates":false}
+  "board": {
+    "cols": 8,
+    "rows": 8,
+    "reference_image_size": [
+      1672,
+      941
+    ],
+    "corners": {
+      "p00": [
+        785.8062519854639,
+        286.44325233527604
+      ],
+      "p10": [
+        1493.02283721993,
+        531.1572489530942
+      ],
+      "p11": [
+        1042.6596392405297,
+        844.3669334366049
+      ],
+      "p01": [
+        298.78755614375797,
+        467.71591609752414
+      ]
+    },
+    "reference_region": [
+      1,
+      3,
+      6,
+      4
+    ],
+    "cells": [
+      [
+        3,
+        2
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        6
+      ]
+    ]
+  },
+  "hud": {
+    "layout": "overlay",
+    "safe_margin": 24
+  },
+  "debug": {
+    "show_grid": false,
+    "show_cell_centers": false,
+    "show_coordinates": false
+  }
 }
 ```
 
@@ -2894,6 +5304,263 @@ if __name__ == "__main__":
     print(json.dumps(build(args.ref, args.output_dir), indent=2))
 ```
 
+## scripts/calibrate_board.py
+
+```python
+"""Inspect measured seams or collect a draft homography calibration; never changes gameplay config."""
+
+import argparse
+from dataclasses import replace
+import hashlib
+import json
+import math
+from pathlib import Path
+import struct
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from tactics.data_files import DataError, fields, read_json, rooted_path, version
+from tactics.perspective_geometry import BackgroundFit, PerspectiveBoardGeometry, pair
+from tactics.presentation_layout import size_pair
+
+DEFAULT = ROOT / "docs/calibration/war_torn_observations.json"
+CORNER_NAMES = ("p00", "p10", "p11", "p01")
+
+
+def load_observations(path):
+    data = read_json(path)
+    label = str(path)
+    fields(data, ("schema_version", "status", "image", "sha256", "image_size", "viewport_size",
+                  "physical_span", "corners", "samples", "annotation"), (), label)
+    version(data, label)
+    if data["status"] not in ("diagnostic_only", "draft"):
+        raise DataError(label + ": observations must be diagnostic_only or draft")
+    image = rooted_path(ROOT, data["image"], label + ".image")
+    raw = image.read_bytes()
+    if raw[:8] != b"\x89PNG\r\n\x1a\n" or len(raw) < 24:
+        raise DataError(label + ": invalid native PNG")
+    if hashlib.sha256(raw).hexdigest() != data["sha256"]:
+        raise DataError(label + ": background SHA256 changed; recheck annotations")
+    native = struct.unpack(">II", raw[16:24])
+    if native != size_pair(data["image_size"], label + ".image_size"):
+        raise DataError(label + ": native image size differs from observations")
+    span = size_pair(data["physical_span"], label + ".physical_span")
+    viewport = size_pair(data["viewport_size"], label + ".viewport_size")
+    fields(data["corners"], CORNER_NAMES, (), label + ".corners")
+    try:
+        geometry = PerspectiveBoardGeometry(*span,
+            tuple(data["corners"][key] for key in CORNER_NAMES), native, viewport)
+    except (TypeError, ValueError) as error:
+        raise DataError(label + ": " + str(error)) from error
+    if not isinstance(data["samples"], list) or not data["samples"]:
+        raise DataError(label + ": independent interior samples are required")
+    seen = set()
+    for sample in data["samples"]:
+        fields(sample, ("node", "image", "band"), (), label + ".sample")
+        node = pair(sample["node"], "sample node")
+        point = pair(sample["image"], "sample image")
+        if (any(type(v) is not int for v in node)
+                or not (0 < node[0] < geometry.cols and 0 < node[1] < geometry.rows)
+                or not (0 <= point[0] < native[0] and 0 <= point[1] < native[1])
+                or node in seen or sample["band"] not in ("far", "middle", "near")):
+            raise DataError(label + ": duplicate, outside, or invalid interior sample")
+        seen.add(node)
+    return data, geometry
+
+
+def measure(data, geometry):
+    """Only held-out observations enter error statistics; four fitted corners do not."""
+    errors = []
+    for sample in data["samples"]:
+        projected = geometry.project(sample["node"])
+        observed = geometry.fit.to_screen(sample["image"])
+        errors.append({"node": sample["node"], "observed_image": sample["image"],
+                       "predicted_image": list(geometry.fit.to_image(projected)),
+                       "band": sample["band"], "error_viewport_px": math.dist(projected, observed)})
+
+    def statistics(points):
+        values = [point["error_viewport_px"] for point in points]
+        return {"count": len(values), "mean_px": sum(values)/len(values), "max_px": max(values)}
+
+    summary = statistics(errors)
+    report = {"image_sha256": data["sha256"], "viewport_size": list(geometry.viewport_size),
+              "scale": geometry.fit.scale, "offset": list(geometry.fit.offset),
+              "measured_physical_span": data["physical_span"], "interior": summary,
+              "bands": {band: statistics([p for p in errors if p["band"] == band])
+                        for band in ("far", "middle", "near") if any(p["band"] == band for p in errors)},
+              "points": errors, "local_threshold_met": summary["mean_px"] <= 6 and summary["max_px"] <= 12,
+              "requested_8x8_verified": False,
+              "reason": "This is a diagnostic strip, not a measured complete 8x8 region. No acceptance claim or automatic config export."}
+    return report
+
+
+def inspect_extent(geometry):
+    """Finite diagnostic search, never promotes extrapolated vertices to measurements."""
+    candidates = []
+    for row in range(-16, 9):
+        for col in range(-16, 9):
+            nodes = ((col,row),(col+8,row),(col+8,row+8),(col,row+8))
+            try:
+                points = [geometry.fit.to_image(geometry.project(node)) for node in nodes]
+            except ValueError:
+                continue
+            if all(0 <= x <= geometry.reference_size[0] and 0 <= y <= geometry.reference_size[1]
+                   for x,y in points):
+                candidates.append({"origin_node": [col,row], "predicted_corners_image": points,
+                                   "all_y_at_least_160": all(y >= 160 for _,y in points)})
+    return {"search_origins": "integer col,row in [-16,8] relative to diagnostic strip",
+            "warning": "EXTRAPOLATION ONLY; not measured corners, not a proof of global image topology. y>=160 is a loose necessary paving bound, not a segmentation mask.",
+            "candidates_inside_png": candidates,
+            "candidates_above_loose_paving_bound": sum(c["all_y_at_least_160"] for c in candidates)}
+
+
+def capture_game(data, geometry, output):
+    import pygame
+    from tactics.game import Game
+
+    game = Game(presentation_file="presentations/war_torn_8x8.json", debug_grid=True)
+    try:
+        geometry = replace(geometry, viewport_size=game.screen.get_size())
+        game.draw()
+        font = pygame.font.Font(None, 18)
+        polygon = [geometry.fit.to_screen(data["corners"][key]) for key in CORNER_NAMES]
+        pygame.draw.polygon(game.screen, (255,210,70), polygon, 2)
+        for key, point in zip(CORNER_NAMES, polygon):
+            pygame.draw.circle(game.screen, (255,210,70), point, 5, 1)
+            game.screen.blit(font.render("REF " + key, True, (255,230,90)), (point[0]+6,point[1]-20))
+        for sample in data["samples"]:
+            observed = geometry.fit.to_screen(sample["image"])
+            predicted = geometry.project(sample["node"])
+            pygame.draw.line(game.screen, (255,160,110), observed, predicted, 2)
+            pygame.draw.circle(game.screen, (80,255,170), observed, 4, 1)
+            pygame.draw.circle(game.screen, (255,140,140), predicted, 2)
+            game.screen.blit(font.render("REF {},{}".format(*sample["node"]), True, (110,255,180)),
+                             (observed[0]+5,observed[1]+4))
+        pygame.display.flip()
+        pygame.event.pump()
+        pygame.image.save(game.screen, str(output))
+        print("Actual Game diagnostic screenshot; SDL driver=" + pygame.display.get_driver())
+        pygame.event.post(pygame.event.Event(pygame.QUIT))
+        game.run()
+    finally:
+        pygame.quit()
+
+
+def pick(image_path, cols, rows, output):
+    """Four corners followed by row-major interior samples; saves raw mouse observations only."""
+    import pygame
+
+    raw = image_path.read_bytes()
+    pygame.display.init()
+    pygame.font.init()
+    screen = pygame.display.set_mode((1280,720))
+    pygame.display.set_caption("Homography calibration DRAFT - native image coordinates")
+    original = pygame.image.load(str(image_path)).convert_alpha()
+    fit = BackgroundFit(original.get_size(), screen.get_size())
+    background = pygame.transform.smoothscale(original, tuple(round(v*fit.scale) for v in original.get_size()))
+    font = pygame.font.Font(None, 22)
+    order = [(0,0),(cols,0),(cols,rows),(0,rows)]
+    order += [(col,row) for row in range(1,rows) for col in range(1,cols)]
+    points, geometry, error, preview = [], None, "", True
+    clock = pygame.time.Clock()
+    running = True
+    try:
+        while running:
+            changed = False
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+                    running = False
+                elif (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
+                      and event.pos[1] >= 76 and len(points) < len(order)):
+                    point = fit.to_image(event.pos)
+                    if 0 <= point[0] < original.get_width() and 0 <= point[1] < original.get_height():
+                        points.append(tuple(round(v,2) for v in point))
+                        changed = True
+                elif event.type == pygame.KEYDOWN:
+                    if event.key in (pygame.K_BACKSPACE,pygame.K_z) and points:
+                        points.pop()
+                        changed = True
+                    elif event.key == pygame.K_p:
+                        preview = not preview
+                    elif event.key == pygame.K_s:
+                        result = {"schema_version":1,"status":"draft", "image":image_path.relative_to(ROOT).as_posix(),
+                                  "sha256":hashlib.sha256(raw).hexdigest(), "image_size":list(original.get_size()),
+                                  "viewport_size":[1280,720],"physical_span":[cols,rows],
+                                  "corners":dict(zip(CORNER_NAMES,points[:4])),
+                                  "samples":[{"node":node,"image":point,"band":"far" if node[1]<rows/3 else "near" if node[1]>rows*2/3 else "middle"}
+                                             for node,point in zip(order[4:],points[4:])],
+                                  "annotation":"Draft raw clicks only. Verify stone counts and independent seam landmarks before runtime adoption."}
+                        output.parent.mkdir(parents=True,exist_ok=True)
+                        output.write_text(json.dumps(result,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+                        error = "DRAFT saved: " + str(output)
+            if changed:
+                geometry, error = None, ""
+                if len(points) >= 4:
+                    try:
+                        geometry = PerspectiveBoardGeometry(cols,rows,tuple(points[:4]),original.get_size())
+                    except ValueError as problem:
+                        error = str(problem)
+            screen.fill((21,30,42))
+            screen.blit(background,tuple(round(v) for v in fit.offset))
+            if preview and geometry is not None:
+                for row in range(rows):
+                    for col in range(cols):
+                        pygame.draw.polygon(screen,(140,215,235),geometry.cell_polygon((col,row)),1)
+            for index,point in enumerate(points):
+                screen_point = fit.to_screen(point)
+                pygame.draw.circle(screen,(80,255,160),screen_point,4,1)
+                screen.blit(font.render(str(order[index]),True,(245,230,150)),screen_point)
+            next_point = str(order[len(points)]) if len(points)<len(order) else "all observations collected"
+            bar = pygame.Surface((1280,76),pygame.SRCALPHA)
+            bar.fill((15,22,30,220))
+            screen.blit(bar,(0,0))
+            for index,line in enumerate(("DRAFT: pick real seam intersections. Next="+next_point,
+                                         "Left: mark | Backspace/Z: undo | P: preview | S: save draft | Esc: quit",
+                                         error)):
+                screen.blit(font.render(line,True,(240,232,206)),(12,6+index*22))
+            pygame.display.flip()
+            clock.tick(30)
+    finally:
+        pygame.quit()
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--observations",type=Path,default=DEFAULT)
+    parser.add_argument("--report",type=Path)
+    parser.add_argument("--screenshot",type=Path,help="actual Game with F3 plus observed seam overlay")
+    parser.add_argument("--pick",action="store_true",help="open draft four-corner and interior-point picker")
+    parser.add_argument("--cols",type=int,default=8)
+    parser.add_argument("--rows",type=int,default=8)
+    parser.add_argument("--output",type=Path,default=ROOT/".delivery/war_torn_calibration_draft.json")
+    args = parser.parse_args()
+    try:
+        if args.pick:
+            if args.cols < 2 or args.rows < 2:
+                raise DataError("calibration requires at least 2 rows/columns for interior samples")
+            pick(ROOT/"assets/skins/war_torn/backgrounds/battlefield.png",args.cols,args.rows,args.output)
+            return
+        data, geometry = load_observations(args.observations)
+        report = measure(data,geometry)
+        report["extent_diagnostic"] = inspect_extent(geometry)
+        encoded = json.dumps(report,ensure_ascii=False,indent=2)+"\n"
+        if args.report:
+            args.report.parent.mkdir(parents=True,exist_ok=True)
+            args.report.write_text(encoded,encoding="utf-8")
+        print(encoded)
+        if args.screenshot:
+            capture_game(data,geometry,args.screenshot)
+    except (OSError,ValueError,KeyError,TypeError) as error:
+        parser.exit(2,"Calibration error: {}\n".format(error))
+
+
+if __name__ == "__main__":
+    main()
+```
+
 ## scripts/export_source.py
 
 ```python
@@ -2941,6 +5608,213 @@ def main():
         with OUTPUT.open("w", encoding="utf-8", newline="\n") as output:
             output.write(expected)
         print("SOURCE.md generated ({} files).".format(len(source_files())))
+
+
+if __name__ == "__main__":
+    main()
+```
+
+## scripts/fit_board.py
+
+```python
+"""Refine ONE homography from native-image observations; keep holdouts independent."""
+
+import argparse
+import hashlib
+import json
+import math
+from pathlib import Path
+import struct
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from tactics.data_files import DataError, fields, read_json, rooted_path, version
+from tactics.perspective_geometry import PerspectiveBoardGeometry, pair, transform
+from tactics.presentation_layout import size_pair
+
+DEFAULT = ROOT / "docs/calibration/war_torn_map_observations.json"
+PRESENTATION = ROOT / "presentations/war_torn_8x8.json"
+NAMES = ("p00", "p10", "p11", "p01")
+
+
+def solve(matrix, values):
+    rows = [list(row)+[value] for row,value in zip(matrix,values)]
+    for col in range(len(values)):
+        pivot = max(range(col,len(values)), key=lambda r: abs(rows[r][col]))
+        rows[col],rows[pivot] = rows[pivot],rows[col]
+        divisor = rows[col][col]
+        if abs(divisor) < 1e-12:
+            raise DataError("calibration observations do not determine a homography")
+        rows[col] = [v/divisor for v in rows[col]]
+        for row in range(len(values)):
+            if row != col:
+                factor = rows[row][col]
+                rows[row] = [a-factor*b for a,b in zip(rows[row],rows[col])]
+    return tuple(row[-1] for row in rows)
+
+
+def fit_corners(data):
+    """Offline linear least squares. Only role=calibration is allowed into the fit."""
+    ox,oy,width,height = data["reference_region"]
+    iw,ih = data["image_size"]
+    equations,values = [],[]
+    for item in data["observations"]:
+        if item["role"] != "calibration":
+            continue
+        u,v = (item["node"][0]-ox)/width,(item["node"][1]-oy)/height
+        x,y = item["image"][0]/iw,item["image"][1]/ih
+        equations.extend(((u,v,1,0,0,0,-x*u,-x*v),(0,0,0,u,v,1,-y*u,-y*v)))
+        values.extend((x,y))
+    normal = [[sum(row[i]*row[j] for row in equations) for j in range(8)] for i in range(8)]
+    rhs = [sum(row[i]*v for row,v in zip(equations,values)) for i in range(8)]
+    matrix = (*solve(normal,rhs),1)
+    return tuple(tuple(v*d for v,d in zip(transform(matrix,p),(iw,ih)))
+                 for p in ((0,0),(1,0),(1,1),(0,1)))
+
+
+def load_map(path=DEFAULT):
+    data = read_json(path)
+    label = str(path)
+    fields(data,("schema_version","image","sha256","image_size","viewport_size","logical_size",
+                 "reference_region","cells","observations","annotation"),(),label)
+    version(data,label)
+    image = rooted_path(ROOT,data["image"],label+".image")
+    raw = image.read_bytes()
+    if raw[:8] != b"\x89PNG\r\n\x1a\n" or len(raw) < 24 or hashlib.sha256(raw).hexdigest() != data["sha256"]:
+        raise DataError("native background changed or invalid PNG; recheck observations")
+    native = struct.unpack(">II",raw[16:24])
+    if native != size_pair(data["image_size"],label+".image_size"):
+        raise DataError("native image dimensions differ from observations")
+    cols,rows = size_pair(data["logical_size"],label+".logical_size")
+    viewport = size_pair(data["viewport_size"],label+".viewport_size")
+    if not isinstance(data["observations"],list):
+        raise DataError("observations must be a list")
+    observed = {}
+    for item in data["observations"]:
+        fields(item,("node","image","role","band"),(),label+".observation")
+        node,point = pair(item["node"],"node"),pair(item["image"],"image point")
+        if (any(type(v) is not int for v in node) or not (0 <= node[0] <= cols and 0 <= node[1] <= rows)
+                or not (0 <= point[0] < native[0] and 0 <= point[1] < native[1]) or node in observed
+                or item["role"] not in ("calibration","validation") or item["band"] not in ("far","middle","near")):
+            raise DataError("duplicate or invalid native observation")
+        observed[node] = point
+    if any(sum(item["role"]==role for item in data["observations"]) < 4 for role in ("calibration","validation")):
+        raise DataError("at least four calibration and four independent validation points required")
+    if any(not any(p["role"]=="validation" and p["band"]==band for p in data["observations"])
+           for band in ("far","middle","near")):
+        raise DataError("independent validation must cover far, middle and near bands")
+    corners = fit_corners(data)
+    geometry = PerspectiveBoardGeometry(cols,rows,corners,native,viewport,data["reference_region"],data["cells"])
+    needed = {(c+dx,r+dy) for c,r in geometry.cells for dx,dy in ((0,0),(1,0),(1,1),(0,1))}
+    if needed != observed.keys():
+        raise DataError("every playable tile vertex must have a real observation, with no unused nodes")
+    return data,geometry
+
+
+def statistics(points):
+    values = [item["error_px"] for item in points]
+    return {"count":len(values),"mean_px":sum(values)/len(values),"max_px":max(values)}
+
+
+def measure_map(data,geometry):
+    points = [{**item,"predicted_image":list(geometry.fit.to_image(geometry.project(item["node"]))),
+               "error_px":math.dist(geometry.project(item["node"]),geometry.fit.to_screen(item["image"]))}
+              for item in data["observations"]]
+    ox,oy,width,height = data["reference_region"]
+    nodes = ((ox,oy),(ox+width,oy),(ox+width,oy+height),(ox,oy+height))
+    observed = {tuple(item["node"]):item["image"] for item in points}
+    baseline = PerspectiveBoardGeometry(geometry.cols,geometry.rows,tuple(observed[n] for n in nodes),
+        geometry.reference_size,geometry.viewport_size,geometry.reference_region,geometry.cells)
+    baseline_points = [{"error_px":math.dist(baseline.project(p["node"]),baseline.fit.to_screen(p["image"]))}
+                       for p in points if tuple(p["node"]) not in nodes]
+    validation = [p for p in points if p["role"]=="validation"]
+    cells = frozenset(geometry.cells)
+    interior = [p for p in validation if all((p["node"][0]+dx,p["node"][1]+dy) in cells
+                for dx,dy in ((-1,-1),(0,-1),(0,0),(-1,0)))]
+    metrics = statistics(validation)
+    all_metrics = statistics(points)
+    return {"image_sha256":data["sha256"],"viewport_size":list(geometry.viewport_size),
+            "scale":geometry.fit.scale,"offset":list(geometry.fit.offset),"playable_cells":len(geometry.cells),
+            "method":"One homography refined offline; runtime PerspectiveBoardGeometry formula unchanged.",
+            "reference_region":data["reference_region"],"fitted_corners_image":dict(zip(NAMES,geometry.corners)),
+            "observed_reference_corners_image":dict(zip(NAMES,(observed[n] for n in nodes))),
+            "four_observed_corners_baseline":statistics(baseline_points),
+            "calibration":statistics([p for p in points if p["role"]=="calibration"]),
+            "independent_validation":metrics,"all_vertices":all_metrics,
+            "independent_interior":statistics(interior) if interior else None,
+            "bands":{band:statistics([p for p in validation if p["band"]==band]) for band in ("far","middle","near")},
+            "threshold_met":metrics["mean_px"] <= 6 and metrics["max_px"] <= 12
+                            and all_metrics["mean_px"] <= 6 and all_metrics["max_px"] <= 12,
+            "full_rectangular_8x8":False,"points":points}
+
+
+def check_presentation(data,geometry,path=PRESENTATION):
+    board = read_json(path)["board"]
+    if (board.get("reference_region") != data["reference_region"] or board.get("cells") != data["cells"]
+            or board["reference_image_size"] != data["image_size"]
+            or [board["cols"],board["rows"]] != data["logical_size"]
+            or any(math.dist(board["corners"][name],point) > 1e-5 for name,point in zip(NAMES,geometry.corners))):
+        raise DataError("presentation differs from measured calibration; regenerate explicitly with --write-presentation")
+
+
+def capture_game(data,geometry,output):
+    """Capture the actual Game/F3 surface; optional measured-point overlay is diagnostic UI."""
+    import pygame
+    from tactics.game import Game
+    game = Game(presentation_file=PRESENTATION.relative_to(ROOT).as_posix(),debug_grid=True)
+    try:
+        game.draw()
+        for item in data["observations"]:
+            if item["role"] != "validation":
+                continue
+            measured = geometry.fit.to_screen(item["image"])
+            projected = geometry.project(item["node"])
+            pygame.draw.line(game.screen,(255,180,130),measured,projected,1)
+            pygame.draw.circle(game.screen,(80,255,150),measured,4,1)
+            pygame.draw.circle(game.screen,(255,140,140),projected,2)
+        pygame.display.flip()
+        pygame.event.pump()
+        output.parent.mkdir(parents=True,exist_ok=True)
+        pygame.image.save(game.screen,str(output))
+        print("Actual Game/F3 capture; SDL driver="+pygame.display.get_driver())
+        pygame.event.post(pygame.event.Event(pygame.QUIT))
+        game.run()
+    finally:
+        pygame.quit()
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--observations",type=Path,default=DEFAULT)
+    parser.add_argument("--report",type=Path)
+    parser.add_argument("--check",action="store_true")
+    parser.add_argument("--write-presentation",action="store_true")
+    parser.add_argument("--screenshot",type=Path,help="actual Game/F3 with held-out seam markers")
+    args = parser.parse_args()
+    try:
+        data,geometry = load_map(args.observations)
+        report = measure_map(data,geometry)
+        if not report["threshold_met"]:
+            raise DataError("measured alignment does not meet 6/12 px thresholds")
+        if args.write_presentation:
+            config = read_json(PRESENTATION)
+            config["board"].update(corners=dict(zip(NAMES,geometry.corners)),
+                                   reference_region=data["reference_region"],cells=data["cells"])
+            PRESENTATION.write_text(json.dumps(config,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+        if args.check:
+            check_presentation(data,geometry)
+        if args.report:
+            args.report.parent.mkdir(parents=True,exist_ok=True)
+            args.report.write_text(json.dumps(report,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+        if args.screenshot:
+            check_presentation(data,geometry)
+            capture_game(data,geometry,args.screenshot)
+        print(json.dumps({k:v for k,v in report.items() if k != "points"},ensure_ascii=False,indent=2))
+    except (OSError,ValueError,KeyError,TypeError) as error:
+        parser.exit(2,"Calibration error: {}\n".format(error))
 
 
 if __name__ == "__main__":
@@ -3119,6 +5993,7 @@ def verify(archive, expected_commit=None):
         env = dict(os.environ, PYTHONPATH=str(root), PYGAME_HIDE_SUPPORT_PROMPT="1",
                    SDL_VIDEODRIVER="dummy", SDL_AUDIODRIVER="dummy")
         for args in (("scripts/export_source.py", "--check"), ("main.py", "--help"),
+                     ("-S", "scripts/fit_board.py", "--check"),
                      ("-m", "unittest", "discover", "-s", "tests", "-p", "test_milestone.py", "-v"),
                      ("-m", "unittest", "discover", "-s", "tests", "-p", "test_perspective_rendering.py", "-v")):
             subprocess.run([sys.executable, *args], cwd=root, env=env, check=True, timeout=180)
@@ -4091,7 +6966,7 @@ from dataclasses import dataclass
 import pygame
 
 from .geometry import BoardGeometry
-from .assets import Clip, SpriteBody
+from .assets import Clip, Sprite, SpriteBody
 from .view_models import AttackPresentation
 
 DAMAGE_DURATION = 0.9
@@ -4169,39 +7044,48 @@ class CombatEffects:
         return ()
 
     def body_views(self):
-        return tuple(SpriteBody(effect.uid, effect.cell, effect.clip.frame_at(effect.age))
-                     for effect in self.sprites)
+        bodies = tuple(SpriteBody(effect.uid, effect.cell, effect.clip.frame_at(effect.age))
+                       for effect in self.sprites)
+        if hasattr(self.geometry, "depth_at"):
+            # Geometric defeat bodies share the renderer's foot-Y/UID ordering with PNG clips.
+            bodies += tuple(SpriteBody(effect.uid, effect.cell, Sprite(self._death_layer(effect), (.5, 1)))
+                            for effect in self.deaths)
+        return bodies
+
+    def _death_layer(self, effect):
+        body_rect = self.geometry.body_rect(effect.cell)
+        cell_size = body_rect[2]
+        scale = self.geometry.cell_scale(effect.cell)
+        progress = effect.age / DEATH_DURATION
+        layer = pygame.Surface((cell_size, cell_size), pygame.SRCALPHA)
+        size = max(1, round(max(4, 42 * (1 - progress * 0.6)) * scale))
+        color = (69, 156, 239) if effect.team == "ally" else (231, 88, 94)
+        if int(effect.age * 20) % 2 == 0:
+            color = (255, 224, 192)
+        center = (cell_size // 2, cell_size // 2)
+        if effect.team == "ally":
+            pygame.draw.circle(layer, color, center, size // 2)
+        else:
+            rect = pygame.Rect(0, 0, size, size)
+            rect.center = center
+            pygame.draw.rect(layer, color, rect, border_radius=3)
+        label = self.label_font.render(effect.uid, True, "white")
+        layer.blit(label, label.get_rect(center=center))
+        for index in range(6):
+            angle = index * math.tau / 6
+            radius = (8 + 23 * progress) * scale
+            point = (round(center[0] + math.cos(angle) * radius),
+                     round(center[1] + math.sin(angle) * radius))
+            pygame.draw.circle(layer, (255, 192, 132), point, max(1, round(3 * (1 - progress) * scale)))
+        layer.set_alpha(round(255 * (1 - progress)))
+        return layer
 
     def draw(self, surface):
         old_clip = surface.get_clip()
         surface.set_clip(old_clip.clip(pygame.Rect(self.geometry.bounds)))
-        for effect in self.deaths:
-            body_rect = self.geometry.body_rect(effect.cell)
-            cell_size = body_rect[2]
-            scale = self.geometry.cell_scale(effect.cell)
-            progress = effect.age / DEATH_DURATION
-            layer = pygame.Surface((cell_size, cell_size), pygame.SRCALPHA)
-            size = max(1, round(max(4, 42 * (1 - progress * 0.6)) * scale))
-            color = (69, 156, 239) if effect.team == "ally" else (231, 88, 94)
-            if int(effect.age * 20) % 2 == 0:
-                color = (255, 224, 192)
-            center = (cell_size // 2, cell_size // 2)
-            if effect.team == "ally":
-                pygame.draw.circle(layer, color, center, size // 2)
-            else:
-                rect = pygame.Rect(0, 0, size, size)
-                rect.center = center
-                pygame.draw.rect(layer, color, rect, border_radius=3)
-            label = self.label_font.render(effect.uid, True, "white")
-            layer.blit(label, label.get_rect(center=center))
-            for index in range(6):
-                angle = index * math.tau / 6
-                radius = (8 + 23 * progress) * scale
-                point = (round(center[0] + math.cos(angle) * radius),
-                         round(center[1] + math.sin(angle) * radius))
-                pygame.draw.circle(layer, (255, 192, 132), point, max(1, round(3 * (1 - progress) * scale)))
-            layer.set_alpha(round(255 * (1 - progress)))
-            surface.blit(layer, body_rect[:2])
+        if not hasattr(self.geometry, "depth_at"):
+            for effect in self.deaths:
+                surface.blit(self._death_layer(effect), self.geometry.body_rect(effect.cell)[:2])
 
         for effect in self.damage_texts:
             progress = effect.age / DAMAGE_DURATION
@@ -4259,6 +7143,12 @@ class Game:
             self.geometry = layout.geometry
             if (scenario.cols,scenario.rows) != (self.geometry.cols,self.geometry.rows):
                 raise DataError("presentation board dimensions differ from scenario")
+            cells = frozenset(self.geometry.cells)
+            voids = {(c,r) for r in range(scenario.rows) for c in range(scenario.cols)} - cells
+            if not voids <= set(scenario.obstacles):
+                raise DataError("presentation void cells must be blocked in scenario.obstacles")
+            if any(unit.cell not in cells for unit in scenario.units):
+                raise DataError("scenario unit starts outside presentation playable cells")
             window_size = self.geometry.viewport_size
         else:
             self.geometry = BoardGeometry(scenario.cols, scenario.rows, CELL_SIZE)
@@ -4308,7 +7198,9 @@ class Game:
             elif isinstance(self.panel,SceneHUD) and self.panel.contains(event.pos):
                 return
             else:
-                self.controller.click_cell(self.geometry.cell_at(event.pos))
+                cell = (self.renderer.cell_at(event.pos,self.controller.get_view_state().board)
+                        if isinstance(self.renderer,PerspectiveBoardRenderer) else self.geometry.cell_at(event.pos))
+                self.controller.click_cell(cell)
 
     def update(self, elapsed):
         self.renderer.update(elapsed)
@@ -4632,6 +7524,7 @@ import pygame
 class PerspectiveBoardRenderer:
     def __init__(self, geometry, assets, debug=()):
         self.geometry = geometry
+        self.cells = frozenset(geometry.cells)
         self.assets = assets
         self.elapsed = 0
         self.debug = dict(debug)
@@ -4644,24 +7537,26 @@ class PerspectiveBoardRenderer:
 
     def _build_debug_layer(self):
         layer = pygame.Surface(tuple(map(int, self.geometry.viewport_size)), pygame.SRCALPHA)
-        for row in range(self.geometry.rows):
-            for col in range(self.geometry.cols):
-                cell = (col,row)
-                polygon = self.geometry.cell_polygon(cell)
-                center = self.geometry.cell_center(cell)
-                if self.debug.get("show_grid"):
-                    pygame.draw.polygon(layer,(130,210,236,180),polygon,1)
-                if self.debug.get("show_cell_centers"):
-                    pygame.draw.circle(layer,(255,210,90),center,2)
-                if self.debug.get("show_coordinates"):
-                    label = self.debug_font.render("{},{}".format(col,row),True,(255,248,199))
-                    layer.blit(label,label.get_rect(center=center))
+        for col,row in self.geometry.cells:
+            cell = (col,row)
+            polygon = self.geometry.cell_polygon(cell)
+            center = self.geometry.cell_center(cell)
+            if self.debug.get("show_grid"):
+                pygame.draw.polygon(layer,(130,210,236,180),polygon,1)
+            if self.debug.get("show_cell_centers"):
+                pygame.draw.circle(layer,(255,210,90),center,2)
+            if self.debug.get("show_coordinates"):
+                label = self.debug_font.render("{},{}".format(col,row),True,(255,248,199))
+                layer.blit(label,label.get_rect(center=center))
         if self.debug.get("show_grid"):
-            for name, point in zip(("p00","p10","p11","p01"),self.geometry.corners):
+            ox,oy,w,h = self.geometry.reference_region
+            nodes = ((ox,oy),(ox+w,oy),(ox+w,oy+h),(ox,oy+h))
+            for name, point, node in zip(("p00","p10","p11","p01"),self.geometry.corners,nodes):
                 screen = self.geometry.fit.to_screen(point)
                 pygame.draw.circle(layer,(255,160,100),screen,5)
-                label = self.debug_font.render(name,True,(255,238,200))
-                layer.blit(label,(screen[0]+6,screen[1]-18))
+                label = self.debug_font.render("REF {} {}".format(name,node),True,(255,238,200))
+                label_x = screen[0]-label.get_width()-8 if name == "p01" else screen[0]+6
+                layer.blit(label,(label_x,screen[1]-18))
         return layer
 
     def update(self, elapsed):
@@ -4671,6 +7566,27 @@ class PerspectiveBoardRenderer:
         enabled = not any(self.debug.values())
         self.debug = dict.fromkeys(("show_grid","show_cell_centers","show_coordinates"),enabled)
         self._debug_layer = self._build_debug_layer()
+
+    def cell_at(self, position, view):
+        """Visible bodies use the same foot pivots as drawing, then fall back to floor picking."""
+        for unit in sorted(view.units, key=lambda u: (self.geometry.depth_at(u.cell),u.uid), reverse=True):
+            anchor = self.geometry.cell_anchor(unit.cell)
+            clip = self.assets.visual(unit.definition_id,"idle",self.geometry.cell_scale(unit.cell))
+            if clip:
+                sprite = clip.frame_at(self.elapsed)
+                width,height = sprite.surface.get_size()
+                rect = pygame.Rect(round(anchor[0]-width*sprite.pivot[0]),
+                                   round(anchor[1]-height*sprite.pivot[1]),width,height)
+                if rect.collidepoint(position):
+                    x,y = round(position[0]-rect.x),round(position[1]-rect.y)
+                    if 0 <= x < width and 0 <= y < height and sprite.surface.get_at((x,y)).a:
+                        return unit.cell
+            else:
+                rect = pygame.Rect(self.geometry.body_rect(unit.cell))
+                if rect.collidepoint(position):
+                    if unit.team != "ally" or ((position[0]-rect.centerx)**2+(position[1]-rect.centery)**2 <= (rect.width/2)**2):
+                        return unit.cell
+        return self.geometry.cell_at(position)
 
     def draw(self, surface, view, bodies=()):
         if (view.cols,view.rows) != (self.geometry.cols,self.geometry.rows):
@@ -4687,7 +7603,8 @@ class PerspectiveBoardRenderer:
         surface.blit(layer,(0,0))
 
         overrides = {body.uid:body for body in bodies}
-        drawables = [(self.geometry.depth_at(c),"obstacle:{}:{}".format(*c),"obstacle",c) for c in view.obstacles]
+        drawables = [(self.geometry.depth_at(c),"obstacle:{}:{}".format(*c),"obstacle",c)
+                     for c in view.obstacles if c in self.cells]
         drawables += [(self.geometry.depth_at(u.cell),u.uid,"unit",u) for u in view.units if u.uid not in overrides]
         drawables += [(self.geometry.depth_at(b.cell),b.uid,"sprite",b) for b in bodies]
         # Shadows precede all bodies. Cached sprites are never modified in-place.
@@ -4710,6 +7627,7 @@ class PerspectiveBoardRenderer:
                     sprite.blit(surface,anchor)
                 else:
                     rock = rect.inflate(-rect.width*.3,-rect.height*.3)
+                    rock.midbottom = tuple(round(v) for v in anchor)
                     pygame.draw.rect(surface,(92,89,84),rock,border_radius=6)
                     pygame.draw.line(surface,(172,159,133),rock.topleft,rock.bottomright,2)
                 continue
@@ -4717,10 +7635,10 @@ class PerspectiveBoardRenderer:
             if clip:
                 clip.frame_at(self.elapsed).blit(surface,anchor)
             elif item.team == "ally":
-                pygame.draw.circle(surface,(61,131,177),rect.center,round(19*scale))
-                pygame.draw.circle(surface,(163,215,227),rect.center,round(19*scale),2)
+                pygame.draw.circle(surface,(61,131,177),rect.center,rect.width//2)
+                pygame.draw.circle(surface,(163,215,227),rect.center,rect.width//2,2)
             else:
-                block = rect.inflate(-rect.width*.4,-rect.height*.4)
+                block = rect
                 pygame.draw.rect(surface,(170,72,64),block,border_radius=3)
                 pygame.draw.rect(surface,(235,162,128),block,2,border_radius=3)
         # Every mark and health bar remains above all large neighboring bodies.
@@ -4729,10 +7647,10 @@ class PerspectiveBoardRenderer:
             if unit.uid == view.active_uid:
                 pygame.draw.polygon(surface,(239,204,113),self.geometry.cell_polygon(unit.cell),2)
             if unit.uid == view.selected_uid:
-                pygame.draw.ellipse(surface,(235,238,219),rect.inflate(8,8),2)
+                pygame.draw.polygon(surface,(235,238,219),self.geometry.cell_polygon(unit.cell),3)
             label = self.label_font.render(unit.uid,True,(255,249,225))
             surface.blit(label,label.get_rect(center=rect.center))
-            bar = pygame.Rect(rect.x+6,rect.bottom-3,max(12,rect.width-12),4)
+            bar = pygame.Rect(rect.x,rect.top-7,rect.width,4)
             pygame.draw.rect(surface,(33,30,28),bar)
             fill = bar.copy()
             fill.width = round(bar.width*min(1,unit.health/max(1,unit.max_health)))
@@ -4811,6 +7729,9 @@ class PerspectiveBoardGeometry:
     corners: tuple
     reference_size: tuple
     viewport_size: tuple = (1280, 720)
+    reference_region: tuple = None
+    cells: tuple = None
+    _cell_set: frozenset = field(init=False, repr=False)
     _matrix: tuple = field(init=False, repr=False)
     _inverse: tuple = field(init=False, repr=False)
     _polygons: tuple = field(init=False, repr=False)
@@ -4822,6 +7743,24 @@ class PerspectiveBoardGeometry:
     def __post_init__(self):
         if any(type(v) is not int or v <= 0 for v in (self.cols, self.rows)):
             raise ValueError("board dimensions must be positive integers")
+        region = (0, 0, self.cols, self.rows) if self.reference_region is None else self.reference_region
+        if (not isinstance(region, (tuple, list)) or len(region) != 4
+                or any(type(v) is not int for v in region)
+                or min(region[:2]) < 0 or min(region[2:]) <= 0
+                or region[0]+region[2] > self.cols or region[1]+region[3] > self.rows):
+            raise ValueError("reference_region must be an integer rectangle inside the logical board")
+        object.__setattr__(self, "reference_region", tuple(region))
+        cells = tuple((c,r) for r in range(self.rows) for c in range(self.cols)) if self.cells is None else self.cells
+        if (not isinstance(cells, (tuple, list)) or not cells
+                or any(not isinstance(p, (tuple, list)) or len(p) != 2
+                       or any(type(v) is not int for v in p)
+                       or not (0 <= p[0] < self.cols and 0 <= p[1] < self.rows) for p in cells)):
+            raise ValueError("cells must be nonempty integer cells inside the logical board")
+        cell_set = frozenset(tuple(p) for p in cells)
+        if len(cell_set) != len(cells):
+            raise ValueError("duplicate playable cell")
+        object.__setattr__(self, "_cell_set", cell_set)
+        object.__setattr__(self, "cells", tuple(sorted(cell_set, key=lambda p: (p[1],p[0]))))
         fit = BackgroundFit(self.reference_size, self.viewport_size)
         object.__setattr__(self, "reference_size", fit.image_size)
         object.__setattr__(self, "viewport_size", fit.viewport_size)
@@ -4856,7 +7795,15 @@ class PerspectiveBoardGeometry:
         polygons, centers, anchors, scales = [], [], [], []
         for row in range(self.rows):
             for col in range(self.cols):
+                if (col,row) not in self._cell_set:
+                    for cache in (polygons, centers, anchors, scales):
+                        cache.append(None)
+                    continue
                 polygon = tuple(self.project(p) for p in ((col,row),(col+1,row),(col+1,row+1),(col,row+1)))
+                if any(not (-EPSILON <= x <= self.reference_size[0]+EPSILON
+                            and -EPSILON <= y <= self.reference_size[1]+EPSILON)
+                       for x,y in (self.fit.to_image(point) for point in polygon)):
+                    raise ValueError("playable cell projects outside reference image")
                 polygons.append(polygon)
                 centers.append(self.project((col+.5, row+.5)))
                 anchors.append(self.project((col+.5, row+.82)))
@@ -4873,13 +7820,14 @@ class PerspectiveBoardGeometry:
     def _index(self, cell):
         if (not isinstance(cell, (tuple, list)) or len(cell) != 2
                 or any(type(v) is not int for v in cell)
-                or not (0 <= cell[0] < self.cols and 0 <= cell[1] < self.rows)):
+                or tuple(cell) not in self._cell_set):
             raise ValueError("cell outside perspective board: {}".format(cell))
         return cell[1]*self.cols + cell[0]
 
     def project(self, logical_point):
         point = pair(logical_point, "logical point")
-        x, y = transform(self._matrix, (point[0]/self.cols, point[1]/self.rows))
+        ox, oy, width, height = self.reference_region
+        x, y = transform(self._matrix, ((point[0]-ox)/width, (point[1]-oy)/height))
         return self.fit.to_screen((x*self.reference_size[0], y*self.reference_size[1]))
 
     def cell_at(self, position):
@@ -4888,12 +7836,14 @@ class PerspectiveBoardGeometry:
             if not (0 <= x < self.reference_size[0] and 0 <= y < self.reference_size[1]):
                 return None
             u, v = transform(self._inverse, (x/self.reference_size[0], y/self.reference_size[1]))
-            u, v = u*self.cols, v*self.rows
+            ox, oy, width, height = self.reference_region
+            u, v = u*width+ox, v*height+oy
             # Snap roundoff on exact shared edges; ownership remains [left, right).
             u = round(u) if abs(u-round(u)) < EPSILON else u
             v = round(v) if abs(v-round(v)) < EPSILON else v
             if 0 <= u < self.cols and 0 <= v < self.rows:
-                return math.floor(u), math.floor(v)
+                cell = math.floor(u), math.floor(v)
+                return cell if cell in self._cell_set else None
         except (ValueError, TypeError, OverflowError):
             pass
         return None
@@ -4914,15 +7864,13 @@ class PerspectiveBoardGeometry:
         return self.cell_anchor(cell)[1]
 
     def body_rect(self, cell):
-        # Geometric placeholders remain centered on their actual pickable cell.
-        # PNG bodies use cell_anchor separately, so their bottom pivot stays intact.
-        x, y = self.cell_center(cell)
-        size = round(64*self.cell_scale(cell))
-        return round(x-size/2), round(y-size/2), size, size
+        x, y = self.cell_anchor(cell)
+        size = round(42*self.cell_scale(cell))
+        return round(x-size/2), round(y-size), size, size
 
     @property
     def scales(self):
-        return tuple(sorted(set(self._scales)))
+        return tuple(sorted(s for s in set(self._scales) if s is not None))
 ```
 
 ## tactics/presentation_layout.py
@@ -4970,14 +7918,16 @@ def load_presentation(filename, root=None):
     if viewport["background_fit"] != "contain":
         raise DataError(label + ": background_fit must be contain")
     viewport_size = size_pair(viewport["reference_size"], label + ".viewport.reference_size")
-    fields(board, ("cols","rows","reference_image_size","corners"), (), label + ".board")
+    fields(board, ("cols","rows","reference_image_size","corners"), ("reference_region","cells"), label + ".board")
     cols = number(board["cols"], label + ".board.cols", minimum=1, integer=True)
     rows = number(board["rows"], label + ".board.rows", minimum=1, integer=True)
     image_size = size_pair(board["reference_image_size"], label + ".board.reference_image_size")
+    if any(key in board and board[key] is None for key in ("reference_region","cells")):
+        raise DataError(label + ".board: optional region/cells cannot be null")
     fields(board["corners"], ("p00","p10","p11","p01"), (), label + ".board.corners")
     try:
         geometry = PerspectiveBoardGeometry(cols, rows, tuple(board["corners"][k] for k in ("p00","p10","p11","p01")),
-                                            image_size, viewport_size)
+                                            image_size, viewport_size, board.get("reference_region"), board.get("cells"))
     except ValueError as error:
         raise DataError(label + ".board.corners: " + str(error)) from error
     fields(hud, ("layout","safe_margin"), (), label + ".hud")
@@ -5726,6 +8676,125 @@ class BattleChecks(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+```
+
+## tests/test_calibration.py
+
+```python
+"""Observation integrity and independent error metrics; no Pygame required."""
+
+from copy import deepcopy
+import json
+from pathlib import Path
+import tempfile
+import unittest
+
+from scripts.calibrate_board import DEFAULT, inspect_extent, load_observations, measure
+from tactics.data_files import DataError
+from tactics.perspective_geometry import PerspectiveBoardGeometry
+from scripts.fit_board import load_map, measure_map, check_presentation
+
+
+class CalibrationChecks(unittest.TestCase):
+    def setUp(self):
+        self.data,self.geometry = load_observations(DEFAULT)
+
+    def test_measured_strip_is_not_claimed_as_eight_by_eight(self):
+        report = measure(self.data,self.geometry)
+        self.assertEqual(report['measured_physical_span'],[2,6])
+        self.assertEqual(report['interior']['count'],5)
+        self.assertAlmostEqual(report['interior']['mean_px'],5.555742450788599)
+        self.assertAlmostEqual(report['interior']['max_px'],11.713753031428595)
+        self.assertTrue(report['local_threshold_met'])
+        self.assertFalse(report['requested_8x8_verified'])
+
+    def test_metric_uses_holdout_points_excludes_fitted_corners(self):
+        geometry = PerspectiveBoardGeometry(4,4,((0,0),(400,0),(400,400),(0,400)),(400,400),(400,400))
+        data = {'sha256':'test','physical_span':[4,4], 'samples':[
+            {'node':[1,1],'image':[102,100],'band':'far'},
+            {'node':[2,2],'image':[210,200],'band':'near'}]}
+        report = measure(data,geometry)
+        self.assertEqual(report['interior'],{'count':2,'mean_px':6.0,'max_px':10.0})
+        data['samples'][1]['image']=[214,200]
+        self.assertFalse(measure(data,geometry)['local_threshold_met'])
+
+    def test_scaled_viewport_metrics_scale_with_background(self):
+        from dataclasses import replace
+        original = measure(self.data,self.geometry)
+        small = measure(self.data,replace(self.geometry,viewport_size=(640,360)))
+        self.assertAlmostEqual(small['interior']['mean_px'],original['interior']['mean_px']/2)
+        self.assertAlmostEqual(small['interior']['max_px'],original['interior']['max_px']/2)
+
+    def test_invalid_source_digest_duplicate_sample_and_placeholder_rejected(self):
+        variations = []
+        changed=deepcopy(self.data); changed['sha256']='0'*64; variations.append(changed)
+        changed=deepcopy(self.data); changed['samples'].append(changed['samples'][0]); variations.append(changed)
+        changed=deepcopy(self.data); changed['corners']={k:[0,0] for k in changed['corners']}; variations.append(changed)
+        changed=deepcopy(self.data); changed['samples'][0]['node']=[0,1]; variations.append(changed)
+        changed=deepcopy(self.data); changed['physical_span']=[True,6]; variations.append(changed)
+        changed=deepcopy(self.data); changed['image']='../../escape.png'; variations.append(changed)
+        with tempfile.TemporaryDirectory() as temp:
+            path=Path(temp)/'observations.json'
+            for data in variations:
+                with self.subTest(data=data):
+                    path.write_text(json.dumps(data),encoding='utf-8')
+                    with self.assertRaises(DataError): load_observations(path)
+
+    def test_extent_candidates_are_explicitly_extrapolation_not_observations(self):
+        data=deepcopy(self.data)
+        result=inspect_extent(self.geometry)
+        self.assertIn('EXTRAPOLATION ONLY',result['warning'])
+        self.assertTrue(result['candidates_inside_png'])
+        self.assertEqual(result['candidates_above_loose_paving_bound'],0)
+        self.assertEqual(self.data,data)
+
+    def test_source_points_are_native_coordinates_and_interior_picks_roundtrip(self):
+        self.assertEqual(self.geometry.reference_size,(1672,941))
+        for sample in self.data['samples']:
+            self.assertEqual(self.geometry.cell_at(self.geometry.cell_center((0,sample['node'][1]-1))),
+                             (0,sample['node'][1]-1))
+            native=self.geometry.fit.to_image(self.geometry.fit.to_screen(sample['image']))
+            for a,b in zip(native,sample['image']): self.assertAlmostEqual(a,b)
+
+    def test_irregular_map_holdouts_meet_target_and_runtime_matches_fit(self):
+        data,geometry=load_map()
+        report=measure_map(data,geometry)
+        self.assertTrue(report['threshold_met'])
+        self.assertFalse(report['full_rectangular_8x8'])
+        self.assertEqual(report['playable_cells'],28)
+        self.assertEqual(report['independent_validation']['count'],20)
+        self.assertAlmostEqual(report['independent_validation']['mean_px'],5.567315763585733)
+        self.assertAlmostEqual(report['independent_validation']['max_px'],11.41999211967498)
+        self.assertEqual(report['independent_interior']['count'],9)
+        self.assertGreater(report['four_observed_corners_baseline']['max_px'],12)
+        # These four reference corners are held out, not falsely reported as zero-error fits.
+        for node in ((1,3),(7,3),(7,7),(1,7)):
+            self.assertEqual(next(p['role'] for p in data['observations'] if tuple(p['node'])==node),'validation')
+        check_presentation(data,geometry)
+
+    def test_map_validation_points_cannot_influence_homography(self):
+        from scripts.fit_board import fit_corners
+        data,geometry=load_map()
+        changed=deepcopy(data)
+        for item in changed['observations']:
+            if item['role']=='validation': item['image'][0]+=30
+        self.assertEqual(fit_corners(changed),fit_corners(data))
+        self.assertFalse(measure_map(changed,geometry)['threshold_met'])
+
+    def test_map_missing_duplicate_and_unusable_observations_rejected(self):
+        data,_=load_map()
+        variations=[]
+        changed=deepcopy(data); changed['observations'].pop(); variations.append(changed)
+        changed=deepcopy(data); changed['observations'].append(changed['observations'][0]); variations.append(changed)
+        changed=deepcopy(data); changed['sha256']='0'*64; variations.append(changed)
+        changed=deepcopy(data)
+        for item in changed['observations']: item['role']='calibration'
+        variations.append(changed)
+        with tempfile.TemporaryDirectory() as temp:
+            path=Path(temp)/'map.json'
+            for changed in variations:
+                path.write_text(json.dumps(changed),encoding='utf-8')
+                with self.subTest(changed=changed),self.assertRaises(DataError): load_map(path)
 ```
 
 ## tests/test_content.py
@@ -6997,7 +10066,9 @@ class PerspectiveGeometryChecks(unittest.TestCase):
                     self.assertEqual(self.geometry.cell_at(self.geometry.project((col+dx,row+dy))), cell)
                 self.assertEqual(self.geometry.cell_at(self.geometry.cell_anchor(cell)), cell)
                 x,y,w,h = self.geometry.body_rect(cell)
-                self.assertEqual(self.geometry.cell_at((x+w/2,y+h/2)),cell)
+                ax,ay = self.geometry.cell_anchor(cell)
+                self.assertLessEqual(abs(x+w/2-ax),1)
+                self.assertLessEqual(abs(y+h-ay),1)
                 self.assertEqual(self.geometry.depth_at(cell), self.geometry.cell_anchor(cell)[1])
 
     def test_polygons_share_exact_edges_and_consistent_winding(self):
@@ -7046,6 +10117,21 @@ class PerspectiveGeometryChecks(unittest.TestCase):
         geometry = PerspectiveBoardGeometry(8,8,((0,0),(800,0),(800,800),(0,800)),(800,800),(800,800))
         self.assertEqual(geometry.cell_center((2,5)),(250.0,550.0))
         self.assertEqual(geometry.cell_at((350,250)),(3,2))
+
+    def test_irregular_mask_reference_rectangle_and_shared_edge_ownership(self):
+        geometry = PerspectiveBoardGeometry(8,8,((100,100),(400,100),(400,400),(100,400)),
+            (800,800),(800,800),(1,2,3,3),((1,2),(2,2),(2,3)))
+        self.assertEqual(geometry.cell_center((2,3)),(250,250))
+        self.assertIsNone(geometry.cell_at(geometry.project((1.5,3.5))))
+        self.assertEqual(geometry.cell_at(geometry.project((2,2.5))),(2,2))
+        self.assertIsNone(geometry.cell_at(geometry.project((3,2.5))))
+        self.assertEqual(geometry.cell_at(geometry.project((2.5,3))),(2,3))
+        for cell in geometry.cells:
+            self.assertEqual(geometry.cell_at(geometry.cell_center(cell)),cell)
+        with self.assertRaises(ValueError): geometry.cell_anchor((1,3))
+        for changes in ({'cells':[]},{'cells':[(1,2),(1,2)]},{'cells':[(True,2)]},
+                        {'reference_region':[]},{'reference_region':[1,2,8,8]}):
+            with self.subTest(changes=changes),self.assertRaises(ValueError): replace(geometry,**changes)
 ```
 
 ## tests/test_perspective_rendering.py
@@ -7135,6 +10221,30 @@ class PerspectiveRenderingChecks(unittest.TestCase):
     def tearDown(self):
         pygame.quit()
 
+    def test_calibration_picker_undo_preview_and_save_raw_draft(self):
+        from scripts.calibrate_board import DEFAULT, load_observations, pick
+        data,geometry=load_observations(DEFAULT)
+        points=list(data['corners'].values())+[s['image'] for s in data['samples']]
+        events=[]
+        # Mark then undo a duplicate corner; saved points must be actual clicks only.
+        for index,point in enumerate(points):
+            position=geometry.fit.to_screen(point)
+            click=pygame.event.Event(pygame.MOUSEBUTTONDOWN,button=1,pos=position)
+            events.append(click)
+            if index==1:
+                events.extend((pygame.event.Event(pygame.KEYDOWN,key=pygame.K_BACKSPACE),click))
+        events.extend(pygame.event.Event(pygame.KEYDOWN,key=key) for key in (pygame.K_p,pygame.K_s))
+        events.append(pygame.event.Event(pygame.QUIT))
+        with tempfile.TemporaryDirectory() as temp:
+            output=Path(temp)/'draft.json'
+            with patch('pygame.event.get',return_value=events):
+                pick(ROOT/data['image'],2,6,output)
+            saved=json.loads(output.read_text(encoding='utf-8'))
+            self.assertEqual(saved['status'],'draft')
+            self.assertEqual(list(saved['corners'].values()),points[:4])
+            self.assertEqual([s['image'] for s in saved['samples']],points[4:])
+            self.assertFalse(pygame.display.get_init())
+
     def test_same_full_combat_trace_as_rectangular_mode(self):
         original=load_content(scenario_file='scenarios/war_torn.json').scenario
         scenario=replace(original,units=tuple(replace(u,health=5) if u.team=='enemy' else u for u in original.units))
@@ -7150,7 +10260,7 @@ class PerspectiveRenderingChecks(unittest.TestCase):
         initial=game.controller.get_view_state()
         for unit in initial.units:
             rect=pygame.Rect(game.geometry.body_rect(unit.cell))
-            self.assertEqual(game.geometry.cell_at(rect.center),unit.cell)
+            self.assertEqual(game.renderer.cell_at(rect.center,initial.board),unit.cell)
         for position in ((30,30),(40,180),(410,60)):
             self.assertTrue(game.panel.contains(position))
             game.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN,button=1,pos=position))
@@ -7184,6 +10294,48 @@ class PerspectiveRenderingChecks(unittest.TestCase):
         center=tuple(round(v) for v in game.geometry.cell_center((2,4)))
         pixel=game.screen.get_at(center)
         self.assertNotEqual(pixel[:3],(76,139,137))  # Range fill preserves image texture via alpha.
+
+    def test_irregular_voids_body_picking_ranges_and_foot_anchored_obstacle(self):
+        original=load_content(scenario_file='scenarios/war_torn.json').scenario
+        scenario=replace(original,obstacles=frozenset(original.obstacles)|{(3,6)})
+        game=Game(scenario,presentation_file=PRESENTATION,debug_grid=True)
+        initial=game.controller.get_view_state()
+        cells=frozenset(game.geometry.cells)
+        self.assertTrue(initial.board.move_cells<=cells)
+        self.assertEqual(tuple((u.uid,u.cell) for u in initial.units),tuple((u.uid,u.cell) for u in original.units))
+        for uid in ('D2','D1','A1','A2'):
+            unit=next(u for u in initial.units if u.uid==uid)
+            body=pygame.Rect(game.geometry.body_rect(unit.cell))
+            game.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN,button=1,pos=body.center))
+            self.assertEqual(game.controller.get_view_state().selected.uid,uid)
+        # Ground hits are tested independently of body-selection priority, across all 28 tiles.
+        for cell in cells:
+            self.assertEqual(game.geometry.cell_at(game.geometry.cell_center(cell)),cell)
+        for cell in original.obstacles:
+            self.assertIsNone(game.geometry.cell_at(game.geometry.project((cell[0]+.5,cell[1]+.5))))
+        rectangles=[]
+        draw_rect=pygame.draw.rect
+        def record(surface,color,rect,*args,**kwargs):
+            if color==(92,89,84): rectangles.append(pygame.Rect(rect))
+            return draw_rect(surface,color,rect,*args,**kwargs)
+        with patch('pygame.draw.rect',side_effect=record): game.draw()
+        self.assertEqual(len(rectangles),1)
+        anchor=game.geometry.cell_anchor((3,6))
+        self.assertEqual(rectangles[0].midbottom,tuple(round(v) for v in anchor))
+        self.assertTrue(game.controller.move_to((4,3)))
+        self.assertTrue(game.controller.attack('D1'))
+        game.update(.2)
+        death=next(body for body in game.effects.body_views() if body.uid=='D1')
+        self.assertEqual(death.sprite.pivot,(.5,1))
+        anchors=[]
+        blit=Sprite.blit
+        def record_body(sprite,surface,position):
+            if sprite is not game.renderer.background: anchors.append(position)
+            return blit(sprite,surface,position)
+        with patch.object(Sprite,'blit',record_body): game.draw()
+        self.assertEqual(anchors,[game.geometry.cell_anchor(death.cell)])  # One depth-sorted defeat body.
+        broken=replace(original,obstacles=frozenset())
+        with self.assertRaisesRegex(DataError,'void'): Game(broken,presentation_file=PRESENTATION)
 
     def test_missing_corrupt_and_wrong_sized_background_fail_cleanly(self):
         layout=load_presentation(PRESENTATION)
@@ -7314,7 +10466,16 @@ class PresentationLayoutChecks(unittest.TestCase):
         self.assertEqual(layout.geometry.reference_size,(1672,941))
         for folder in ('assets','assets/skins/dusk','assets/skins/war_torn'):
             self.assertTrue(load_manifest(ROOT/folder).visuals)
-        self.assertEqual(layout.geometry.cell_at(layout.geometry.cell_center((7,7))),(7,7))
+        self.assertEqual(len(layout.geometry.cells),28)
+        self.assertEqual(layout.geometry.cell_at(layout.geometry.cell_center((6,5))),(6,5))
+        self.assertIsNone(layout.geometry.cell_at(layout.geometry.project((7.5,7.5))))
+
+    def test_legacy_full_rectangular_presentation_remains_supported(self):
+        self.data['board'].pop('reference_region')
+        self.data['board'].pop('cells')
+        geometry=self.load().geometry
+        self.assertEqual(len(geometry.cells),64)
+        self.assertEqual(geometry.cell_at(geometry.cell_center((7,7))),(7,7))
 
     def test_unknown_fields_versions_modes_and_placeholder_corners(self):
         for key,value in (('schema_version',2),('mode','unknown'),('unexpected',1)):

@@ -46,6 +46,7 @@ def verify(archive, expected_commit=None):
         env = dict(os.environ, PYTHONPATH=str(root), PYGAME_HIDE_SUPPORT_PROMPT="1",
                    SDL_VIDEODRIVER="dummy", SDL_AUDIODRIVER="dummy")
         for args in (("scripts/export_source.py", "--check"), ("main.py", "--help"),
+                     ("-S", "scripts/fit_board.py", "--check"),
                      ("-m", "unittest", "discover", "-s", "tests", "-p", "test_milestone.py", "-v"),
                      ("-m", "unittest", "discover", "-s", "tests", "-p", "test_perspective_rendering.py", "-v")):
             subprocess.run([sys.executable, *args], cwd=root, env=env, check=True, timeout=180)

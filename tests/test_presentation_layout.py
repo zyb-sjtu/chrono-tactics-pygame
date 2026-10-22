@@ -30,7 +30,16 @@ class PresentationLayoutChecks(unittest.TestCase):
         self.assertEqual(layout.geometry.reference_size,(1672,941))
         for folder in ('assets','assets/skins/dusk','assets/skins/war_torn'):
             self.assertTrue(load_manifest(ROOT/folder).visuals)
-        self.assertEqual(layout.geometry.cell_at(layout.geometry.cell_center((7,7))),(7,7))
+        self.assertEqual(len(layout.geometry.cells),28)
+        self.assertEqual(layout.geometry.cell_at(layout.geometry.cell_center((6,5))),(6,5))
+        self.assertIsNone(layout.geometry.cell_at(layout.geometry.project((7.5,7.5))))
+
+    def test_legacy_full_rectangular_presentation_remains_supported(self):
+        self.data['board'].pop('reference_region')
+        self.data['board'].pop('cells')
+        geometry=self.load().geometry
+        self.assertEqual(len(geometry.cells),64)
+        self.assertEqual(geometry.cell_at(geometry.cell_center((7,7))),(7,7))
 
     def test_unknown_fields_versions_modes_and_placeholder_corners(self):
         for key,value in (('schema_version',2),('mode','unknown'),('unexpected',1)):

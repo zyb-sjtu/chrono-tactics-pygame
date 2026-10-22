@@ -34,6 +34,12 @@ class Game:
             self.geometry = layout.geometry
             if (scenario.cols,scenario.rows) != (self.geometry.cols,self.geometry.rows):
                 raise DataError("presentation board dimensions differ from scenario")
+            cells = frozenset(self.geometry.cells)
+            voids = {(c,r) for r in range(scenario.rows) for c in range(scenario.cols)} - cells
+            if not voids <= set(scenario.obstacles):
+                raise DataError("presentation void cells must be blocked in scenario.obstacles")
+            if any(unit.cell not in cells for unit in scenario.units):
+                raise DataError("scenario unit starts outside presentation playable cells")
             window_size = self.geometry.viewport_size
         else:
             self.geometry = BoardGeometry(scenario.cols, scenario.rows, CELL_SIZE)
@@ -83,7 +89,9 @@ class Game:
             elif isinstance(self.panel,SceneHUD) and self.panel.contains(event.pos):
                 return
             else:
-                self.controller.click_cell(self.geometry.cell_at(event.pos))
+                cell = (self.renderer.cell_at(event.pos,self.controller.get_view_state().board)
+                        if isinstance(self.renderer,PerspectiveBoardRenderer) else self.geometry.cell_at(event.pos))
+                self.controller.click_cell(cell)
 
     def update(self, elapsed):
         self.renderer.update(elapsed)
